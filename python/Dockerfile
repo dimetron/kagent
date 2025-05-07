@@ -1,9 +1,21 @@
 ARG TOOLS_UV_VERSION=latest
-FROM ghcr.io/astral-sh/uv:${TOOLS_UV_VERSION}-debian-slim AS builder
+FROM --platform=$BUILDPLATFORM docker-registry-proxy.corp.amdocs.com/astral-sh/uv:${TOOLS_UV_VERSION}-debian-slim AS builder
 
 ARG TARGETARCH
 ARG TOOLS_ISTIO_VERSION
 ARG TOOLS_ARGO_CD_VERSION
+
+#proxy env
+ENV http_proxy=${PROXY:-http://10.232.233.70:8080}
+ENV https_proxy=${PROXY:-http://10.232.233.70:8080}
+ENV no_proxy="localhost,127.0.0.1,172.17.0.0/12,192.168.0.0/16,.svc,.default,.local,.internal,fs.amdocs.com,.amdocs.com,.amdocs.aws,.sock,bitbucket.corp.amdocs.com,.corp.amdocs.com,docker-registry-proxy.corp.amdocs.com"
+
+RUN echo /etc/apt/apt.conf.d/99genproxy && \
+    echo "Acquire::http::Pipeline-Depth 0;"     > /etc/apt/apt.conf.d/99genproxy   && \
+    echo "Acquire::http::No-Cache=True;"        >> /etc/apt/apt.conf.d/99genproxy  && \
+    echo "Acquire::BrokenProxy=True;"           >> /etc/apt/apt.conf.d/99genproxy  && \
+    echo "Acquire::http::Timeout \"120\";"      >> /etc/apt/apt.conf.d/99genproxy  && \
+    echo "Acquire::http::Proxy \"http://10.232.233.70:8080\";" >> /etc/apt/apt.conf.d/99genproxy
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
@@ -34,7 +46,7 @@ RUN curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/s
     && ./get_helm.sh \
     && rm get_helm.sh
 
-FROM ghcr.io/astral-sh/uv:${TOOLS_UV_VERSION}-debian-slim AS final
+FROM --platform=$BUILDPLATFORM docker-registry-proxy.corp.amdocs.com/astral-sh/uv:${TOOLS_UV_VERSION}-debian-slim AS final
 
 ARG TARGETARCH
 
