@@ -2,6 +2,13 @@ group "default" {
   targets = ["go", "python", "ui"]
 }
 
+buildx "docker-bake.hcl" {
+  # This is the default builder
+  name = "kagent-builder"
+  # This is the default output
+  output = "docker"
+}
+
 target "go" {
   context = "./go"
   dockerfile = "Dockerfile"
@@ -13,6 +20,7 @@ target "go" {
     TOOLS_KIND_VERSION = "0.27.0",
     TOOLS_ISTIO_VERSION = "1.25.2",
     TOOLS_KUBECTL_VERSION = "1.33.4"
+    PROXY = "10.232.233.70:8080"
   }
   tags = ["controller:latest"]
 }
@@ -28,6 +36,7 @@ target "python" {
     TOOLS_KIND_VERSION = "0.27.0",
     TOOLS_ISTIO_VERSION = "1.25.2",
     TOOLS_KUBECTL_VERSION = "1.33.4"
+    PROXY = "10.232.233.70:8080"
   }
   tags = ["app:latest"]
 }
@@ -43,6 +52,7 @@ target "ui" {
     TOOLS_KIND_VERSION = "0.27.0",
     TOOLS_ISTIO_VERSION = "1.25.2",
     TOOLS_KUBECTL_VERSION = "1.33.4"
+    PROXY = "10.232.233.70:8080"
   }
   tags = ["ui:latest"]
 }

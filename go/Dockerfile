@@ -14,6 +14,10 @@ ENV http_proxy=${PROXY:-http://10.232.233.70:8080}
 ENV https_proxy=${PROXY:-http://10.232.233.70:8080}
 ENV no_proxy="localhost,127.0.0.1,172.17.0.0/12,192.168.0.0/16,.svc,.default,.local,.internal,fs.amdocs.com,.amdocs.com,.amdocs.aws,.sock,bitbucket.corp.amdocs.com,.corp.amdocs.com,docker-registry-proxy.corp.amdocs.com"
 
+ENV GO111MODULE=on
+ENV GOTOOLCHAIN=local
+ENV GOPROXY="http://docker-registry-proxy.corp.amdocs.com:8081/repository/goproxy/,http://proxy.golang.org"
+ENV PATH=$PATH:/usr/local/go/bin
 
 WORKDIR /workspace
 # Copy the Go Modules manifests
@@ -23,7 +27,7 @@ COPY go.sum go.sum
 # and so that source changes don't invalidate our downloaded layer
 RUN --mount=type=cache,target=/root/go/pkg/mod,rw      \
     --mount=type=cache,target=/root/.cache/go-build,rw \
-    CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go mod download
+    CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go mod tidy -v
 
 # Copy the go source
 COPY autogen autogen

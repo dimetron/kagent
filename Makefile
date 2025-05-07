@@ -221,4 +221,36 @@ kagent-cli-port-forward: use-kind-cluster
 
 .PHONY: build-dev-container
 build-dev-container:
-	$(DOCKER_BUILDER) build -t kagent-devcontainer --load $(TOOLS_IMAGE_BUILD_ARGS) .devcontainer
+	devcontainer build .
+	@echo "Dev container built successfully."
+	devcontainer up . --name kagent-dev
+
+.PHONY: bake
+bake: buildkit = v0.20.2
+bake: BUILDX_NAME = kagent-builder
+bake: DOCKER_BUILDER = docker buildx bake
+bake: TARGET_PLATFORM=linux/amd64,linux/arm64
+bake:
+	@echo "Setup builder ..."
+	docker buildx rm     $(BUILDX_NAME) || true
+	docker buildx create --config build/buildkitd.toml --name $(BUILDX_NAME) --use \
+	--driver-opt "image=docker-registry-proxy.corp.amdocs.com/moby/buildkit:$(buildkit)"
+	@echo "Running images build $(DOCKER_BUILDER) ..."
+	$(DOCKER_BUILDER) $(TARGET_PLATFORM) go
+	$(DOCKER_BUILDER) $(TARGET_PLATFORM) ui
+	$(DOCKER_BUILDER) $(TARGET_PLATFORM) python
+
+.PHONY: buildx
+buildx: buildkit = v0.20.2
+buildx: BUILDX_NAME = kagent-builder
+buildx: DOCKER_BUILDER = docker buildx
+buildx: TARGET_PLATFORM=--platform=linux/amd64,linux/arm64
+buildx:
+	@echo "Setup builder ..."
+	docker buildx rm     $(BUILDX_NAME) || true
+	docker buildx create --name $(BUILDX_NAME) --use --config build/buildkitd.toml \
+	--driver-opt "image=docker-registry-proxy.corp.amdocs.com/moby/buildkit:$(buildkit)"
+	@echo "Running images build $(DOCKER_BUILDER) ..."
+	$(DOCKER_BUILDER) build $(TARGET_PLATFORM) go
+	$(DOCKER_BUILDER) build $(TARGET_PLATFORM) ui
+	$(DOCKER_BUILDER) build $(TARGET_PLATFORM) python

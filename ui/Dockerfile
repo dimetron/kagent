@@ -26,8 +26,9 @@ COPY . .
 RUN npm run build
 
 FROM --platform=$BUILDPLATFORM docker-registry-proxy.corp.amdocs.com/astral-sh/uv:${TOOLS_UV_VERSION}-debian-slim AS final
+ARG PROXY
 
-ENV http_proxy=${PROXY:-http://10.232.233.70:8080}
+ENV http_proxy=${PROXY}
 ENV https_proxy=${PROXY:-http://10.232.233.70:8080}
 ENV no_proxy="localhost,127.0.0.1,172.17.0.0/12,192.168.0.0/16,.svc,.default,.local,.internal,fs.amdocs.com,.amdocs.com,.amdocs.aws,.sock,bitbucket.corp.amdocs.com,.corp.amdocs.com,docker-registry-proxy.corp.amdocs.com"
 ENV NEXT_TELEMETRY_DISABLED=1
