@@ -1,11 +1,17 @@
 # Build the manager binary
 ARG TOOLS_GO_VERSION=latest
-FROM --platform=$BUILDPLATFORM golang:${TOOLS_GO_VERSION}-alpine AS builder
+FROM --platform=$BUILDPLATFORM docker-registry-proxy.corp.amdocs.com/golang:${TOOLS_GO_VERSION}-alpine AS builder
 
 ARG TARGETPLATFORM
 ARG BUILDPLATFORM
 ARG TARGETOS
 ARG TARGETARCH
+
+#proxy env
+ENV http_proxy=${PROXY:-http://10.232.233.70:8080}
+ENV https_proxy=${PROXY:-http://10.232.233.70:8080}
+ENV no_proxy="localhost,127.0.0.1,172.17.0.0/12,192.168.0.0/16,.svc,.default,.local,.internal,fs.amdocs.com,.amdocs.com,.amdocs.aws,.sock,bitbucket.corp.amdocs.com,.corp.amdocs.com,docker-registry-proxy.corp.amdocs.com"
+
 
 WORKDIR /workspace
 # Copy the Go Modules manifests
@@ -32,7 +38,7 @@ RUN --mount=type=cache,target=/root/go/pkg/mod,rw      \
 
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
-FROM gcr.io/distroless/static:nonroot
+FROM --platform=$BUILDPLATFORM docker-registry-proxy.corp.amdocs.com/distroless/static:nonroot
 WORKDIR /
 COPY --from=builder /workspace/manager .
 USER 65532:65532

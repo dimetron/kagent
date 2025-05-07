@@ -1,5 +1,5 @@
 # Image configuration
-DOCKER_REGISTRY ?= ghcr.io
+DOCKER_REGISTRY ?= illin4261.corp.amdocs.com:28090/platform
 DOCKER_REPO ?= kagent-dev/kagent
 CONTROLLER_IMAGE_NAME ?= controller
 UI_IMAGE_NAME ?= ui
