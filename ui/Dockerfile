@@ -1,11 +1,13 @@
 ARG TOOLS_UV_VERSION=latest
 ARG TOOLS_NODE_VERSION=20
+ARG PROXY
+
 FROM --platform=$BUILDPLATFORM docker-registry-proxy.corp.amdocs.com/node:${TOOLS_NODE_VERSION}-bookworm AS ui-builder
 
-#proxy env
 ENV http_proxy=${PROXY:-http://10.232.233.70:8080}
 ENV https_proxy=${PROXY:-http://10.232.233.70:8080}
 ENV no_proxy="localhost,127.0.0.1,172.17.0.0/12,192.168.0.0/16,.svc,.default,.local,.internal,fs.amdocs.com,.amdocs.com,.amdocs.aws,.sock,bitbucket.corp.amdocs.com,.corp.amdocs.com,docker-registry-proxy.corp.amdocs.com"
+ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN echo /etc/apt/apt.conf.d/99genproxy && \
     echo "Acquire::http::Pipeline-Depth 0;"     > /etc/apt/apt.conf.d/99genproxy   && \
@@ -18,14 +20,24 @@ WORKDIR /app/ui
 
 COPY package*.json ./
 RUN mkdir -p /app/ui/public
-ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN npm ci
-
 COPY . .
 RUN npm run build
 
 FROM --platform=$BUILDPLATFORM docker-registry-proxy.corp.amdocs.com/astral-sh/uv:${TOOLS_UV_VERSION}-debian-slim AS final
+
+ENV http_proxy=${PROXY:-http://10.232.233.70:8080}
+ENV https_proxy=${PROXY:-http://10.232.233.70:8080}
+ENV no_proxy="localhost,127.0.0.1,172.17.0.0/12,192.168.0.0/16,.svc,.default,.local,.internal,fs.amdocs.com,.amdocs.com,.amdocs.aws,.sock,bitbucket.corp.amdocs.com,.corp.amdocs.com,docker-registry-proxy.corp.amdocs.com"
+ENV NEXT_TELEMETRY_DISABLED=1
+
+RUN echo /etc/apt/apt.conf.d/99genproxy && \
+    echo "Acquire::http::Pipeline-Depth 0;"     > /etc/apt/apt.conf.d/99genproxy   && \
+    echo "Acquire::http::No-Cache=True;"        >> /etc/apt/apt.conf.d/99genproxy  && \
+    echo "Acquire::BrokenProxy=True;"           >> /etc/apt/apt.conf.d/99genproxy  && \
+    echo "Acquire::http::Timeout \"120\";"      >> /etc/apt/apt.conf.d/99genproxy  && \
+    echo "Acquire::http::Proxy \"http://10.232.233.70:8080\";" >> /etc/apt/apt.conf.d/99genproxy
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
@@ -35,10 +47,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     nginx \
     supervisor \
     gnupg \
-    && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
-    && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_18.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list \
-    && apt-get update \
-    && apt-get install -y nodejs \
     && update-ca-certificates \
     && rm -rf /var/lib/apt/lists/* \
     && ln -sf /usr/bin/python3 /usr/bin/python

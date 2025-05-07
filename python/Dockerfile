@@ -4,6 +4,7 @@ FROM --platform=$BUILDPLATFORM docker-registry-proxy.corp.amdocs.com/astral-sh/u
 ARG TARGETARCH
 ARG TOOLS_ISTIO_VERSION
 ARG TOOLS_ARGO_CD_VERSION
+ARG PROXY
 
 #proxy env
 ENV http_proxy=${PROXY:-http://10.232.233.70:8080}
@@ -47,8 +48,15 @@ RUN curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/s
     && rm get_helm.sh
 
 FROM --platform=$BUILDPLATFORM docker-registry-proxy.corp.amdocs.com/astral-sh/uv:${TOOLS_UV_VERSION}-debian-slim AS final
-
 ARG TARGETARCH
+ARG PROXY
+
+RUN echo /etc/apt/apt.conf.d/99genproxy && \
+    echo "Acquire::http::Pipeline-Depth 0;"     > /etc/apt/apt.conf.d/99genproxy   && \
+    echo "Acquire::http::No-Cache=True;"        >> /etc/apt/apt.conf.d/99genproxy  && \
+    echo "Acquire::BrokenProxy=True;"           >> /etc/apt/apt.conf.d/99genproxy  && \
+    echo "Acquire::http::Timeout \"120\";"      >> /etc/apt/apt.conf.d/99genproxy  && \
+    echo "Acquire::http::Proxy \"http://10.232.233.70:8080\";" >> /etc/apt/apt.conf.d/99genproxy
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
