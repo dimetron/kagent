@@ -1,23 +1,46 @@
-# Build the manager binary
-ARG TOOLS_GO_VERSION=latest
-FROM --platform=$BUILDPLATFORM docker-registry-proxy.corp.amdocs.com/golang:${TOOLS_GO_VERSION}-alpine AS builder
+ARG DOCKER_REGISTRY=ghcr.io
+ARG TOOLS_UV_VERSION=latest
+ARG PROXY
+ARG NOPROXY
+
+
+### STAGE 1: base image
+FROM --platform=$BUILDPLATFORM $DOCKER_REGISTRY/astral-sh/uv:${TOOLS_UV_VERSION}-bookworm-slim AS base-os
+ARG TOOLS_NODE_VERSION
+
+#ENVIRONMENT VARIABLES
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN mkdir -p /etc/apt/keyrings \
+    && apt-get update && apt-get install -y --no-install-recommends \
+    git                       \
+    ca-certificates           \
+    curl                      \
+    gnupg                     \
+    wget                      \
+    && update-ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && ln -sf /usr/bin/python3 /usr/bin/python
+
+FROM --platform=$BUILDPLATFORM base-os AS go-base
+ARG TOOLS_GO_VERSION
+ARG ARCH=${TARGETARCH:-amd64}
+ARG GOPROXY="http://proxy.golang.org"
+
+ENV GO111MODULE=on
+ENV GOTOOLCHAIN=local
+ENV PATH=$PATH:/usr/local/go/bin
+
+RUN --mount=type=cache,target=/cache,rw \
+    wget -q --show-progress -P /cache https://golang.org/dl/go${TOOLS_GO_VERSION}.linux-${ARCH}.tar.gz && \
+    tar     -C /usr/local -xzf /cache/go${TOOLS_GO_VERSION}.linux-${ARCH}.tar.gz
+
+FROM --platform=$BUILDPLATFORM go-base AS builder
 
 ARG TARGETPLATFORM
 ARG BUILDPLATFORM
 ARG TARGETOS
 ARG TARGETARCH
-ARG PROXY
-
-
-#proxy env
-ENV http_proxy=${PROXY:-http://10.232.233.70:8080}
-ENV https_proxy=${PROXY:-http://10.232.233.70:8080}
-ENV no_proxy="localhost,127.0.0.1,172.17.0.0/12,192.168.0.0/16,.svc,.default,.local,.internal,fs.amdocs.com,.amdocs.com,.amdocs.aws,.sock,bitbucket.corp.amdocs.com,.corp.amdocs.com,docker-registry-proxy.corp.amdocs.com"
-
-ENV GO111MODULE=on
-ENV GOTOOLCHAIN=local
-ENV GOPROXY="http://docker-registry-proxy.corp.amdocs.com:8081/repository/goproxy/,http://proxy.golang.org"
-ENV PATH=$PATH:/usr/local/go/bin
 
 WORKDIR /workspace
 # Copy the Go Modules manifests
@@ -27,7 +50,7 @@ COPY go.sum go.sum
 # and so that source changes don't invalidate our downloaded layer
 RUN --mount=type=cache,target=/root/go/pkg/mod,rw      \
     --mount=type=cache,target=/root/.cache/go-build,rw \
-    CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go mod tidy -v
+    CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go mod download
 
 # Copy the go source
 COPY autogen autogen
@@ -44,7 +67,7 @@ RUN --mount=type=cache,target=/root/go/pkg/mod,rw      \
 
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
-FROM --platform=$BUILDPLATFORM docker-registry-proxy.corp.amdocs.com/distroless/static:nonroot
+FROM --platform=$BUILDPLATFORM gcr.io/distroless/static:nonroot
 WORKDIR /
 COPY --from=builder /workspace/manager .
 USER 65532:65532

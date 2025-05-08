@@ -1,121 +1,99 @@
+ARG DOCKER_REGISTRY=ghcr.io
 ARG TOOLS_UV_VERSION=latest
-FROM --platform=$BUILDPLATFORM docker-registry-proxy.corp.amdocs.com/astral-sh/uv:${TOOLS_UV_VERSION}-debian-slim AS builder
-
-ARG TARGETARCH
-ARG TOOLS_ISTIO_VERSION
-ARG TOOLS_ARGO_CD_VERSION
 ARG PROXY
+ARG NOPROXY
 
-#proxy env
-ENV http_proxy=${PROXY:-http://10.232.233.70:8080}
-ENV https_proxy=${PROXY:-http://10.232.233.70:8080}
-ENV no_proxy="localhost,127.0.0.1,172.17.0.0/12,192.168.0.0/16,.svc,.default,.local,.internal,fs.amdocs.com,.amdocs.com,.amdocs.aws,.sock,bitbucket.corp.amdocs.com,.corp.amdocs.com,docker-registry-proxy.corp.amdocs.com"
+### STAGE 1: base image
+FROM --platform=$BUILDPLATFORM $DOCKER_REGISTRY/astral-sh/uv:${TOOLS_UV_VERSION}-bookworm-slim AS base-os
+ARG TOOLS_NODE_VERSION
 
-RUN echo /etc/apt/apt.conf.d/99genproxy && \
-    echo "Acquire::http::Pipeline-Depth 0;"     > /etc/apt/apt.conf.d/99genproxy   && \
-    echo "Acquire::http::No-Cache=True;"        >> /etc/apt/apt.conf.d/99genproxy  && \
-    echo "Acquire::BrokenProxy=True;"           >> /etc/apt/apt.conf.d/99genproxy  && \
-    echo "Acquire::http::Timeout \"120\";"      >> /etc/apt/apt.conf.d/99genproxy  && \
-    echo "Acquire::http::Proxy \"http://10.232.233.70:8080\";" >> /etc/apt/apt.conf.d/99genproxy
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    git \
-    build-essential \
-    curl \
-    ca-certificates \
-    && apt-get update \
-    && update-ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install kubectl
-RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/$TARGETARCH/kubectl" \
-    && chmod +x kubectl \
-    && mv kubectl /usr/local/bin/
-
-# Install kubectl argo plugin
-RUN curl -o /usr/local/bin/kubectl-argo-rollouts -L https://github.com/argoproj/argo-rollouts/releases/$TOOLS_ARGO_CD_VERSION/download/kubectl-argo-rollouts-linux-$TARGETARCH \
-    && chmod +x /usr/local/bin/kubectl-argo-rollouts
-
-# Install Istio
-RUN curl -L https://istio.io/downloadIstio | TOOLS_ISTIO_VERSION=$TOOLS_ISTIO_VERSION TARGET_ARCH=$TARGETARCH sh - \
-    && mv istio-$TOOLS_ISTIO_VERSION/bin/istioctl /usr/local/bin/istioctl \
-    && rm -rf istio-$TOOLS_ISTIO_VERSION
-
-# Install Helm
-RUN curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 \
-    && chmod 700 get_helm.sh \
-    && ./get_helm.sh \
-    && rm get_helm.sh
-
-FROM --platform=$BUILDPLATFORM docker-registry-proxy.corp.amdocs.com/astral-sh/uv:${TOOLS_UV_VERSION}-debian-slim AS final
-ARG TARGETARCH
-ARG PROXY
-
-RUN echo /etc/apt/apt.conf.d/99genproxy && \
-    echo "Acquire::http::Pipeline-Depth 0;"     > /etc/apt/apt.conf.d/99genproxy   && \
-    echo "Acquire::http::No-Cache=True;"        >> /etc/apt/apt.conf.d/99genproxy  && \
-    echo "Acquire::BrokenProxy=True;"           >> /etc/apt/apt.conf.d/99genproxy  && \
-    echo "Acquire::http::Timeout \"120\";"      >> /etc/apt/apt.conf.d/99genproxy  && \
-    echo "Acquire::http::Proxy \"http://10.232.233.70:8080\";" >> /etc/apt/apt.conf.d/99genproxy
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    git \
-    ca-certificates \
-    curl \
-    gnupg \
-    && update-ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
-
-COPY --from=builder /usr/local/bin/kubectl /usr/local/bin/kubectl
-COPY --from=builder /usr/local/bin/istioctl /usr/local/bin/istioctl
-COPY --from=builder /usr/local/bin/helm /usr/local/bin/helm
+#ENVIRONMENT VARIABLES
+ENV DEBIAN_FRONTEND=noninteractive
 
 RUN mkdir -p /etc/apt/keyrings \
-    && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
-    && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list \
-    && apt-get update \
-    && apt-get install -y nodejs \
-    && rm -rf /var/lib/apt/lists/*
+    && apt-get update && apt-get install -y --no-install-recommends \
+    git                       \
+    ca-certificates           \
+    curl                      \
+    gnupg                     \
+    wget                      \
+    && update-ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && ln -sf /usr/bin/python3 /usr/bin/python
 
-ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    PIP_NO_CACHE_DIR=1 \
-    UV_LINK_MODE=copy  \
-    PATH="/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/sbin:/bin:/root/.cargo/bin"
+FROM --platform=$BUILDPLATFORM base-os AS base
 
+# Install python
 RUN uv python install 3.12
 
+# Install nvm
+ENV NVM_DIR=/usr/local/nvm
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV PATH=$NVM_DIR/versions/node/v$TOOLS_NODE_VERSION/bin:$PATH
+ENV NODE_PATH=$NVM_DIR/v$TOOLS_NODE_VERSION/lib/node_modules
+
+# Install nvm with node and npm
+RUN mkdir -p  $NVM_DIR \
+    && curl https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh  | bash \
+    && . $NVM_DIR/nvm.sh \
+    && mkdir -p $NVM_DIR/versions \
+    && nvm install $TOOLS_NODE_VERSION \
+    && nvm use $TOOLS_NODE_VERSION \
+    && which node && node --version
+
+### STAGE 2: build + tools
+FROM --platform=$BUILDPLATFORM base AS ui-builder
+
+WORKDIR /app/ui
+
+COPY package*.json ./
+RUN mkdir -p /app/ui/public
+
+RUN ls /usr/local/nvm/versions/node \
+    && npm ci
+
+COPY . .
+RUN npm run build
+
+### STAGE 3: final
+FROM base-os AS final
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    nginx \
+    supervisor \
+    && rm -rf /var/lib/apt/lists/* \
+    && ln -sf /usr/bin/python3 /usr/bin/python
+
 # Create groups and users
-RUN groupadd -g 1002 pythongroup \
-    && useradd  -u 1002 -g pythongroup -s /bin/bash -m python \
-    && mkdir -p /app/python /root/.cache/uv \
-    && chown -R python:pythongroup /app/python
+RUN groupadd -g 1001 nodejs \
+    && groupadd -g 1002 pythongroup \
+    && useradd -u 1001 -g nodejs -s /bin/bash -m nextjs \
+    && useradd -u 1002 -g pythongroup -s /bin/bash -m python \
+    && mkdir -p /app/python /app/ui /run/nginx \
+    && chown -R python:pythongroup /app/python \
+    && chown -R nextjs:nodejs /app/ui
 
-# Set up Python backend
-WORKDIR /app/python
-COPY pyproject.toml .
-COPY .python-version .
-COPY uv.lock .
-COPY README.md .
-RUN --mount=type=cache,target=/root/.cache/uv uv cache dir && uv venv .venv && uv pip install hatchling
-RUN --mount=type=cache,target=/root/.cache/uv uv sync --frozen
-COPY src src
-RUN chown -R python:pythongroup /app/python
+# Set up Next.js UI
+WORKDIR /app/ui
 
-# Generate tools and agents
-RUN mkdir -p /root/.autogenstudio/configs
-RUN --mount=type=cache,target=/root/.cache/uv uv run tool_gen -o /root/.autogenstudio/configs
+COPY --from=ui-builder /app/ui/next.config.ts ./
+COPY --from=ui-builder /app/ui/public ./public
+COPY --from=ui-builder /app/ui/package.json ./package.json
+COPY --from=ui-builder --chown=nextjs:nodejs /app/ui/.next/standalone ./
+COPY --from=ui-builder --chown=nextjs:nodejs /app/ui/.next/static ./.next/static
+
+# Set up Nginx and Supervisor
+WORKDIR /app
+COPY conf/nginx.conf /etc/nginx/nginx.conf
+COPY conf/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 # Ensure correct permissions
-RUN chown -R python:pythongroup /app/python && \
+RUN chown -R nextjs:nodejs /app/ui && \
     chmod -R 755 /app
 
-RUN mkdir -p /app/python/.cache/uv && \
-    chown -R python:pythongroup /app/python/.cache
-
-EXPOSE 8081
+EXPOSE 80
 
 LABEL org.opencontainers.image.source=https://github.com/kagent-dev/kagent
-LABEL org.opencontainers.image.description="Kagent app is the apiserver for running agents."
+LABEL org.opencontainers.image.description="Kagent app is the UI and apiserver for running agents."
 
-CMD ["uv", "run", "kagent-engine", "serve", "--host", "0.0.0.0", "--port", "8081"]
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
