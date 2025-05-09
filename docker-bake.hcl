@@ -12,6 +12,7 @@ buildx "docker-bake.hcl" {
 }
 
 args = {
+  LOCALPLATFORM= "arm64"
   TOOLS_GO_VERSION = "1.24.3",
   TOOLS_NODE_VERSION = "22",
   TOOLS_UV_VERSION = "0.7.2",

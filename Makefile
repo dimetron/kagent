@@ -230,7 +230,7 @@ helm-publish: helm-version
 	helm push kagent-$(VERSION).tgz oci://ghcr.io/kagent-dev/kagent/helm
 
 .PHONY: kagent-cli-install
-kagent-cli-install: build-cli-local helm-version kind-load-docker-images
+kagent-cli-install: build-cli-local helm-version
 kagent-cli-install:
 	KAGENT_HELM_REPO=./helm/ ./go/bin/kagent-local
 
