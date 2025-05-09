@@ -1,8 +1,10 @@
 # Image configuration
-# crane copy --insecure docker-registry-proxy.corp.amdocs.com/astral-sh/uv:0.7.2 illin4261.corp.amdocs.com:28090/astral-sh/uv:0.7.2
+# crane copy --insecure docker-registry-proxy.corp.amdocs.com/astral-sh/uv:0.7.2-bookworm-slim illin4261.corp.amdocs.com:28090/astral-sh/uv:0.7.2-bookworm-slim
+# crane copy --insecure docker-registry-proxy.corp.amdocs.com//distroless/static:nonroot illin4261.corp.amdocs.com:28090//distroless/static:nonroot
 DOCKER_REGISTRY ?= illin4261.corp.amdocs.com:28090/platform
+DOCKER_REGISTRY_GOOGLE ?= illin4261.corp.amdocs.com:28090/platform
 DOCKER_REPO ?= kagent-dev/kagent
-VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null | sed 's/-dirty//' || echo "v0.0.0-local")
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null | sed 's/-dirty//' | grep v || echo "v0.0.0-local")
 
 CONTROLLER_IMAGE_NAME ?= controller
 UI_IMAGE_NAME ?= ui
@@ -25,6 +27,9 @@ DOCKER_BUILDER ?= docker
 DOCKER_BUILD_ARGS ?=
 KIND_CLUSTER_NAME ?= kagent
 
+PROXY ?= ""
+NOPROXY ?= ""
+
 #take from go/go.mod
 AWK ?= $(shell command -v gawk || command -v awk)
 TOOLS_GO_VERSION ?= $(shell $(AWK) '/^go / { print $$2 }' go/go.mod)
@@ -42,6 +47,7 @@ TOOLS_KUBECTL_VERSION ?= 1.33.4
 TOOLS_IMAGE_BUILD_ARGS =  --build-arg PROXY=$(PROXY)
 TOOLS_IMAGE_BUILD_ARGS =  --build-arg NOPROXY=$(NOPROXY)
 TOOLS_IMAGE_BUILD_ARGS += --build-arg DOCKER_REGISTRY=$(DOCKER_REGISTRY)
+TOOLS_IMAGE_BUILD_ARGS += --build-arg DOCKER_REGISTRY_GOOGLE=$(DOCKER_REGISTRY_GOOGLE)
 TOOLS_IMAGE_BUILD_ARGS += --build-arg TOOLS_GO_VERSION=$(TOOLS_GO_VERSION)
 TOOLS_IMAGE_BUILD_ARGS += --build-arg TOOLS_UV_VERSION=$(TOOLS_UV_VERSION)
 TOOLS_IMAGE_BUILD_ARGS += --build-arg TOOLS_K9S_VERSION=$(TOOLS_K9S_VERSION)
@@ -153,7 +159,7 @@ release-app: DOCKER_BUILDER = docker buildx
 release-app: build-app
 
 .PHONY: kind-load-docker-images
-kind-load-docker-images: retag-docker-images prune-kind-cluster
+kind-load-docker-images: retag-docker-images
 	kind load docker-image --name $(KIND_CLUSTER_NAME) $(RETAGGED_CONTROLLER_IMG)
 	kind load docker-image --name $(KIND_CLUSTER_NAME) $(RETAGGED_UI_IMG)
 	kind load docker-image --name $(KIND_CLUSTER_NAME) $(RETAGGED_APP_IMG)
