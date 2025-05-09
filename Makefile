@@ -1,8 +1,8 @@
 # Image configuration
 # crane copy --insecure docker-registry-proxy.corp.amdocs.com/astral-sh/uv:0.7.2-bookworm-slim illin4261.corp.amdocs.com:28090/astral-sh/uv:0.7.2-bookworm-slim
 # crane copy --insecure docker-registry-proxy.corp.amdocs.com//distroless/static:nonroot illin4261.corp.amdocs.com:28090//distroless/static:nonroot
-DOCKER_REGISTRY ?= illin4261.corp.amdocs.com:28090/platform
-DOCKER_REGISTRY_GOOGLE ?= illin4261.corp.amdocs.com:28090/platform
+DOCKER_REGISTRY ?= illin4261.corp.amdocs.com:28090
+DOCKER_REGISTRY_GOOGLE ?= illin4261.corp.amdocs.com:28090
 DOCKER_REPO ?= kagent-dev/kagent
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null | sed 's/-dirty//' | grep v || echo "v0.0.0-local")
 

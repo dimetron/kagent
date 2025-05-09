@@ -7,6 +7,8 @@ buildx "docker-bake.hcl" {
   name = "kagent-builder"
   # This is the default output
   output = "docker"
+  # This is the default buildkit
+  buildkit = "docker-container"
 }
 
 args = {
@@ -18,6 +20,8 @@ args = {
   TOOLS_ISTIO_VERSION = "1.25.2",
   TOOLS_KUBECTL_VERSION = "1.33.4"
   PROXY = "10.232.233.70:8080"
+  DOCKER_REGISTRY = "illin4261.corp.amdocs.com:28090"
+  DOCKER_REGISTRY_GOOGLE = "illin4261.corp.amdocs.com:28090"
 }
 
 target "go" {
