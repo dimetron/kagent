@@ -113,10 +113,11 @@ COPY pyproject.toml .
 COPY .python-version .
 COPY uv.lock .
 COPY README.md .
-RUN --mount=type=cache,target=/app/python/.cache/uv,rw \
-    export https_proxy=http://10.232.233.70:8080 \
-    && uv venv .venv            \
-    && uv pip install hatchling \
+RUN --mount=type=cache,target=/app/python/.cache/uv,rw  \
+    export https_proxy=http://10.232.233.70:8080        \
+    && uv venv .venv                                    \
+    && uv pip install .                                 \
+    && uv pip install hatchling                         \
     && uv sync --frozen
 
 COPY src src
@@ -140,4 +141,4 @@ EXPOSE 8081
 LABEL org.opencontainers.image.source=https://github.com/kagent-dev/kagent
 LABEL org.opencontainers.image.description="Kagent app is the apiserver for running agents."
 
-CMD ["uv", "run", "kagent-engine", "serve", "--host", "0.0.0.0", "--port", "8081", "--cache-dir", "/app/python/.cache/uv"]
+CMD ["uv", "run", "--cache-dir", "/app/python/.cache/uv", "kagent-engine", "serve", "--host", "0.0.0.0", "--port", "8081"]
