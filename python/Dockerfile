@@ -2,6 +2,7 @@
 ARG DOCKER_REGISTRY="illin4261.corp.amdocs.com:28090"
 ARG DOCKER_REGISTRY_GOOGLE="illin4261.corp.amdocs.com:28090"
 ARG TOOLS_UV_VERSION=0.7.2
+ARG LOCALPLATFORM
 ARG PROXY="genproxy:8080"
 ARG NOPROXY
 
@@ -24,6 +25,7 @@ RUN echo /etc/apt/apt.conf.d/99genproxy && \
     curl                      \
     gnupg                     \
     wget                      \
+    unzip                     \
     && update-ca-certificates \
     && rm -rf /var/lib/apt/lists/* \
     && ln -sf /usr/bin/python3 /usr/bin/python
@@ -31,47 +33,44 @@ RUN echo /etc/apt/apt.conf.d/99genproxy && \
 FROM base-os AS base
 ARG PROXY
 
-ENV https_proxy=$PROXY
-ENV noproxy=$NOPROXY
-
 # Install nvm
-ENV NVM_DIR=/usr/local/nvm
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV PATH=$NVM_DIR/versions/node/v$TOOLS_NODE_VERSION/bin:$PATH
+ENV BUN_INSTALL=/usr/local/bun
+ENV NVM_DIR=/usr/local/nvm
+ENV NODE_ENV=production
 ENV NODE_PATH=$NVM_DIR/v$TOOLS_NODE_VERSION/lib/node_modules
+ENV PATH=$NVM_DIR/versions/node/v$TOOLS_NODE_VERSION/bin:$BUN_INSTALL/bin:$PATH
 
-# Install nvm with node and npm
-RUN mkdir -p  $NVM_DIR \
-    && export https_proxy=$PROXY \
-    && curl https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh  | bash \
-    && . $NVM_DIR/nvm.sh \
-    && mkdir -p $NVM_DIR/versions \
-    && nvm install $TOOLS_NODE_VERSION \
-    && nvm use $TOOLS_NODE_VERSION \
-    && which node && node --version \
-    && ln -sf $NVM_DIR/versions/node/v$TOOLS_NODE_VERSION/bin/node /usr/bin/node
+## Install nvm with node and npm
+#RUN mkdir -p  $NVM_DIR \
+#    && export https_proxy=$PROXY \
+#    && curl https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh  | bash \
+#    && . $NVM_DIR/nvm.sh \
+#    && mkdir -p $NVM_DIR/versions \
+#    && nvm install $TOOLS_NODE_VERSION \
+#    && nvm use $TOOLS_NODE_VERSION \
+#    && which node && node --version \
+#    && ln -sf $NVM_DIR/versions/node/v$TOOLS_NODE_VERSION/bin/node /usr/bin/node
 
 # Install python
 RUN https_proxy=$PROXY uv python install 3.12
 
-
-### STAGE 2: build + tools
-FROM base AS app-builder
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    nginx \
-    supervisor \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+# Install bun
+RUN export https_proxy=$PROXY \
+    && curl -fsSL https://bun.sh/install | bash \
+    && ln -sf $BUN_INSTALL/bin/bun /usr/bin/bun \
+    && bun --version
 
 ### STAGE 2: build + tools
 FROM --platform=$BUILDPLATFORM base AS builder
+ARG PROXY
 ARG TARGETARCH
+
 ARG TOOLS_ISTIO_VERSION
 ARG TOOLS_ARGO_CD_VERSION
-ARG PROXY
-
 ENV https_proxy=$PROXY
 
+#
 WORKDIR /app/
 
 # Install kubectl

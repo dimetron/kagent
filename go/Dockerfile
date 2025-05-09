@@ -25,6 +25,7 @@ RUN echo /etc/apt/apt.conf.d/99genproxy && \
     curl                      \
     gnupg                     \
     wget                      \
+    unzip                     \
     && update-ca-certificates \
     && rm -rf /var/lib/apt/lists/* \
     && ln -sf /usr/bin/python3 /usr/bin/python
