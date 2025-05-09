@@ -115,7 +115,6 @@ COPY uv.lock .
 COPY README.md .
 RUN --mount=type=cache,target=/app/python/.cache/uv,rw \
     export https_proxy=http://10.232.233.70:8080 \
-    && uv cache dir             \
     && uv venv .venv            \
     && uv pip install hatchling \
     && uv sync --frozen
@@ -125,7 +124,9 @@ RUN chown -R python:pythongroup /app/python
 
 # Generate tools and agents
 RUN mkdir -p /root/.autogenstudio/configs
-RUN --mount=type=cache,target=/root/.cache/uv uv run tool_gen -o /root/.autogenstudio/configs
+RUN --mount=type=cache,target=/app/python/.cache/uv,rw \
+    export https_proxy=http://10.232.233.70:8080 \
+    && uv run tool_gen -o /root/.autogenstudio/configs
 
 # Ensure correct permissions
 RUN chown -R python:pythongroup /app/python && \
