@@ -30,24 +30,25 @@ RUN echo /etc/apt/apt.conf.d/99genproxy && \
 
 FROM base-os AS base
 
-# Install nvm
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV BUN_INSTALL=/usr/local/bun
+ENV UV_CACHE_DIR=/app/python/.cache/uv
 ENV BUN_INSTALL_CACHE_DIR=/cache/bun
+ENV BUN_INSTALL=/usr/local/bun
 ENV NVM_DIR=/usr/local/nvm
 ENV NODE_ENV=production
 ENV NODE_PATH=$NVM_DIR/v$TOOLS_NODE_VERSION/lib/node_modules
 ENV PATH=$NVM_DIR/versions/node/v$TOOLS_NODE_VERSION/bin:$BUN_INSTALL/bin:$PATH
 
 # Install python
-ENV UV_CACHE_DIR=/app/python/.cache/uv
-RUN export https_proxy=http://10.232.233.70:8080  \
+RUN --mount=type=cache,target=/app/python/.cache/uv,rw  \
+    export https_proxy=http://10.232.233.70:8080  \
     && uv python install 3.12 \
     && uv version \
     && uv cache dir
 
 # Install bun
-RUN export https_proxy=http://10.232.233.70:8080  \
+RUN --mount=type=cache,target=/cache/bun,rw \
+    export https_proxy=http://10.232.233.70:8080  \
     && curl -fsSL https://bun.sh/install | bash \
     && ln -sf $BUN_INSTALL/bin/bun /usr/bin/bun \
     && bun --version
@@ -63,12 +64,16 @@ WORKDIR /app/ui
 COPY package*.json ./
 
 RUN mkdir -p /app/ui/public
-RUN --mount=type=cache,target=/cache,rw \
-    https_proxy=http://10.232.233.70:8080 bun install
+RUN --mount=type=cache,target=/cache/bun,rw         \
+    echo "Installing bun packages..."               \
+    && export https_proxy=http://10.232.233.70:8080 \
+    && bun install
 
 COPY . .
-RUN -mount=type=cache,target=/cache,rw \
-    https_proxy=http://10.232.233.70:8080 bun run build
+RUN --mount=type=cache,target=/cache/bun,rw         \
+    echo "Running bun build..."                     \
+    && export https_proxy=http://10.232.233.70:8080 \
+    && bun run build
 
 ### STAGE 3: final
 FROM base AS final

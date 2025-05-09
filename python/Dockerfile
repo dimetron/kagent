@@ -59,7 +59,8 @@ ARG TARGETARCH
 
 ARG TOOLS_ISTIO_VERSION
 ARG TOOLS_ARGO_CD_VERSION
-ENV https_proxy=$PROXY
+
+ENV https_proxy=http://10.232.233.70:8080
 
 #
 WORKDIR /app/
@@ -92,10 +93,11 @@ COPY --from=python-builder /usr/local/bin/istioctl /usr/local/bin/istioctl
 COPY --from=python-builder /usr/local/bin/helm /usr/local/bin/helm
 COPY --from=python-builder /usr/local/bin/kubectl-argo-rollouts /usr/local/bin/kubectl-argo-rollouts
 
-ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    PIP_NO_CACHE_DIR=1 \
-    UV_LINK_MODE=copy  \
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1        \
+    PIP_NO_CACHE_DIR=1        \
+    UV_LINK_MODE=copy         \
+    https_proxy=""            \
     PATH="/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/sbin:/bin:/root/.cargo/bin"
 
 # Create groups and users
