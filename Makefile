@@ -167,9 +167,9 @@ release-app: build-app
 
 .PHONY: kind-load-docker-images
 kind-load-docker-images: retag-docker-images
-	kind load docker-image --name $(KIND_CLUSTER_NAME) $(RETAGGED_CONTROLLER_IMG)
-	kind load docker-image --name $(KIND_CLUSTER_NAME) $(RETAGGED_UI_IMG)
-	kind load docker-image --name $(KIND_CLUSTER_NAME) $(RETAGGED_APP_IMG)
+	kind load docker-image --name $(KIND_CLUSTER_NAME) $(RETAGGED_CONTROLLER_IMG)	|| :
+	kind load docker-image --name $(KIND_CLUSTER_NAME) $(RETAGGED_UI_IMG)			|| :
+	kind load docker-image --name $(KIND_CLUSTER_NAME) $(RETAGGED_APP_IMG)			|| :
 
 .PHONY: retag-docker-images
 retag-docker-images: build
@@ -230,7 +230,7 @@ helm-publish: helm-version
 	helm push kagent-$(VERSION).tgz oci://ghcr.io/kagent-dev/kagent/helm
 
 .PHONY: kagent-cli-install
-kagent-cli-install: build-cli-local helm-version
+kagent-cli-install: build-cli-local helm-version kind-load-docker-images
 kagent-cli-install:
 	KAGENT_HELM_REPO=./helm/ ./go/bin/kagent-local
 
