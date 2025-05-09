@@ -3,6 +3,7 @@ ARG DOCKER_REGISTRY="illin4261.corp.amdocs.com:28090"
 ARG DOCKER_REGISTRY_GOOGLE="illin4261.corp.amdocs.com:28090"
 ARG TOOLS_UV_VERSION=0.7.2
 ARG PROXY="genproxy:8080"
+ARG NOPROXY
 
 ### STAGE 1: base image
 FROM $DOCKER_REGISTRY/astral-sh/uv:${TOOLS_UV_VERSION}-bookworm-slim AS base-os
@@ -30,7 +31,7 @@ RUN echo /etc/apt/apt.conf.d/99genproxy && \
 FROM base-os AS base
 
 # Install python
-RUN uv python install 3.12
+RUN https_proxy=http://10.232.233.70:8080 uv python install 3.12
 
 # Install nvm
 ENV NVM_DIR=/usr/local/nvm

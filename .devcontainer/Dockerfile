@@ -2,6 +2,7 @@
 ARG DOCKER_REGISTRY="illin4261.corp.amdocs.com:28090"
 ARG DOCKER_REGISTRY_GOOGLE="illin4261.corp.amdocs.com:28090"
 ARG TOOLS_UV_VERSION=0.7.2
+ARG LOCALPLATFORM
 ARG PROXY="genproxy:8080"
 ARG NOPROXY
 
@@ -100,8 +101,8 @@ ARG TOOLS_KIND_VERSION
 ARG TOOLS_ISTIO_VERSION
 ARG TOOLS_ARGO_CD_VERSION
 ARG TOOLS_KUBECTL_VERSION
-ARG ARCH=${TARGETARCH:-amd64}
 ARG PROXY="http://10.232.233.70:8080"
+ARG LOCALPLATFORM
 
 #ENVIRONMENT VARIABLES
 ENV DEBIAN_FRONTEND=noninteractive
@@ -114,8 +115,8 @@ ENV GOPROXY="http://docker-registry-proxy.corp.amdocs.com:8081/repository/goprox
 ENV PATH=$PATH:/usr/local/go/bin
 
 RUN --mount=type=cache,target=/cache,rw \
-    wget -e use_proxy=yes -e http_proxy=$PROXY -q --show-progress -P /cache https://golang.org/dl/go${TOOLS_GO_VERSION}.linux-${ARCH}.tar.gz && \
-    tar     -C /usr/local -xzf /cache/go${TOOLS_GO_VERSION}.linux-${ARCH}.tar.gz
+    wget -e https_proxy=$PROXY  -q --show-progress -P /cache https://golang.org/dl/go${TOOLS_GO_VERSION}.linux-${LOCALPLATFORM}.tar.gz \
+    && tar     -C /usr/local -xzf /cache/go${TOOLS_GO_VERSION}.linux-${LOCALPLATFORM}.tar.gz
 
 ### STAGE 3 add tools
 FROM --platform=$BUILDPLATFORM node-python-golang AS tools-node-python-golang

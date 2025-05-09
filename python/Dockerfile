@@ -31,7 +31,7 @@ RUN echo /etc/apt/apt.conf.d/99genproxy && \
 FROM base-os AS base
 
 # Install python
-RUN uv python install 3.12
+RUN https_proxy=http://10.232.233.70:8080 uv python install 3.12
 
 # Install nvm
 ENV NVM_DIR=/usr/local/nvm
