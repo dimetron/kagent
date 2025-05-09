@@ -3,8 +3,6 @@ ARG DOCKER_REGISTRY="illin4261.corp.amdocs.com:28090"
 ARG DOCKER_REGISTRY_GOOGLE="illin4261.corp.amdocs.com:28090"
 ARG TOOLS_UV_VERSION=0.7.2
 ARG LOCALPLATFORM
-ARG PROXY="genproxy:8080"
-ARG NOPROXY
 
 ### STAGE 1: base image
 FROM $DOCKER_REGISTRY/astral-sh/uv:${TOOLS_UV_VERSION}-bookworm-slim AS base-os
@@ -31,24 +29,27 @@ RUN echo /etc/apt/apt.conf.d/99genproxy && \
 
 FROM base-os AS base
 
-# Install python
-RUN uv python install 3.12
-
 # Install nvm
-ENV NVM_DIR=/usr/local/nvm
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV PATH=$NVM_DIR/versions/node/v$TOOLS_NODE_VERSION/bin:$PATH
+ENV BUN_INSTALL=/usr/local/bun
+ENV BUN_INSTALL_CACHE_DIR=/cache/bun
+ENV NVM_DIR=/usr/local/nvm
+ENV NODE_ENV=production
 ENV NODE_PATH=$NVM_DIR/v$TOOLS_NODE_VERSION/lib/node_modules
+ENV PATH=$NVM_DIR/versions/node/v$TOOLS_NODE_VERSION/bin:$BUN_INSTALL/bin:$PATH
 
-# Install nvm with node and npm
-RUN mkdir -p  $NVM_DIR \
-    && curl https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh  | bash \
-    && . $NVM_DIR/nvm.sh \
-    && mkdir -p $NVM_DIR/versions \
-    && nvm install $TOOLS_NODE_VERSION \
-    && nvm use $TOOLS_NODE_VERSION \
-    && which node && node --version \
-    && ln -sf $NVM_DIR/versions/node/v$TOOLS_NODE_VERSION/bin/node /usr/bin/node
+# Install python
+ENV UV_CACHE_DIR=/app/python/.cache/uv
+RUN export https_proxy=http://10.232.233.70:8080  \
+    && uv python install 3.12 \
+    && uv version \
+    && uv cache dir
+
+# Install bun
+RUN export https_proxy=http://10.232.233.70:8080  \
+    && curl -fsSL https://bun.sh/install | bash   \
+    && ln -sf $BUN_INSTALL/bin/bun /usr/bin/bun   \
+    && bun --version
 
 ### STAGE 2: build + tools
 FROM --platform=$BUILDPLATFORM base-os AS builder
