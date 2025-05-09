@@ -107,7 +107,6 @@ RUN chown -R nextjs:nodejs /app/ui && \
     chmod -R 755 /app
 
 EXPOSE 80
-USER 1001
 
 LABEL org.opencontainers.image.description="Kagent app is the UI and apiserver for running agents."
 LABEL org.opencontainers.image.source=https://github.com/kagent-dev/kagent

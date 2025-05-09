@@ -18,15 +18,15 @@ RUN echo /etc/apt/apt.conf.d/99genproxy && \
     echo "Acquire::http::Timeout \"120\";"      >> /etc/apt/apt.conf.d/99genproxy  && \
     echo "Acquire::http::Proxy \"http://10.232.233.70:8080\";" >> /etc/apt/apt.conf.d/99proxy   \
     && apt-get update && apt-get install -y --no-install-recommends \
-    git                       \
-    git-lfs                   \
-    ca-certificates           \
-    curl                      \
-    gnupg                     \
-    wget                      \
-    unzip                     \
-    && update-ca-certificates \
-    && rm -rf /var/lib/apt/lists/* \
+    git                             \
+    git-lfs                         \
+    ca-certificates                 \
+    curl                            \
+    gnupg                           \
+    wget                            \
+    unzip                           \
+    && update-ca-certificates       \
+    && rm -rf /var/lib/apt/lists/*  \
     && ln -sf /usr/bin/python3 /usr/bin/python
 
 FROM base-os AS base
@@ -91,7 +91,6 @@ ENV PYTHONDONTWRITEBYTECODE=1       \
     PYTHONUNBUFFERED=1              \
     GIT_LFS_SKIP_SMUDGE=1           \
     UV_LINK_MODE=copy               \
-    VIRTUAL_ENV=/app/python/.venv   \
     https_proxy=""                  \
     PATH="/app/python/.venv/bin:/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/sbin:/bin:/root/.cargo/bin"
 
@@ -105,10 +104,11 @@ COPY README.md .
 COPY src src
 
 #create venv globally
-RUN --mount=type=cache,target=/app/python/.cache                  \
-    export https_proxy=http://10.232.233.70:8080                  \
-    && uv venv /app/python/.venv                                  \
-    && ls /app/python/.venv
+#VIRTUAL_ENV=/app/python/.venv                                     \
+#RUN --mount=type=cache,target=/app/python/.cache                  \
+#    export https_proxy=http://10.232.233.70:8080                  \
+#    && uv venv /app/python/.venv                                  \
+#    && ls /app/python/.venv
 
 # Install dependencies
 RUN --mount=type=cache,target=/app/python/.cache                  \
@@ -116,7 +116,7 @@ RUN --mount=type=cache,target=/app/python/.cache                  \
     export https_proxy=http://10.232.233.70:8080                  \
     && uv sync --frozen                                           \
     && uv pip install .                                           \
-    && uv pip install hatchling
+    && uv pip install hatchling --find-links
 
 # Generate configs
 RUN --mount=type=cache,target=/app/python/.cache                  \
@@ -132,11 +132,10 @@ RUN echo "Creating app user" \
     && chown -R python:pythongroup /app/python
 
 # Ensure correct permissions
-RUN chown -R python:pythongroup /app/python && \
+RUN chown -R python:pythongroup /app/python &&                    \
     chmod -R 755 /app
 
 EXPOSE 8081
-USER 1001
 
 LABEL org.opencontainers.image.description="Kagent app is the apiserver for running agents."
 LABEL org.opencontainers.image.source=https://github.com/kagent-dev/kagent
