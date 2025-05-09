@@ -29,9 +29,7 @@ RUN echo /etc/apt/apt.conf.d/99genproxy && \
     && ln -sf /usr/bin/python3 /usr/bin/python
 
 FROM base-os AS base
-
-# Install python
-RUN https_proxy=http://10.232.233.70:8080 uv python install 3.12
+ARG PROXY
 
 # Install nvm
 ENV NVM_DIR=/usr/local/nvm
@@ -41,6 +39,7 @@ ENV NODE_PATH=$NVM_DIR/v$TOOLS_NODE_VERSION/lib/node_modules
 
 # Install nvm with node and npm
 RUN mkdir -p  $NVM_DIR \
+    && export https_proxy=$PROXY \
     && curl https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh  | bash \
     && . $NVM_DIR/nvm.sh \
     && mkdir -p $NVM_DIR/versions \
@@ -49,8 +48,13 @@ RUN mkdir -p  $NVM_DIR \
     && which node && node --version \
     && ln -sf $NVM_DIR/versions/node/v$TOOLS_NODE_VERSION/bin/node /usr/bin/node
 
+# Install python
+RUN https_proxy=$PROXY uv python install 3.12
+
+
 ### STAGE 2: build + tools
 FROM --platform=$BUILDPLATFORM base AS ui-builder
+ARG PROXY
 
 WORKDIR /app/ui
 

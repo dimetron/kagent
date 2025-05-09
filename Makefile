@@ -32,8 +32,8 @@ DOCKER_BUILD_ARGS ?=
 
 KIND_CLUSTER_NAME ?= kagent
 
-PROXY ?= "genproxy:8080"
-NOPROXY ?= "genproxy:8080"
+PROXY ?= "http://genproxy:8080"
+NOPROXY ?= "*.corp.amdocs.com,localhost,"
 
 #take from go/go.mod
 AWK ?= $(shell command -v gawk || command -v awk)

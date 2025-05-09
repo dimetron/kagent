@@ -29,9 +29,10 @@ RUN echo /etc/apt/apt.conf.d/99genproxy && \
     && ln -sf /usr/bin/python3 /usr/bin/python
 
 FROM base-os AS base
+ARG PROXY
 
-# Install python
-RUN https_proxy=http://10.232.233.70:8080 uv python install 3.12
+ENV https_proxy=$PROXY
+ENV noproxy=$NOPROXY
 
 # Install nvm
 ENV NVM_DIR=/usr/local/nvm
@@ -41,6 +42,7 @@ ENV NODE_PATH=$NVM_DIR/v$TOOLS_NODE_VERSION/lib/node_modules
 
 # Install nvm with node and npm
 RUN mkdir -p  $NVM_DIR \
+    && export https_proxy=$PROXY \
     && curl https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh  | bash \
     && . $NVM_DIR/nvm.sh \
     && mkdir -p $NVM_DIR/versions \
@@ -48,6 +50,10 @@ RUN mkdir -p  $NVM_DIR \
     && nvm use $TOOLS_NODE_VERSION \
     && which node && node --version \
     && ln -sf $NVM_DIR/versions/node/v$TOOLS_NODE_VERSION/bin/node /usr/bin/node
+
+# Install python
+RUN https_proxy=$PROXY uv python install 3.12
+
 
 ### STAGE 2: build + tools
 FROM base AS app-builder
@@ -59,12 +65,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 ### STAGE 2: build + tools
 FROM --platform=$BUILDPLATFORM base AS builder
-
-WORKDIR /app/
-
 ARG TARGETARCH
 ARG TOOLS_ISTIO_VERSION
 ARG TOOLS_ARGO_CD_VERSION
+ARG PROXY
+
+ENV https_proxy=$PROXY
+
+WORKDIR /app/
 
 # Install kubectl
 RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/$TARGETARCH/kubectl" \
@@ -72,7 +80,7 @@ RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/s
     && mv kubectl /usr/local/bin/
 
 # Install kubectl argo plugin
-RUN curl -o /usr/local/bin/kubectl-argo-rollouts -L https://github.com/argoproj/argo-rollouts/releases/$TOOLS_ARGO_CD_VERSION/download/kubectl-argo-rollouts-linux-$TARGETARCH \
+RUN curl -Lo /usr/local/bin/kubectl-argo-rollouts -L https://github.com/argoproj/argo-rollouts/releases/$TOOLS_ARGO_CD_VERSION/download/kubectl-argo-rollouts-linux-$TARGETARCH \
     && chmod +x /usr/local/bin/kubectl-argo-rollouts
 
 # Install Istio
