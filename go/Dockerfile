@@ -3,8 +3,6 @@ ARG DOCKER_REGISTRY="illin4261.corp.amdocs.com:28090"
 ARG DOCKER_REGISTRY_GOOGLE="illin4261.corp.amdocs.com:28090"
 ARG TOOLS_UV_VERSION=0.7.2
 ARG LOCALPLATFORM
-ARG PROXY="genproxy:8080"
-ARG NOPROXY
 
 ### STAGE 1: base image
 FROM $DOCKER_REGISTRY/astral-sh/uv:${TOOLS_UV_VERSION}-bookworm-slim AS base-os
@@ -21,6 +19,7 @@ RUN echo /etc/apt/apt.conf.d/99genproxy && \
     echo "Acquire::http::Proxy \"http://10.232.233.70:8080\";" >> /etc/apt/apt.conf.d/99proxy   \
     && apt-get update && apt-get install -y --no-install-recommends \
     git                       \
+    git-lfs                   \
     ca-certificates           \
     curl                      \
     gnupg                     \

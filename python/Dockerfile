@@ -19,6 +19,7 @@ RUN echo /etc/apt/apt.conf.d/99genproxy && \
     echo "Acquire::http::Proxy \"http://10.232.233.70:8080\";" >> /etc/apt/apt.conf.d/99proxy   \
     && apt-get update && apt-get install -y --no-install-recommends \
     git                       \
+    git-lfs                   \
     ca-certificates           \
     curl                      \
     gnupg                     \
@@ -31,7 +32,7 @@ RUN echo /etc/apt/apt.conf.d/99genproxy && \
 FROM base-os AS base
 
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV UV_CACHE_DIR=/opt/uv-cache/
+ENV UV_CACHE_DIR=/app/python/.cache
 ENV BUN_INSTALL_CACHE_DIR=/cache/bun
 ENV BUN_INSTALL=/usr/local/bun
 ENV NVM_DIR=/usr/local/nvm
@@ -40,31 +41,23 @@ ENV NODE_PATH=$NVM_DIR/v$TOOLS_NODE_VERSION/lib/node_modules
 ENV PATH=$NVM_DIR/versions/node/v$TOOLS_NODE_VERSION/bin:$BUN_INSTALL/bin:$PATH
 
 # Install python
-RUN --mount=type=cache,target=/opt/uv-cache/,rw  \
-    export https_proxy=http://10.232.233.70:8080  \
-    && uv python install 3.12 \
-    && uv version \
-    && uv cache dir
-
-# Install bun
-RUN --mount=type=cache,target=/cache/bun,rw \
-    export https_proxy=http://10.232.233.70:8080  \
-    && curl -fsSL https://bun.sh/install | bash   \
-    && ln -sf $BUN_INSTALL/bin/bun /usr/bin/bun   \
-    && bun --version
+RUN --mount=type=cache,target=/app/python/.cache,rw  \
+    export https_proxy=http://10.232.233.70:8080     \
+    && mkdir -p /app/python/.cache/uv                \
+    && uv python install 3.12                        \
+    && uv cache dir                                  \
+    && uv version
 
 ### STAGE 2: build + tools
 FROM --platform=$TARGETPLATFORM base AS python-builder
 ARG PROXY
 ARG TARGETARCH
-
 ARG TOOLS_ISTIO_VERSION
 ARG TOOLS_ARGO_CD_VERSION
 
-ENV https_proxy=http://10.232.233.70:8080
-
 #
-WORKDIR /app/
+WORKDIR /app/downloads
+ENV https_proxy=http://10.232.233.70:8080
 
 # Install kubectl
 RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/$TARGETARCH/kubectl" \
@@ -94,29 +87,16 @@ COPY --from=python-builder /usr/local/bin/istioctl /usr/local/bin/istioctl
 COPY --from=python-builder /usr/local/bin/helm /usr/local/bin/helm
 COPY --from=python-builder /usr/local/bin/kubectl-argo-rollouts /usr/local/bin/kubectl-argo-rollouts
 
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1        \
-    GIT_LFS_SKIP_SMUDGE=1     \
-    UV_SYSTEM_PYTHON=1        \
-    UV_LINK_MODE=copy         \
-    VIRTUAL_ENV=/opt/venv     \
-    https_proxy=""            \
-    PATH="/opt/venv/bin:/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/sbin:/bin:/root/.cargo/bin"
+ENV PYTHONDONTWRITEBYTECODE=1       \
+    PYTHONUNBUFFERED=1              \
+    GIT_LFS_SKIP_SMUDGE=1           \
+    UV_LINK_MODE=copy               \
+    VIRTUAL_ENV=/app/python/.venv   \
+    https_proxy=""                  \
+    PATH="/app/python/.venv/bin:/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/sbin:/bin:/root/.cargo/bin"
 
 # Set up Python backend
 WORKDIR /app/python
-
-#create venv globally
-RUN --mount=type=cache,target=/opt/uv-cache/,rw  \
-    export https_proxy=http://10.232.233.70:8080 \
-    && uv venv /opt/venv                         \
-    && ls /opt/venv
-
-# Create groups and users
-RUN echo "Creating app user" \
-    && groupadd -g 1002 pythongroup                           \
-    && useradd  -u 1002 -g pythongroup -s /bin/bash -m python \
-    && chown -R python:pythongroup /app/python \
 
 COPY pyproject.toml .
 COPY .python-version .
@@ -124,31 +104,42 @@ COPY uv.lock .
 COPY README.md .
 COPY src src
 
-# Install dependencies
-RUN --mount=type=cache,target=/opt/uv-cache/,rw  \
-    export https_proxy=http://10.232.233.70:8080        \
-    && uv cache dir                                     \
-    && uv pip install .                                 \
-    && uv pip install hatchling                         \
-    && uv sync --frozen                                 \
-    && uv sync --all-extras                             \
-    && ls /opt/uv-cache/
+#create venv globally
+RUN --mount=type=cache,target=/app/python/.cache                  \
+    export https_proxy=http://10.232.233.70:8080                  \
+    && uv venv /app/python/.venv                                  \
+    && ls /app/python/.venv
 
-# Generate tools and agents
-RUN --mount=type=cache,target=/opt/uv-cache/,rw         \
-    export https_proxy=http://10.232.233.70:8080        \
-    && mkdir -p /root/.autogenstudio/configs            \
+# Install dependencies
+RUN --mount=type=cache,target=/app/python/.cache                  \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    export https_proxy=http://10.232.233.70:8080                  \
+    && uv sync --frozen                                           \
+    && uv pip install .                                           \
+    && uv pip install hatchling
+
+# Generate configs
+RUN --mount=type=cache,target=/app/python/.cache                  \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    export https_proxy=http://10.232.233.70:8080                  \
+    && mkdir -p /root/.autogenstudio/configs                      \
     && uv run tool_gen -o /app/python/.autogenstudio/configs
+
+# Create groups and users
+RUN echo "Creating app user" \
+    && groupadd -g 1001 pythongroup                               \
+    && useradd  -u 1001 -g pythongroup -s /bin/bash -m python     \
+    && chown -R python:pythongroup /app/python
 
 # Ensure correct permissions
 RUN chown -R python:pythongroup /app/python && \
     chmod -R 755 /app
 
 EXPOSE 8081
-USER 1002
+USER 1001
 
-LABEL org.opencontainers.image.source=https://github.com/kagent-dev/kagent
 LABEL org.opencontainers.image.description="Kagent app is the apiserver for running agents."
-LABEL org.opencontainers.image.authors="Kagent Creators <"
+LABEL org.opencontainers.image.source=https://github.com/kagent-dev/kagent
+LABEL org.opencontainers.image.authors="Kagent Creators 🤖"
 
-CMD ["uv", "run", "--cache-dir", "/opt/uv-cache/", "kagent-engine", "serve", "--host", "0.0.0.0", "--port", "8081"]
+CMD ["uv", "run", "--cache-dir", "/app/python/.cache", "kagent-engine", "serve", "--host", "0.0.0.0", "--port", "8081"]
