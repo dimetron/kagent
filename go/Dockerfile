@@ -12,7 +12,12 @@ ARG TOOLS_NODE_VERSION
 #ENVIRONMENT VARIABLES
 ENV DEBIAN_FRONTEND=noninteractive
 
-RUN mkdir -p /etc/apt/keyrings \
+RUN echo /etc/apt/apt.conf.d/99genproxy && \
+    echo "Acquire::http::Pipeline-Depth 0;"     > /etc/apt/apt.conf.d/99genproxy   && \
+    echo "Acquire::http::No-Cache=True;"        >> /etc/apt/apt.conf.d/99genproxy  && \
+    echo "Acquire::BrokenProxy=True;"           >> /etc/apt/apt.conf.d/99genproxy  && \
+    echo "Acquire::http::Timeout \"120\";"      >> /etc/apt/apt.conf.d/99genproxy  && \
+    echo "Acquire::http::Proxy \"http://$(PROXY)\";" >> /etc/apt/apt.conf.d/99proxy   \
     && apt-get update && apt-get install -y --no-install-recommends \
     git                       \
     ca-certificates           \
