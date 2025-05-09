@@ -32,7 +32,7 @@ RUN echo /etc/apt/apt.conf.d/99genproxy && \
 FROM base-os AS base
 
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV UV_CACHE_DIR=/app/python/.cache
+ENV UV_CACHE_DIR=/app/python/.cache/uv
 ENV BUN_INSTALL_CACHE_DIR=/cache/bun
 ENV BUN_INSTALL=/usr/local/bun
 ENV NVM_DIR=/usr/local/nvm
@@ -114,9 +114,11 @@ COPY src src
 RUN --mount=type=cache,target=/app/python/.cache                  \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     export https_proxy=http://10.232.233.70:8080                  \
+    && uv venv /app/python/.venv                                  \
     && uv sync --frozen                                           \
     && uv pip install .                                           \
-    && uv pip install hatchling --find-links
+    && uv pip install hatchling                                   \
+    && uv run kagent-engine --help
 
 # Generate configs
 RUN --mount=type=cache,target=/app/python/.cache                  \

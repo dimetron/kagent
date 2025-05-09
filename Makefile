@@ -158,6 +158,7 @@ release-ui: build-ui
 
 .PHONY: build-app
 build-app:
+	make -C python build #update lock file before docker build
 	$(DOCKER_BUILDER) build $(DOCKER_BUILD_ARGS) $(TOOLS_IMAGE_BUILD_ARGS) -t $(APP_IMG) -f python/Dockerfile ./python
 
 .PHONY: release-app
