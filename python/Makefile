@@ -7,6 +7,7 @@ VIRTUAL_ENV ?= .venv
 .PHONY: update
 update:
 	uv sync --all-extras --all-groups
+	uv pip install hatchling
 	uv lock
 
 .PHONY: format

@@ -1,6 +1,6 @@
 [build-system]
 requires = [
-  "hatchling >=1.0.0",
+  "hatchling >=1.27.0",
 ]
 build-backend = "hatchling.build"
 
@@ -11,6 +11,7 @@ description = "kagent is a tool for building and deploying agent-based applicati
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+  "hatchling >=1.27.0",
   "autogen-core>=0.5.6",
   "autogen-agentchat>=0.5.6",
   "autogen-ext[anthropic,azure,mcp,ollama,openai]>=0.5.6",

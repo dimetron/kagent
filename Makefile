@@ -139,7 +139,7 @@ controller-manifests:
 
 .PHONY: build-controller
 build-controller: controller-manifests
-	$(DOCKER_BUILDER) build $(DOCKER_BUILD_ARGS) $(TOOLS_IMAGE_BUILD_ARGS) -t $(CONTROLLER_IMG) -f go/Dockerfile ./go
+	$(DOCKER_BUILDER) build --progress=plain $(DOCKER_BUILD_ARGS) $(TOOLS_IMAGE_BUILD_ARGS) -t $(CONTROLLER_IMG) -f go/Dockerfile ./go
 
 .PHONY: release-controller
 release-controller: DOCKER_BUILD_ARGS += --push --platform linux/amd64,linux/arm64
@@ -149,7 +149,7 @@ release-controller: build-controller
 .PHONY: build-ui
 build-ui:
 	# Build the combined UI and backend image
-	$(DOCKER_BUILDER) build $(DOCKER_BUILD_ARGS) $(TOOLS_IMAGE_BUILD_ARGS) -t $(UI_IMG) -f ui/Dockerfile ./ui
+	$(DOCKER_BUILDER) build --progress=plain $(DOCKER_BUILD_ARGS) $(TOOLS_IMAGE_BUILD_ARGS) -t $(UI_IMG) -f ui/Dockerfile ./ui
 
 .PHONY: release-ui
 release-ui: DOCKER_BUILD_ARGS += --push --platform linux/amd64,linux/arm64
@@ -159,7 +159,7 @@ release-ui: build-ui
 .PHONY: build-app
 build-app:
 	make -C python build #update lock file before docker build
-	$(DOCKER_BUILDER) build $(DOCKER_BUILD_ARGS) $(TOOLS_IMAGE_BUILD_ARGS) -t $(APP_IMG) -f python/Dockerfile ./python
+	$(DOCKER_BUILDER) build --progress=plain $(DOCKER_BUILD_ARGS) $(TOOLS_IMAGE_BUILD_ARGS) -t $(APP_IMG) -f python/Dockerfile ./python
 
 .PHONY: release-app
 release-app: DOCKER_BUILD_ARGS += --push --platform linux/amd64,linux/arm64

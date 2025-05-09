@@ -110,7 +110,7 @@ RUN --mount=type=cache,target=/app/python/.cache                  \
     && echo  "Installing dependencies"                            \
     && uv venv .venv                                              \
     && . .venv/bin/activate                                       \
-    && uv sync --frozen --all-extras --all-groups                 \
+    && uv sync --frozen                                           \
     && uv pip install hatchling                                   \
     && uv run kagent-engine --help                                \
     && echo  "Generating autogenstudio configs"                   \
