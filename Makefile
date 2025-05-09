@@ -27,8 +27,8 @@ DOCKER_BUILDER ?= docker
 DOCKER_BUILD_ARGS ?=
 KIND_CLUSTER_NAME ?= kagent
 
-PROXY ?= ""
-NOPROXY ?= ""
+PROXY ?= "genproxy:8080"
+NOPROXY ?= "genproxy:8080"
 
 #take from go/go.mod
 AWK ?= $(shell command -v gawk || command -v awk)
