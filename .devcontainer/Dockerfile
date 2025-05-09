@@ -1,8 +1,8 @@
 #https://www.docker.com/blog/faster-multi-platform-builds-dockerfile-cross-compilation-guide/
-ARG DOCKER_REGISTRY=ghcr.io
-ARG DOCKER_REGISTRY_GOOGLE=gcr.io
-ARG TOOLS_UV_VERSION=latest
-ARG PROXY
+ARG DOCKER_REGISTRY="illin4261.corp.amdocs.com:28090"
+ARG DOCKER_REGISTRY_GOOGLE="illin4261.corp.amdocs.com:28090"
+ARG TOOLS_UV_VERSION=0.7.2
+ARG PROXY="genproxy:8080"
 ARG NOPROXY
 
 ### STAGE 1: base image
@@ -12,7 +12,12 @@ ARG TOOLS_NODE_VERSION
 #ENVIRONMENT VARIABLES
 ENV DEBIAN_FRONTEND=noninteractive
 
-RUN mkdir -p /etc/apt/keyrings \
+RUN echo /etc/apt/apt.conf.d/99genproxy && \
+    echo "Acquire::http::Pipeline-Depth 0;"     > /etc/apt/apt.conf.d/99genproxy   && \
+    echo "Acquire::http::No-Cache=True;"        >> /etc/apt/apt.conf.d/99genproxy  && \
+    echo "Acquire::BrokenProxy=True;"           >> /etc/apt/apt.conf.d/99genproxy  && \
+    echo "Acquire::http::Timeout \"120\";"      >> /etc/apt/apt.conf.d/99genproxy  && \
+    echo "Acquire::http::Proxy \"http://10.232.233.70:8080\";" >> /etc/apt/apt.conf.d/99proxy   \
     && apt-get update && apt-get install -y --no-install-recommends \
     git                       \
     ca-certificates           \
@@ -96,16 +101,20 @@ ARG TOOLS_ISTIO_VERSION
 ARG TOOLS_ARGO_CD_VERSION
 ARG TOOLS_KUBECTL_VERSION
 ARG ARCH=${TARGETARCH:-amd64}
+ARG PROXY="http://10.232.233.70:8080"
 
 #ENVIRONMENT VARIABLES
 ENV DEBIAN_FRONTEND=noninteractive
 ENV GO111MODULE=on
 ENV GOTOOLCHAIN=local
-ENV GOPROXY="http://proxy.golang.org"
+ENV GONOSUMDB="bitbucket.corp.amdocs.com"
+ENV GOPRIVATE="bitbucket.corp.amdocs.com/*"
+ENV GOINSECURE="bitbucket.corp.amdocs.com/*"
+ENV GOPROXY="http://docker-registry-proxy.corp.amdocs.com:8081/repository/goproxy/,http://proxy.golang.org"
 ENV PATH=$PATH:/usr/local/go/bin
 
 RUN --mount=type=cache,target=/cache,rw \
-    wget -q --show-progress -P /cache https://golang.org/dl/go${TOOLS_GO_VERSION}.linux-${ARCH}.tar.gz && \
+    wget -e use_proxy=yes -e http_proxy=$PROXY -q --show-progress -P /cache https://golang.org/dl/go${TOOLS_GO_VERSION}.linux-${ARCH}.tar.gz && \
     tar     -C /usr/local -xzf /cache/go${TOOLS_GO_VERSION}.linux-${ARCH}.tar.gz
 
 ### STAGE 3 add tools

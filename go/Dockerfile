@@ -29,16 +29,21 @@ RUN echo /etc/apt/apt.conf.d/99genproxy && \
     && ln -sf /usr/bin/python3 /usr/bin/python
 
 FROM base-os AS go-base
-ARG TOOLS_GO_VERSION
+ARG TOOLS_GO_VERSION=1.24.3
 ARG ARCH=${TARGETARCH:-amd64}
 ARG GOPROXY="http://proxy.golang.org"
+ARG PROXY="http://10.232.233.70:8080"
 
 ENV GO111MODULE=on
 ENV GOTOOLCHAIN=local
+ENV GONOSUMDB="bitbucket.corp.amdocs.com"
+ENV GOPRIVATE="bitbucket.corp.amdocs.com/*"
+ENV GOINSECURE="bitbucket.corp.amdocs.com/*"
+ENV GOPROXY="http://docker-registry-proxy.corp.amdocs.com:8081/repository/goproxy/,http://proxy.golang.org"
 ENV PATH=$PATH:/usr/local/go/bin
 
 RUN --mount=type=cache,target=/cache,rw \
-    wget -q --show-progress -P /cache https://golang.org/dl/go${TOOLS_GO_VERSION}.linux-${ARCH}.tar.gz && \
+    wget -e use_proxy=yes -e http_proxy=$PROXY -q --show-progress -P /cache https://golang.org/dl/go${TOOLS_GO_VERSION}.linux-${ARCH}.tar.gz && \
     tar     -C /usr/local -xzf /cache/go${TOOLS_GO_VERSION}.linux-${ARCH}.tar.gz
 
 FROM --platform=$BUILDPLATFORM go-base AS builder
