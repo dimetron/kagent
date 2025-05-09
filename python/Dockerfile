@@ -31,14 +31,14 @@ RUN echo /etc/apt/apt.conf.d/99genproxy && \
 
 FROM base-os AS base
 
-ENV NEXT_TELEMETRY_DISABLED=1
 ENV UV_CACHE_DIR=/app/python/.cache/uv
-ENV BUN_INSTALL_CACHE_DIR=/cache/bun
-ENV BUN_INSTALL=/usr/local/bun
-ENV NVM_DIR=/usr/local/nvm
-ENV NODE_ENV=production
-ENV NODE_PATH=$NVM_DIR/v$TOOLS_NODE_VERSION/lib/node_modules
-ENV PATH=$NVM_DIR/versions/node/v$TOOLS_NODE_VERSION/bin:$BUN_INSTALL/bin:$PATH
+ENV NEXT_TELEMETRY_DISABLED=1
+#ENV BUN_INSTALL_CACHE_DIR=/cache/bun
+#ENV BUN_INSTALL=/usr/local/bun
+#ENV NVM_DIR=/usr/local/nvm
+#ENV NODE_ENV=production
+#ENV NODE_PATH=$NVM_DIR/v$TOOLS_NODE_VERSION/lib/node_modules
+#ENV PATH=$NVM_DIR/versions/node/v$TOOLS_NODE_VERSION/bin:$BUN_INSTALL/bin:$PATH
 
 # Install python
 RUN --mount=type=cache,target=/app/python/.cache,rw  \
@@ -50,12 +50,11 @@ RUN --mount=type=cache,target=/app/python/.cache,rw  \
 
 ### STAGE 2: build + tools
 FROM --platform=$TARGETPLATFORM base AS python-builder
-ARG PROXY
+
 ARG TARGETARCH
 ARG TOOLS_ISTIO_VERSION
 ARG TOOLS_ARGO_CD_VERSION
 
-#
 WORKDIR /app/downloads
 ENV https_proxy=http://10.232.233.70:8080
 
@@ -91,6 +90,7 @@ ENV PYTHONDONTWRITEBYTECODE=1       \
     PYTHONUNBUFFERED=1              \
     GIT_LFS_SKIP_SMUDGE=1           \
     UV_LINK_MODE=copy               \
+    VIRTUAL_ENV=/app/python/.venv   \
     https_proxy=""                  \
     PATH="/app/python/.venv/bin:/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/sbin:/bin:/root/.cargo/bin"
 
@@ -103,27 +103,17 @@ COPY uv.lock .
 COPY README.md .
 COPY src src
 
-#create venv globally
-#VIRTUAL_ENV=/app/python/.venv                                     \
-#RUN --mount=type=cache,target=/app/python/.cache                  \
-#    export https_proxy=http://10.232.233.70:8080                  \
-#    && uv venv /app/python/.venv                                  \
-#    && ls /app/python/.venv
-
 # Install dependencies
 RUN --mount=type=cache,target=/app/python/.cache                  \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     export https_proxy=http://10.232.233.70:8080                  \
-    && uv venv /app/python/.venv                                  \
-    && uv sync --frozen                                           \
-    && uv pip install .                                           \
+    && echo  "Installing dependencies"                            \
+    && uv venv .venv                                              \
+    && . .venv/bin/activate                                       \
+    && uv sync --frozen --all-extras --all-groups                 \
     && uv pip install hatchling                                   \
-    && uv run kagent-engine --help
-
-# Generate configs
-RUN --mount=type=cache,target=/app/python/.cache                  \
-    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    export https_proxy=http://10.232.233.70:8080                  \
+    && uv run kagent-engine --help                                \
+    && echo  "Generating autogenstudio configs"                   \
     && mkdir -p /root/.autogenstudio/configs                      \
     && uv run tool_gen -o /app/python/.autogenstudio/configs
 
@@ -139,8 +129,9 @@ RUN chown -R python:pythongroup /app/python &&                    \
 
 EXPOSE 8081
 
-LABEL org.opencontainers.image.description="Kagent app is the apiserver for running agents."
 LABEL org.opencontainers.image.source=https://github.com/kagent-dev/kagent
+LABEL org.opencontainers.image.description="Kagent app is the apiserver for running agents."
 LABEL org.opencontainers.image.authors="Kagent Creators 🤖"
 
-CMD ["uv", "run", "--cache-dir", "/app/python/.cache", "kagent-engine", "serve", "--host", "0.0.0.0", "--port", "8081"]
+ENV UV_OFFLINE=1
+CMD ["uv", "run", "kagent-engine", "serve", "--host", "0.0.0.0", "--port", "8081"]
