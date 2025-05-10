@@ -121,10 +121,9 @@ RUN --mount=type=cache,target=/app/python/.cache                  \
 
 # Ensure correct permissions
 RUN chown -R python:pythongroup /app/python &&                    \
-    chmod -R 755 /app
+    chmod -vR 755 /app/python/.venv/bin
 
 EXPOSE 8081
-USER 1001
 ENV UV_OFFLINE=1
 
 LABEL org.opencontainers.image.source=https://github.com/kagent-dev/kagent
