@@ -30,23 +30,7 @@ RUN echo /etc/apt/apt.conf.d/99genproxy && \
     && ln -sf /usr/bin/python3 /usr/bin/python
 
 FROM base-os AS base
-
-ENV UV_CACHE_DIR=/app/python/.cache/uv
 ENV NEXT_TELEMETRY_DISABLED=1
-#ENV BUN_INSTALL_CACHE_DIR=/cache/bun
-#ENV BUN_INSTALL=/usr/local/bun
-#ENV NVM_DIR=/usr/local/nvm
-#ENV NODE_ENV=production
-#ENV NODE_PATH=$NVM_DIR/v$TOOLS_NODE_VERSION/lib/node_modules
-#ENV PATH=$NVM_DIR/versions/node/v$TOOLS_NODE_VERSION/bin:$BUN_INSTALL/bin:$PATH
-
-# Install python
-RUN --mount=type=cache,target=/app/python/.cache,rw  \
-    export https_proxy=http://10.232.233.70:8080     \
-    && mkdir -p /app/python/.cache/uv                \
-    && uv python install 3.12                        \
-    && uv cache dir                                  \
-    && uv version
 
 ### STAGE 2: build + tools
 FROM --platform=$TARGETPLATFORM base AS python-builder
@@ -78,7 +62,7 @@ RUN curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/s
     && ./get_helm.sh \
     && rm get_helm.sh
 
-### STAGE 3: final
+##################### STAGE 3: final
 FROM base AS final
 
 COPY --from=python-builder /usr/local/bin/kubectl /usr/local/bin/kubectl
@@ -86,16 +70,30 @@ COPY --from=python-builder /usr/local/bin/istioctl /usr/local/bin/istioctl
 COPY --from=python-builder /usr/local/bin/helm /usr/local/bin/helm
 COPY --from=python-builder /usr/local/bin/kubectl-argo-rollouts /usr/local/bin/kubectl-argo-rollouts
 
-ENV PYTHONDONTWRITEBYTECODE=1        \
-    PYTHONUNBUFFERED=1               \
-    GIT_LFS_SKIP_SMUDGE=1            \
-    UV_LINK_MODE=copy                \
-    UV_PROJECT_ENVIRONMENT="/app/python/.venv" \
-    https_proxy=""                   \
-    PATH="/app/python/.venv/bin:/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/sbin:/bin:/root/.cargo/bin"
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV GIT_LFS_SKIP_SMUDGE=1
+ENV UV_LINK_MODE=copy
+ENV UV_PROJECT_ENVIRONMENT="/app/python/.venv"
+ENV PATH=$UV_PROJECT_ENVIRONMENT/bin:$PATH
+ENV https_proxy=""
 
 # Set up Python backend
 WORKDIR /app/python
+
+# Create groups and users
+RUN echo "Creating app user" \
+    && groupadd -g 1001 pythongroup                               \
+    && useradd  -u 1001 -g pythongroup -s /bin/bash -m python     \
+    && chown -R python:pythongroup /app/python
+
+# Install python
+RUN --mount=type=cache,target=/app/python/.cache,rw  \
+    export https_proxy=http://10.232.233.70:8080     \
+    && uv venv .venv                                 \
+    && uv python install 3.12                        \
+    && uv cache dir                                  \
+    && uv version
 
 COPY pyproject.toml .
 COPY .python-version .
@@ -107,30 +105,31 @@ COPY src src
 RUN --mount=type=cache,target=/app/python/.cache                  \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     export https_proxy=http://10.232.233.70:8080                  \
-    && echo  "Installing dependencies"                            \
     && uv venv .venv                                              \
-    && . .venv/bin/activate                                       \
-    && uv sync --locked                                           \
-    && uv run kagent-engine --help                                \
-    && echo  "Generating autogenstudio configs"                   \
-    && mkdir -p /root/.autogenstudio/configs                      \
+    && uv sync --locked --no-install-project --no-editable
+
+# Generate configs
+RUN --mount=type=cache,target=/app/python/.cache                  \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    export https_proxy=http://10.232.233.70:8080                  \
+    && mkdir -p /app/python/.autogenstudio/configs                   \
     && uv run tool_gen -o /app/python/.autogenstudio/configs
 
-# Create groups and users
-RUN echo "Creating app user" \
-    && groupadd -g 1001 pythongroup                               \
-    && useradd  -u 1001 -g pythongroup -s /bin/bash -m python     \
-    && chown -R python:pythongroup /app/python
+RUN --mount=type=cache,target=/app/python/.cache                  \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    export https_proxy=http://10.232.233.70:8080                  \
+    && /app/.venv/bin/kagent-engine --help
 
 # Ensure correct permissions
 RUN chown -R python:pythongroup /app/python &&                    \
     chmod -R 755 /app
 
 EXPOSE 8081
+USER 1001
+ENV UV_OFFLINE=1
 
 LABEL org.opencontainers.image.source=https://github.com/kagent-dev/kagent
 LABEL org.opencontainers.image.description="Kagent app is the apiserver for running agents."
 LABEL org.opencontainers.image.authors="Kagent Creators 🤖"
 
-ENV UV_OFFLINE=1
 CMD ["uv", "run", "kagent-engine", "serve", "--host", "0.0.0.0", "--port", "8081"]

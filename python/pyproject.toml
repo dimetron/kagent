@@ -1,8 +1,5 @@
 [build-system]
-requires = [
-  "hatchling >=1.27.0",
-]
-build-backend = "hatchling.build"
+requires = ["hatchling", "hatch", "setuptools>=67.0.0"]
 
 [project]
 name = "kagent"
@@ -11,7 +8,6 @@ description = "kagent is a tool for building and deploying agent-based applicati
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-  "hatchling >=1.27.0",
   "autogen-core>=0.5.6",
   "autogen-agentchat>=0.5.6",
   "autogen-ext[anthropic,azure,mcp,ollama,openai]>=0.5.6",
@@ -57,7 +53,6 @@ lint = [
 ]
 
 [project.scripts]
-hatchling = "hatchling.cli:main"
 kagent-engine = "kagent.cli:run"
 tool_gen = "kagent.tools.utils.tool_gen:main"
 
