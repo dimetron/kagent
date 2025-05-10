@@ -118,7 +118,7 @@ RUN --mount=type=cache,target=/app/python/.cache                  \
 RUN --mount=type=cache,target=/app/python/.cache                  \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     export https_proxy=http://10.232.233.70:8080                  \
-    && /app/.venv/bin/kagent-engine --help
+    && uv run kagent-engine --help
 
 # Ensure correct permissions
 RUN chown -R python:pythongroup /app/python &&                    \
