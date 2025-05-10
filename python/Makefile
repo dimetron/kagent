@@ -3,7 +3,7 @@
 
 export http_proxy=http://genproxy:8080
 export UV_PROXY=http://genproxy:8080
-export UV_PROJECT= .venv
+export UV_PROJECT= .
 
 export GIT_LFS_SKIP_SMUDGE=1
 
@@ -12,6 +12,7 @@ export GIT_LFS_SKIP_SMUDGE=1
 .PHONY: update
 update:
 	uv venv .venv
+	uv python install 3.12
 	uv sync --all-extras --all-groups
 	uv pip install hatchling
 	uv lock
