@@ -1,11 +1,17 @@
-export GIT_LFS_SKIP_SMUDGE=1
 
-VIRTUAL_ENV ?= .venv
+# Makefile for Python project using Hatch and Ruff
+
+export http_proxy=http://genproxy:8080
+export UV_PROXY=http://genproxy:8080
+export UV_PROJECT= .venv
+
+export GIT_LFS_SKIP_SMUDGE=1
 
 ### Build and Test
 
 .PHONY: update
 update:
+	uv venv .venv
 	uv sync --all-extras --all-groups
 	uv pip install hatchling
 	uv lock
