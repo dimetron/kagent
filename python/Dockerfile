@@ -86,12 +86,12 @@ COPY --from=python-builder /usr/local/bin/istioctl /usr/local/bin/istioctl
 COPY --from=python-builder /usr/local/bin/helm /usr/local/bin/helm
 COPY --from=python-builder /usr/local/bin/kubectl-argo-rollouts /usr/local/bin/kubectl-argo-rollouts
 
-ENV PYTHONDONTWRITEBYTECODE=1       \
-    PYTHONUNBUFFERED=1              \
-    GIT_LFS_SKIP_SMUDGE=1           \
-    UV_LINK_MODE=copy               \
-    VIRTUAL_ENV=/app/python/.venv   \
-    https_proxy=""                  \
+ENV PYTHONDONTWRITEBYTECODE=1        \
+    PYTHONUNBUFFERED=1               \
+    GIT_LFS_SKIP_SMUDGE=1            \
+    UV_LINK_MODE=copy                \
+    UV_PROJECT_ENVIRONMENT="/app/python/.venv" \
+    https_proxy=""                   \
     PATH="/app/python/.venv/bin:/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/sbin:/bin:/root/.cargo/bin"
 
 # Set up Python backend
@@ -110,8 +110,7 @@ RUN --mount=type=cache,target=/app/python/.cache                  \
     && echo  "Installing dependencies"                            \
     && uv venv .venv                                              \
     && . .venv/bin/activate                                       \
-    && uv sync --frozen                                           \
-    && uv pip install hatchling                                   \
+    && uv sync --locked                                           \
     && uv run kagent-engine --help                                \
     && echo  "Generating autogenstudio configs"                   \
     && mkdir -p /root/.autogenstudio/configs                      \

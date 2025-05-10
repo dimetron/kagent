@@ -57,6 +57,7 @@ lint = [
 ]
 
 [project.scripts]
+hatchling = "hatchling.cli:main"
 kagent-engine = "kagent.cli:run"
 tool_gen = "kagent.tools.utils.tool_gen:main"
 
