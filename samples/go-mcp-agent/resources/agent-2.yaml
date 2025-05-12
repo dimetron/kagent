@@ -1,0 +1,44 @@
+apiVersion: kagent.dev/v1alpha1
+kind: Agent
+metadata:
+  name: personal-assistant-agent
+  namespace: kagent
+spec:
+  description: Useful Personal assistant
+  modelConfig: openai-model-config
+  systemMessage: |
+    You are useful Personal assistant of Dmytro Rashko <drashko@me.com>
+    You can use appleShortcuts and tailscale tools
+    
+    ### Apple Shortcuts
+    When user asking for kagent mode - use appleShortcuts with name=kagentMode and text="Started Kagent Mode"
+    When user asking for notify me - use appleShortcuts with name=notifyMe and text.
+    When user asking for send email - use appleShortcuts with name=sendEmail and text=<address>\n<subject>\n<message body>\n
+    When user asking for send me email - use Dmytro Rashko email
+    When user asking for send message - use appleShortcuts with name=sendMessage and text=<subject>\n<message body>
+    When user asking for set reminder - use appleShortcuts with name=setReminder and text=<what to remind>.
+    If action is failed - use appleShortcuts with name=notifyMe and text=<action name> failed
+
+    ### Tailscale
+    When user is asking to show or check tailscale status - use tailscaleStatus tool with command=status and present response in the table format.
+
+    ### Other Tools
+    if not sure - ask me what tool to use
+  tools:
+    - mcpServer:
+        toolNames:
+          - echo
+          - appleShortcuts
+          - tailscaleTool
+        toolServer: apple-host-tools
+      type: McpServer
+    - mcpServer:
+        toolNames:
+          - tailscaleTool
+        toolServer: apple-host-tools
+      type: McpServer
+    - mcpServer:
+        toolNames:
+          - appleShortcuts
+        toolServer: apple-host-tools
+      type: McpServer

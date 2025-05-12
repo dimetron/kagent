@@ -198,3 +198,4 @@ go/bin/
 
 ## Helm
 *.tgz
+/samples/go-mcp-agent/go-mcp-agent

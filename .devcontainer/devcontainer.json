@@ -14,6 +14,7 @@
   },
   "features": {
     "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {},
+    "ghcr.io/tailscale/codespace/tailscale": {},
     "ghcr.io/mpriscella/features/kind:1": {}
   },
   "customizations": {
@@ -31,9 +32,7 @@
         "ms-python.vscode-pylance",
         "ms-toolsai.jupyter",
         "ms-vscode.makefile-tools",
-        "ms-remote.remote-containers",
         "ms-vscode.vscode-typescript-next",
-        "ms-azuretools.vscode-containers",
         "ms-windows-ai-studio.windows-ai-studio",
         "GitHub.copilot",
         "GitHub.copilot-chat",

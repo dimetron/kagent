@@ -1,0 +1,12 @@
+---
+apiVersion: kagent.dev/v1alpha1
+kind: ToolServer
+metadata:
+  name: apple-host-tools
+  namespace: kagent
+spec:
+  config:
+    sse:
+      timeout: 5s
+      url: http://archm2pro.raccoon-universe.ts.net:3001/sse
+  description: ""
