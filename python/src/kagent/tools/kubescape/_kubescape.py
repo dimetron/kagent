@@ -24,8 +24,7 @@ This command scans given workload in the namespace for security issues.
     name="kubescape_scan_workload",
 )
 
-ScanWorkload = create_typed_fn_tool(kubescape_scan_workload, "kagent.tools.kubescape.ScanWorkload", "ScanWorkload")
-
+ScanWorkload, ScanWorkloadConfig = create_typed_fn_tool(kubescape_scan_workload, "kagent.tools.kubescape.ScanWorkload", "ScanWorkload")
 
 # Function that runs the istioctl command in the shell
 def _run_kubescape_command(command: str) -> str:
