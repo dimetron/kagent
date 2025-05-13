@@ -34,6 +34,9 @@ RUN curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/s
     && ./get_helm.sh \
     && rm get_helm.sh
 
+# Install Kubescape
+RUN curl -Ls https://raw.githubusercontent.com/kubescape/kubescape/master/install.sh | bash
+
 FROM ghcr.io/astral-sh/uv:${TOOLS_UV_VERSION}-debian-slim AS final
 
 ARG TARGETARCH

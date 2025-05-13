@@ -57,6 +57,7 @@ export KAGENT_DEFAULT_MODEL_PROVIDER=anthropic
 export KAGENT_DEFAULT_MODEL_PROVIDER=openAI
 
 # use local helm chart
+export KAGENT_DEFAULT_MODEL_PROVIDER=openAI
 export KAGENT_HELM_REPO=./helm/
 make kagent-cli-install
 
