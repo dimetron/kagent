@@ -56,12 +56,16 @@ export KAGENT_DEFAULT_MODEL_PROVIDER=azureOpenAI
 export KAGENT_DEFAULT_MODEL_PROVIDER=anthropic
 export KAGENT_DEFAULT_MODEL_PROVIDER=openAI
 
-# use local helm chart
+# use local helm chart to install kagent
+export KAGENT_DEFAULT_MODEL_PROVIDER=ollama
 export KAGENT_HELM_REPO=./helm/
 make kagent-cli-install
 
-#or use it directly
-KAGENT_HELM_REPO=./helm/ ./go/bin/kagent-local
+
+# On Mac enable the ollama host
+launchctl setenv OLLAMA_HOST "0.0.0.0"
+launchctl setenv OLLAMA_CONTEXT_LENGTH 8192 
+
 
 ```
 

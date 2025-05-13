@@ -1,6 +1,5 @@
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["hatchling", "hatch", "setuptools>=67.0.0"]
 
 [project]
 name = "kagent"

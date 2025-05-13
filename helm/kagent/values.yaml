@@ -17,7 +17,7 @@ providers:
     provider: Ollama
     model: "llama3.2"
     config:
-      host: host.docker.internal:11434
+      host: host.lima.internal:11434
   anthropic:
     provider: Anthropic
     model: "claude-3-sonnet-20240229"
@@ -47,7 +47,7 @@ controller:
   #  - watch-ns-2
 
   image:
-    registry: cr.kagent.dev
+    registry: illin4261.corp.amdocs.com:28090/platform
     repository: kagent-dev/kagent/controller
     tag: "" # Will default to global, then Chart version
     pullPolicy: IfNotPresent
@@ -62,7 +62,7 @@ controller:
 
 app:
   image:
-    registry: cr.kagent.dev
+    registry: illin4261.corp.amdocs.com:28090/platform
     repository: kagent-dev/kagent/app
     tag: "" # Will default to global, then Chart version
     pullPolicy: IfNotPresent
@@ -77,7 +77,7 @@ app:
 
 ui:
   image:
-    registry: cr.kagent.dev
+    registry: illin4261.corp.amdocs.com:28090/platform
     repository: kagent-dev/kagent/ui
     tag: "" # Will default to global, then Chart version
     pullPolicy: IfNotPresent
