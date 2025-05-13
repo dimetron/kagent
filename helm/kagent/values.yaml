@@ -130,6 +130,8 @@ contrib:
       enabled: true
     promql:
       enabled: true
+    kubescape:
+      enabled: true
     observability:
       enabled: true
       prometheus:

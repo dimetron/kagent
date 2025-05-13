@@ -60,7 +60,11 @@ RUN curl -L https://istio.io/downloadIstio | ISTIO_VERSION=$TOOLS_ISTIO_VERSION 
 RUN curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 \
     && chmod 700 get_helm.sh \
     && ./get_helm.sh \
-    && rm get_helm.sh
+    && rm get_helm.sh \
+
+# Install Kubescape
+RUN curl -Ls https://raw.githubusercontent.com/kubescape/kubescape/master/install.sh | sh \
+    && ls /usr/local/bin/
 
 ##################### STAGE 3: final
 FROM base AS final
