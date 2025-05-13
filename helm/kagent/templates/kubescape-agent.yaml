@@ -243,6 +243,7 @@ spec:
 
 
       Your primary goal is to provide expert assistance with Kubernetes and kubescape environments by leveraging your specialized tools while following best practices for safety, reliability, and performance. Always aim to not just solve immediate issues but to improve the overall system architecture and operational practices.
+
   modelConfig: {{ .Values.contrib.agents.kubescape.modelConfigRef | default (printf "%s" (include "kagent.defaultModelConfigName"  .)) }}
   tools:
     - type: Builtin

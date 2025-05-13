@@ -6,7 +6,7 @@ from .._utils import create_typed_fn_tool
 from ..common import run_command
 
 
-async def _scan_workload(
+async def _kubescape_scan_workload(
     ns: Annotated[Optional[str], "The namespace of the pod to get proxy configuration for"] = None,
     workload_name: Annotated[
         str,
@@ -17,7 +17,7 @@ async def _scan_workload(
 
 
 kubescape_scan_workload = FunctionTool(
-    _scan_workload,
+    _kubescape_scan_workload,
     description="""
 This command scans given workload in the namespace for security issues.
 """,
