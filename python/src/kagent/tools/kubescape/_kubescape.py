@@ -8,7 +8,7 @@ from ..common import run_command
 
 async def _kubescape_scan(
     ns: Annotated[Optional[str], "The namespace of the pod to get proxy configuration for"] = None,)-> str:
-        return _run_kubescape_command(f"scan --verbose  {'--namespace ' + ns if ns else ''}")
+        return _run_kubescape_command(f"scan framework nsa --verbose {'--namespace ' + ns if ns else ''}")
 
 
 async def _kubescape_scan_workload(
