@@ -63,16 +63,18 @@ RUN curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/s
     && rm get_helm.sh \
 
 # Install Kubescape
-RUN curl -Ls https://raw.githubusercontent.com/kubescape/kubescape/master/install.sh | sh \
-    && ls /usr/local/bin/
+RUN curl -Ls https://raw.githubusercontent.com/kubescape/kubescape/master/install.sh | bash
 
 ##################### STAGE 3: final
 FROM base AS final
 
-COPY --from=python-builder /usr/local/bin/kubectl /usr/local/bin/kubectl
-COPY --from=python-builder /usr/local/bin/istioctl /usr/local/bin/istioctl
-COPY --from=python-builder /usr/local/bin/helm /usr/local/bin/helm
+COPY --from=builder /usr/local/bin/helm /usr/local/bin/helm
+COPY --from=builder /usr/local/bin/kubectl /usr/local/bin/kubectl
+COPY --from=builder /usr/local/bin/istioctl /usr/local/bin/istioctl
+COPY --from=builder /usr/local/bin/kubescape /usr/local/bin/kubescape
 COPY --from=python-builder /usr/local/bin/kubectl-argo-rollouts /usr/local/bin/kubectl-argo-rollouts
+
+RUN /usr/local/bin/kubescape download framework
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1

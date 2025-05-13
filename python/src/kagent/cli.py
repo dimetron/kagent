@@ -55,7 +55,6 @@ from kagent.tools.k8s._kubectl import (
     rollout,
     scale,
 )
-from kagent.tools.kubescape._kubescape import ScanWorkload
 from kagent.tools.prometheus._prometheus import (
     AlertmanagersInput,
     AlertmanagersTool,
@@ -91,6 +90,11 @@ from kagent.tools.prometheus._prometheus import (
     TargetsTool,
     TSDBStatusInput,
     TSDBStatusTool,
+)
+
+from kagent.tools.kubescape._kubescape import (
+    Scan,
+    ScanWorkload
 )
 
 app = typer.Typer()
@@ -282,6 +286,7 @@ def helm():
 
 @app.command()
 def kubescape():
+    mcp.add_tool(Scan._func, Scan.name, Scan.description)
     mcp.add_tool(ScanWorkload._func, ScanWorkload.name, ScanWorkload.description)
     mcp.run()
 
