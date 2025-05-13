@@ -71,8 +71,8 @@ app:
       cpu: 100m
       memory: 256Mi
     limits:
-      cpu: 1000m
-      memory: 1Gi
+      cpu: 2000m
+      memory: 2Gi
   env: [] # Additional environment variables for the app can be added here
 
 ui:
@@ -86,7 +86,7 @@ ui:
       cpu: 100m
       memory: 256Mi
     limits:
-      cpu: 1000m
+      cpu: 2000m
       memory: 1Gi
   env: [] # Additional environment variables for the ui can be added here
 
@@ -131,7 +131,7 @@ contrib:
     promql:
       enabled: true
     kubescape:
-      enabled: true
+      enabled: false
     observability:
       enabled: true
       prometheus:

@@ -229,3 +229,6 @@ kagent-cli-port-forward: use-kind-cluster
 .PHONY: build-dev-container
 build-dev-container:
 	$(DOCKER_BUILDER) build -t kagent-devcontainer --load $(TOOLS_IMAGE_BUILD_ARGS) .devcontainer
+
+open-dev-container:
+	devcontainer up --workspace-folder . --name kagent-devcontainer
