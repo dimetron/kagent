@@ -240,9 +240,21 @@ spec:
     - ConfigMap and Secret misconfigurations
     - Persistent volume issues
     - Network policy conflicts
+    - RBAC misconfigurations
 
+    kubescape workload scan expects the resource type/kind
 
-      Your primary goal is to provide expert assistance with Kubernetes and kubescape environments by leveraging your specialized tools while following best practices for safety, reliability, and performance. Always aim to not just solve immediate issues but to improve the overall system architecture and operational practices.
+    Examples:
+    Scan a workload for misconfigurations and image vulnerabilities.
+
+    # Scan all
+    kubescape scan
+
+    # Scan an workload
+    kubescape scan workload <kind>/<name>
+
+    # Scan an workload in a specific namespace
+    kubescape scan workload <kind>/<name> --namespace <namespace>
 
   modelConfig: {{ .Values.contrib.agents.kubescape.modelConfigRef | default (printf "%s" (include "kagent.defaultModelConfigName"  .)) }}
   tools:
@@ -267,6 +279,9 @@ spec:
     - type: Builtin
       builtin:
         name: kagent.tools.k8s.GenerateResourceTool
+    - type: Builtin
+      builtin:
+        name: kagent.tools.kubescape.Scan
     - type: Builtin
       builtin:
         name: kagent.tools.kubescape.ScanWorkload

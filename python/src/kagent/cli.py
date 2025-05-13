@@ -92,7 +92,10 @@ from kagent.tools.prometheus._prometheus import (
     TSDBStatusTool,
 )
 
-from kagent.tools.kubescape._kubescape import ScanWorkload
+from kagent.tools.kubescape._kubescape import (
+    Scan,
+    ScanWorkload
+)
 
 app = typer.Typer()
 
@@ -283,6 +286,7 @@ def helm():
 
 @app.command()
 def kubescape():
+    mcp.add_tool(Scan._func, Scan.name, Scan.description)
     mcp.add_tool(ScanWorkload._func, ScanWorkload.name, ScanWorkload.description)
     mcp.run()
 
