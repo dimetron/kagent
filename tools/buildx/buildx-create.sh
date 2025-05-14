@@ -92,8 +92,11 @@ fi
 
 export BUILDX_NAME=kagent-builder
 echo "Activate BuildX -> $BUILDX_NAME with buildkit version: $BUILDKIT_VERSION"
-docker buildx inspect $BUILDX_NAME > /dev/null 2>&1  || docker buildx create --driver-opt "network=host,image=docker-registry-proxy.corp.amdocs.com/moby/buildkit:$BUILDKIT_VERSION" --config $script_dir/buildkitd.toml --name $BUILDX_NAME --use
-docker buildx use container-builder || true
+docker buildx rm $BUILDX_NAME || true
+docker network inspect infra || docker network create infra
+docker buildx inspect $BUILDX_NAME > /dev/null 2>&1  || docker buildx create --driver-opt "network=infra,image=docker-registry-proxy.corp.amdocs.com/moby/buildkit:$BUILDKIT_VERSION" --config $script_dir/buildkitd.toml --name $BUILDX_NAME --use
+docker buildx use $BUILDX_NAME || true
+docker buildx inspect $BUILDX_NAME
 
 echo "Infra network containers:"
 docker network inspect infra | jq '.[].Containers[].Name' -r
