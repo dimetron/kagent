@@ -111,14 +111,13 @@ RUN --mount=type=cache,target=/app/python/.cache                  \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     export https_proxy=http://10.232.233.70:8080                  \
     && uv venv .venv                                              \
-    && uv sync --locked --no-install-project --no-editable        \
-    && uv pip install certifi
+    && uv sync --locked --no-install-project --no-editable
 
 # Generate configs
 RUN --mount=type=cache,target=/app/python/.cache                  \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     export https_proxy=http://10.232.233.70:8080                  \
-    && mkdir -p /app/python/.autogenstudio/configs                   \
+    && mkdir -p /app/python/.autogenstudio/configs                \
     && uv run tool_gen -o /app/python/.autogenstudio/configs
 
 RUN --mount=type=cache,target=/app/python/.cache                  \
