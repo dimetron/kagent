@@ -115,6 +115,9 @@ prune-kind-cluster:
 buildx/create:
 	tools/buildx/buildx-create.sh
 
+.PHONY: builds
+builds: build build-cli
+
 .PHONY: build
 build: buildx/create build-controller build-ui build-app
 
