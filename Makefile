@@ -38,7 +38,7 @@ NOPROXY ?= "*.corp.amdocs.com,localhost,"
 #take from go/go.mod
 AWK ?= $(shell command -v gawk || command -v awk)
 TOOLS_GO_VERSION ?= $(shell $(AWK) '/^go / { print $$2 }' go/go.mod)
-LOCALPLATFORM=$(shell uname -m | sed 's/aarch64/arm64/g' | sed 's/x86_64/amd64/g')
+LOCALARCH=$(shell uname -m | sed 's/aarch64/arm64/g' | sed 's/x86_64/amd64/g')
 
 #tools versions
 TOOLS_UV_VERSION ?= 0.7.2
@@ -52,7 +52,7 @@ TOOLS_KUBECTL_VERSION ?= 1.33.4
 # build args
 TOOLS_IMAGE_BUILD_ARGS =  --build-arg PROXY=$(PROXY)
 TOOLS_IMAGE_BUILD_ARGS =  --build-arg NOPROXY=$(NOPROXY)
-TOOLS_IMAGE_BUILD_ARGS += --build-arg LOCALPLATFORM=$(LOCALPLATFORM)
+TOOLS_IMAGE_BUILD_ARGS += --build-arg LOCALARCH=$(LOCALARCH)
 TOOLS_IMAGE_BUILD_ARGS += --build-arg DOCKER_REGISTRY=$(DOCKER_REGISTRY)
 TOOLS_IMAGE_BUILD_ARGS += --build-arg DOCKER_REGISTRY_GOOGLE=$(DOCKER_REGISTRY_GOOGLE)
 TOOLS_IMAGE_BUILD_ARGS += --build-arg TOOLS_GO_VERSION=$(TOOLS_GO_VERSION)
