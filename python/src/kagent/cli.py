@@ -55,6 +55,7 @@ from kagent.tools.k8s._kubectl import (
     rollout,
     scale,
 )
+from kagent.tools.kubescape._kubescape import Scan, ScanWorkload
 from kagent.tools.prometheus._prometheus import (
     AlertmanagersInput,
     AlertmanagersTool,
@@ -90,11 +91,6 @@ from kagent.tools.prometheus._prometheus import (
     TargetsTool,
     TSDBStatusInput,
     TSDBStatusTool,
-)
-
-from kagent.tools.kubescape._kubescape import (
-    Scan,
-    ScanWorkload
 )
 
 app = typer.Typer()

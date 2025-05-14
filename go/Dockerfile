@@ -2,7 +2,7 @@
 ARG DOCKER_REGISTRY="illin4261.corp.amdocs.com:28090"
 ARG DOCKER_REGISTRY_GOOGLE="illin4261.corp.amdocs.com:28090"
 ARG TOOLS_UV_VERSION=0.7.2
-ARG LOCALPLATFORM
+ARG TARGETPLATFORM
 
 ### STAGE 1: base image
 FROM $DOCKER_REGISTRY/astral-sh/uv:${TOOLS_UV_VERSION}-bookworm-slim AS base-os
@@ -29,9 +29,9 @@ RUN echo /etc/apt/apt.conf.d/99genproxy && \
     && rm -rf /var/lib/apt/lists/* \
     && ln -sf /usr/bin/python3 /usr/bin/python
 
-FROM --platform=linux/$LOCALPLATFORM base-os AS go-base
+FROM base-os AS go-base
 ARG TOOLS_GO_VERSION=1.24.3
-ARG LOCALPLATFORM
+ARG TARGETARCH
 ARG GOPROXY="http://proxy.golang.org"
 ARG PROXY="http://10.232.233.70:8080"
 
@@ -44,18 +44,18 @@ ENV GOPROXY="http://docker-registry-proxy.corp.amdocs.com:8081/repository/goprox
 ENV PATH=$PATH:/usr/local/go/bin
 
 RUN --mount=type=cache,target=/cache,rw \
-    wget -e https_proxy=$PROXY  -q --show-progress -P /cache https://golang.org/dl/go${TOOLS_GO_VERSION}.linux-${LOCALPLATFORM}.tar.gz \
-    && tar     -C /usr/local -xzf /cache/go${TOOLS_GO_VERSION}.linux-${LOCALPLATFORM}.tar.gz
+    wget -e https_proxy=$PROXY  -q --show-progress -P /cache https://golang.org/dl/go${TOOLS_GO_VERSION}.linux-${TARGETARCH}.tar.gz \
+    && tar     -C /usr/local -xzf /cache/go${TOOLS_GO_VERSION}.linux-${TARGETARCH}.tar.gz
 
 # verify the installation
-RUN echo "LOCALPLATFORM=$LOCALPLATFORM" \
+RUN echo "TARGETARCH=$TARGETARCH" \
     && set \
     && uname -a \
     && go version
 
-FROM --platform=linux/$LOCALPLATFORM go-base AS builder
+FROM go-base AS builder
 
-ARG LOCALPLATFORM
+ARG TARGETPLATFORM
 ARG TARGETPLATFORM
 ARG BUILDPLATFORM
 ARG TARGETOS

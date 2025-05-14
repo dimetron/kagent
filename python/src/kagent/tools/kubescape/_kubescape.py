@@ -7,13 +7,20 @@ from ..common import run_command
 
 
 async def _kubescape_scan(
-    ns: Annotated[Optional[str], "The namespace of the pod to get proxy configuration for"] = None,)-> str:
-        return _run_kubescape_command(f"scan framework all --verbose --exclude-namespaces kube-system {'--include-namespaces ' + ns if ns else ''}")
+    ns: Annotated[Optional[str], "The namespace of the pod to get proxy configuration for"] = None,
+) -> str:
+    return _run_kubescape_command(
+        f"scan framework all --verbose --exclude-namespaces kube-system {'--include-namespaces ' + ns if ns else ''}"
+    )
 
 
 async def _kubescape_scan_workload(
     ns: Annotated[Optional[str], "The namespace of the workload to scan"] = None,
-    workload_name: Annotated[str,"name of workload",    ] = None,) -> str:
+    workload_name: Annotated[
+        str,
+        "name of workload",
+    ] = None,
+) -> str:
     return _run_kubescape_command(f"scan workload  {workload_name} {'-n ' + ns if ns else ''}")
 
 
@@ -32,7 +39,9 @@ kubescape_scan_workload = FunctionTool(
 
 
 Scan, ScanConfig = create_typed_fn_tool(kubescape_scan, "kagent.tools.kubescape.Scan", "Scan")
-ScanWorkload, ScanWorkloadConfig = create_typed_fn_tool(kubescape_scan_workload, "kagent.tools.kubescape.ScanWorkload", "ScanWorkload")
+ScanWorkload, ScanWorkloadConfig = create_typed_fn_tool(
+    kubescape_scan_workload, "kagent.tools.kubescape.ScanWorkload", "ScanWorkload"
+)
 
 
 # Function that runs the istioctl command in the shell

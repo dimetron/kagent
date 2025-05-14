@@ -24,11 +24,11 @@ RETAGGED_CONTROLLER_IMG = $(RETAGGED_DOCKER_REGISTRY)/$(DOCKER_REPO)/$(CONTROLLE
 RETAGGED_UI_IMG = $(RETAGGED_DOCKER_REGISTRY)/$(DOCKER_REPO)/$(UI_IMAGE_NAME):$(UI_IMAGE_TAG)
 RETAGGED_APP_IMG = $(RETAGGED_DOCKER_REGISTRY)/$(DOCKER_REPO)/$(APP_IMAGE_NAME):$(APP_IMAGE_TAG)
 
-DOCKER_BUILDER ?= docker
-DOCKER_BUILD_ARGS ?=
+#DOCKER_BUILDER ?= docker
+#DOCKER_BUILD_ARGS ?=
 
-#DOCKER_BUILDER ?= docker buildx
-#DOCKER_BUILD_ARGS ?= --load --progress=plain
+DOCKER_BUILDER ?= docker buildx
+DOCKER_BUILD_ARGS ?= --load --progress=plain
 
 KIND_CLUSTER_NAME ?= kagent
 
@@ -111,8 +111,12 @@ prune-kind-cluster:
 	docker exec $(KIND_CLUSTER_NAME)-control-plane crictl images --filter dangling=true --no-trunc --quiet | \
 	awk '{print $3}' | xargs -r docker exec $(KIND_CLUSTER_NAME)-control-plane crictl rmi || :
 
+.PHONY: buildx/create
+buildx/create:
+	tools/buildx/buildx-create.sh
+
 .PHONY: build
-build: build-controller build-ui build-app
+build: buildx/create build-controller build-ui build-app
 
 .PHONY: build-cli
 build-cli:
