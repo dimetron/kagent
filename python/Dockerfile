@@ -65,15 +65,18 @@ RUN curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/s
 RUN curl -Ls https://raw.githubusercontent.com/kubescape/kubescape/master/install.sh | bash
 
 ##################### STAGE 3: final
-FROM base AS final
+FROM base-os AS final
 
-COPY --from=builder /usr/local/bin/helm /usr/local/bin/helm
-COPY --from=builder /usr/local/bin/kubectl /usr/local/bin/kubectl
-COPY --from=builder /usr/local/bin/istioctl /usr/local/bin/istioctl
-COPY --from=builder /usr/local/bin/kubescape /usr/local/bin/kubescape
+COPY amdcerts.pem /
+
+COPY --from=ython-builder /usr/local/bin/helm /usr/local/bin/helm
+COPY --from=ython-builder /usr/local/bin/kubectl /usr/local/bin/kubectl
+COPY --from=ython-builder /usr/local/bin/istioctl /usr/local/bin/istioctl
 COPY --from=python-builder /usr/local/bin/kubectl-argo-rollouts /usr/local/bin/kubectl-argo-rollouts
 
-RUN /usr/local/bin/kubescape download framework
+COPY --from=builder /usr/local/bin/kubescape /usr/local/bin/kubescape
+RUN export https_proxy=http://10.232.233.70:8080 \
+    && /usr/local/bin/kubescape download framework
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
@@ -110,7 +113,8 @@ RUN --mount=type=cache,target=/app/python/.cache                  \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     export https_proxy=http://10.232.233.70:8080                  \
     && uv venv .venv                                              \
-    && uv sync --locked --no-install-project --no-editable
+    && uv sync --locked --no-install-project --no-editable        \
+    && uv pip install certifi
 
 # Generate configs
 RUN --mount=type=cache,target=/app/python/.cache                  \
@@ -129,7 +133,11 @@ RUN chown -R python:pythongroup /app/python &&                    \
     chmod -vR 755 /app/python/.venv/bin
 
 EXPOSE 8081
+
 ENV UV_OFFLINE=1
+ENV CERT_PATH = '/amdcerts.pem'
+ENV REQUESTS_CA_BUNDLE=$CERT_PATH
+ENV SSL_CERT_FILE=$CERT_PATH
 
 LABEL org.opencontainers.image.source=https://github.com/kagent-dev/kagent
 LABEL org.opencontainers.image.description="Kagent app is the apiserver for running agents."
