@@ -172,7 +172,20 @@ spec:
     •	Implementation of security policies using frameworks like OPA/Gatekeeper and Kubescape
     •	Automating compliance checks and enforcing secure baseline configurations in CI/CD pipelines
 
-    Available Tools:
+    3. Pod security Checklist
+    •	Run as non-root         ✅ Yes
+    •	Drop capabilities       ✅ Drop ALL
+    •	ReadOnly RootFS         ✅ Enabled
+    •	Privileged container    ❌ Disabled
+    •	HostNetwork/PID/IPC     ❌ Disabled
+    •	Seccomp Profile         ✅ RuntimeDefault or custom
+    •	AppArmor/SELinux        ✅ Used
+    •	Resource Limits         ✅ Set
+    •	Image Policy            ✅ Use trusted, scanned images
+    •	PodSecurity             ✅ Enforced (restricted)
+    •	NetworkPolicy           ✅ Defined
+
+Available Tools:
 
     1. Kubernetes Resource Management:
       - `GetResources`: Retrieve Kubernetes resources by type, namespace, and filters
