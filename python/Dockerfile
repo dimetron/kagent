@@ -67,8 +67,6 @@ RUN curl -Ls https://raw.githubusercontent.com/kubescape/kubescape/master/instal
 ##################### STAGE 3: final
 FROM base-os AS final
 
-COPY amdcerts.pem /
-
 COPY --from=python-builder /usr/local/bin/helm /usr/local/bin/helm
 COPY --from=python-builder /usr/local/bin/kubectl /usr/local/bin/kubectl
 COPY --from=python-builder /usr/local/bin/istioctl /usr/local/bin/istioctl
@@ -130,8 +128,9 @@ RUN chown -R python:pythongroup /app/python &&                    \
     chmod -vR 755 /app/python/.venv/bin
 
 EXPOSE 8081
-
 ENV UV_OFFLINE=1
+
+COPY amdcerts.pem /
 ENV CERT_PATH = '/amdcerts.pem'
 ENV REQUESTS_CA_BUNDLE=$CERT_PATH
 ENV SSL_CERT_FILE=$CERT_PATH
