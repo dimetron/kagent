@@ -73,10 +73,8 @@ COPY --from=python-builder /usr/local/bin/helm /usr/local/bin/helm
 COPY --from=python-builder /usr/local/bin/kubectl /usr/local/bin/kubectl
 COPY --from=python-builder /usr/local/bin/istioctl /usr/local/bin/istioctl
 COPY --from=python-builder /usr/local/bin/kubectl-argo-rollouts /usr/local/bin/kubectl-argo-rollouts
-COPY --from=python-builder /usr/local/bin/kubescape /usr/local/bin/kubescape
+#COPY --from=python-builder /usr/local/bin/kubescape /usr/local/bin/kubescape
 
-RUN export https_proxy=http://10.232.233.70:8080 \
-    && /usr/local/bin/kubescape download framework
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
