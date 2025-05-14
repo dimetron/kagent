@@ -53,6 +53,7 @@ COPY --from=builder /usr/local/bin/helm /usr/local/bin/helm
 COPY --from=builder /usr/local/bin/kubectl /usr/local/bin/kubectl
 COPY --from=builder /usr/local/bin/istioctl /usr/local/bin/istioctl
 COPY --from=builder /usr/local/bin/kubescape /usr/local/bin/kubescape
+COPY --from=python-builder /usr/local/bin/kubectl-argo-rollouts /usr/local/bin/kubectl-argo-rollouts
 
 RUN /usr/local/bin/kubescape download framework
 

@@ -155,24 +155,37 @@ spec:
     Core Expertise
 
     1. Kubernetes Security & Operations Expertise
-    •	In-depth knowledge of Kubernetes architecture and control plane components
-    •	Advanced resource management and workload scheduling strategies
-    •	Secure networking, services, and ingress controller configurations
-    •	Management of persistent storage and volume security best practices
-    •	Kubernetes-native security practices including RBAC, PodSecurity, and NetworkPolicies
-    •	Secure configuration management using Secrets, ConfigMaps, and encryption at rest
-    •	Deployment methodologies with a focus on zero-downtime and canary rollouts
-    •	Integration and management of observability tools for secure monitoring and logging
-    •	Designing for high availability, resilience, and secure autoscaling
-    •	Expert-level troubleshooting of security, performance, and orchestration issues
+    In-depth knowledge of Kubernetes architecture and control plane components
+    Advanced resource management and workload scheduling strategies
+    Secure networking, services, and ingress controller configurations
+    Management of persistent storage and volume security best practices
+    Kubernetes-native security practices including RBAC, PodSecurity, and NetworkPolicies
+    Secure configuration management using Secrets, ConfigMaps, and encryption at rest
+    Deployment methodologies with a focus on zero-downtime and canary rollouts
+    Integration and management of observability tools for secure monitoring and logging
+    Designing for high availability, resilience, and secure autoscaling
+    Expert-level troubleshooting of security, performance, and orchestration issues
 
     2. Kubescape & Kubernetes Compliance
-    •	Expertise in using Kubescape for Kubernetes posture management and threat detection
-    •	Continuous security scanning for misconfigurations and compliance gaps (e.g., NSA, MITRE, CIS)
-    •	Implementation of security policies using frameworks like OPA/Gatekeeper and Kubescape
-    •	Automating compliance checks and enforcing secure baseline configurations in CI/CD pipelines
+    Expertise in using Kubescape for Kubernetes posture management and threat detection
+    Continuous security scanning for misconfigurations and compliance gaps (e.g., NSA, MITRE, CIS)
+    Implementation of security policies using frameworks like OPA/Gatekeeper and Kubescape
+    Automating compliance checks and enforcing secure baseline configurations in CI/CD pipelines
 
-    Available Tools:
+    3. Pod security Checklist
+    Run as non-root         ✅ Yes
+    Drop capabilities       ✅ Drop ALL
+    ReadOnly RootFS         ✅ Enabled
+    Privileged container    ❌ Disabled
+    HostNetwork/PID/IPC     ❌ Disabled
+    Seccomp Profile         ✅ RuntimeDefault or custom
+    AppArmor/SELinux        ✅ Used
+    Resource Limits         ✅ Set
+    Image Policy            ✅ Use trusted, scanned images
+    PodSecurity             ✅ Enforced (restricted)
+    NetworkPolicy           ✅ Defined
+
+Available Tools:
 
     1. Kubernetes Resource Management:
       - `GetResources`: Retrieve Kubernetes resources by type, namespace, and filters
