@@ -1,6 +1,5 @@
 #https://www.docker.com/blog/faster-multi-platform-builds-dockerfile-cross-compilation-guide/
 ARG DOCKER_REGISTRY="illin4261.corp.amdocs.com:28090"
-ARG DOCKER_REGISTRY_GOOGLE="illin4261.corp.amdocs.com:28090"
 ARG TOOLS_UV_VERSION=0.7.2
 ARG LOCALPLATFORM
 
@@ -98,7 +97,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 ### STAGE 3 add golang
-FROM builder AS node-python-golang
+FROM python-builder AS node-python-golang
 ARG TOOLS_GO_VERSION
 ARG TOOLS_K9S_VERSION
 ARG TOOLS_KIND_VERSION

@@ -31,23 +31,28 @@ RUN echo /etc/apt/apt.conf.d/99genproxy && \
     && ln -sf /usr/bin/python3 /usr/bin/python
 
 FROM base-os AS go-base
+
 ARG LOCALARCH=arm64
 ARG TOOLS_GO_VERSION=1.24.3
 ARG TARGETARCH
-ARG GOPROXY="http://proxy.golang.org"
+ARG GOPROXY="http://docker-registry-proxy.corp.amdocs.com:8081/repository/goproxy"
+ARG NOPROXY="*.corp.amdocs.com,bitbucket,localhost,10.42.0.0/16,10.43.0.0/16"
 ARG PROXY="http://10.232.233.70:8080"
 
+#proxy
+ENV https_proxy=$PROXY
+ENV no_proxy=$NOPROXY
 
 ENV GO111MODULE=on
 ENV GOTOOLCHAIN=local
 ENV GONOSUMDB="bitbucket.corp.amdocs.com"
 ENV GOPRIVATE="bitbucket.corp.amdocs.com/*"
 ENV GOINSECURE="bitbucket.corp.amdocs.com/*"
-ENV GOPROXY="http://docker-registry-proxy.corp.amdocs.com:8081/repository/goproxy/,http://proxy.golang.org"
+ENV GOPROXY=$GOPROXY
 ENV PATH=$PATH:/usr/local/go/bin
 
 RUN --mount=type=cache,target=/cache,rw \
-    wget -e https_proxy=$PROXY  -q --show-progress -P /cache https://golang.org/dl/go${TOOLS_GO_VERSION}.linux-${LOCALARCH}.tar.gz \
+    wget  -q --show-progress -P /cache https://golang.org/dl/go${TOOLS_GO_VERSION}.linux-${LOCALARCH}.tar.gz \
     && tar     -C /usr/local -xzf /cache/go${TOOLS_GO_VERSION}.linux-${LOCALARCH}.tar.gz
 
 # verify the installation
@@ -94,7 +99,6 @@ WORKDIR /
 COPY --from=builder /workspace/manager .
 USER 65532:65532
 
-#
 LABEL org.opencontainers.image.source=https://github.com/kagent-dev/kagent
 LABEL org.opencontainers.image.description="Kagent controller is the controller for the Kagent app."
 LABEL org.opencontainers.image.authors="Kagent Creators 🤖"
