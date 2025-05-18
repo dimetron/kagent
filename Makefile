@@ -20,7 +20,7 @@ UI_IMG ?= $(DOCKER_REGISTRY)/$(DOCKER_REPO)/$(UI_IMAGE_NAME):$(UI_IMAGE_TAG)
 APP_IMG ?= $(DOCKER_REGISTRY)/$(DOCKER_REPO)/$(APP_IMAGE_NAME):$(APP_IMAGE_TAG)
 
 # Retagged image variables for kind loading; the Helm chart uses these
-RETAGGED_DOCKER_REGISTRY = cr.kagent.dev
+RETAGGED_DOCKER_REGISTRY = illin4261.corp.amdocs.com:28090
 RETAGGED_CONTROLLER_IMG = $(RETAGGED_DOCKER_REGISTRY)/$(DOCKER_REPO)/$(CONTROLLER_IMAGE_NAME):$(CONTROLLER_IMAGE_TAG)
 RETAGGED_UI_IMG = $(RETAGGED_DOCKER_REGISTRY)/$(DOCKER_REPO)/$(UI_IMAGE_NAME):$(UI_IMAGE_TAG)
 RETAGGED_APP_IMG = $(RETAGGED_DOCKER_REGISTRY)/$(DOCKER_REPO)/$(APP_IMAGE_NAME):$(APP_IMAGE_TAG)
@@ -168,9 +168,14 @@ release-app: build-app
 .PHONY: kind-load-docker-images
 kind-load-docker-images: retag-docker-images
 	docker images | grep $(VERSION) || true
-	kind load docker-image --name $(KIND_CLUSTER_NAME) $(RETAGGED_CONTROLLER_IMG)
-	kind load docker-image --name $(KIND_CLUSTER_NAME) $(RETAGGED_UI_IMG)
-	kind load docker-image --name $(KIND_CLUSTER_NAME) $(RETAGGED_APP_IMG)
+	@if [ "$$(kubectl config current-context)" = "kind-$(KIND_CLUSTER_NAME)" ]; then 		\
+		@echo "Loading docker images into kind cluster $(KIND_CLUSTER_NAME)...";			\
+		kind load docker-image --name $(KIND_CLUSTER_NAME) $(RETAGGED_CONTROLLER_IMG) || :;	\
+		kind load docker-image --name $(KIND_CLUSTER_NAME) $(RETAGGED_UI_IMG)		  || :;	\
+		kind load docker-image --name $(KIND_CLUSTER_NAME) $(RETAGGED_APP_IMG)		  || :;	\
+	else \
+		echo "Not in kind cluster $(KIND_CLUSTER_NAME), skipping image loading."; \
+	fi
 
 .PHONY: retag-docker-images
 retag-docker-images: build
