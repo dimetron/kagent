@@ -15,7 +15,8 @@ ARG TOOLS_PYTHON_VERSION=3.12
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
-RUN apk update && apk add python3 uv
+RUN export https_proxy=http://10.232.233.70:8080  \
+    && apk update && apk add python3 uv
 
 ENV GIT_LFS_SKIP_SMUDGE=1
 ENV UV_LINK_MODE=copy
