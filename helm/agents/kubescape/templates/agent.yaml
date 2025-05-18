@@ -1,5 +1,3 @@
-{{- if .Values.contrib.agents.kubescape.enabled }}
----
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -295,7 +293,7 @@ Available Tools:
     # Scan an workload in a specific namespace
     kubescape scan workload <kind>/<name> --namespace <namespace>
 
-  modelConfig: {{ .Values.contrib.agents.kubescape.modelConfigRef | default (printf "%s" (include "kagent.defaultModelConfigName"  .)) }}
+  modelConfig: {{ .Values.modelConfigRef | default (printf "%s" (include "kagent.defaultModelConfigName" .)) }}
   tools:
     - type: Builtin
       builtin:
@@ -309,4 +307,3 @@ Available Tools:
     - type: Builtin
       builtin:
         name: kagent.tools.kubescape.ScanWorkload
-{{- end }}
