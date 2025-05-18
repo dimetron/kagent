@@ -279,3 +279,8 @@ open-dev-container:
 	@echo "Opening dev container..."
 	devcontainer build .
 	@devcontainer open .
+
+.PHONY: otel-local-viewer
+otel-local-viewer:
+	docker run -d --restart=always -p 8000:8000 -p 4317:4317 -p 4318:4318 $(BASE_IMAGE_REGISTRY)/davetron5000/otel-desktop-viewer:alpine-3
+	open http://localhost:8000

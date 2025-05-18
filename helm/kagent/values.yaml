@@ -28,7 +28,7 @@ providers:
     provider: AzureOpenAI
     model: "gpt-4.1-mini"
     apiKeySecretRef: kagent-azure-openai
-    apiKeySecretKey: OPENAI_API_KEY
+    apiKeySecretKey: AZUREOPENAI_API_KEY
     apiKey: ""
     config:
       apiVersion: "2023-05-15"
@@ -131,10 +131,10 @@ securityContext: {}
 
 otel:
   tracing:
-    enabled: false
+    enabled: true
     exporter:
       otlp:
-        endpoint: http://localhost:4317
+        endpoint: http://host.lima.internal:4317
         timeout: 10
         insecure: true
 
