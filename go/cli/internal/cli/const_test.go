@@ -32,7 +32,7 @@ func TestGetModelProvider(t *testing.T) {
 			name:            "AzureOpenAI provider",
 			envVarValue:     string(v1alpha1.AzureOpenAI),
 			expectedResult:  v1alpha1.AzureOpenAI,
-			expectedAPIKey:  AZUREOPENAI_API_KEY,
+			expectedAPIKey:  OPENAI_API_KEY,
 			expectedHelmKey: "azureOpenAI",
 		},
 		{

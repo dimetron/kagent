@@ -600,7 +600,7 @@ func (a *apiTranslator) translateBuiltinTool(
 		}
 	}
 	if toolNeedsOpenaiApiKey(tool.Name) {
-		if modelConfig.Spec.Provider != v1alpha1.OpenAI {
+		if (modelConfig.Spec.Provider != v1alpha1.OpenAI) && modelConfig.Spec.Provider != v1alpha1.AzureOpenAI {
 			return nil, fmt.Errorf("tool %s requires OpenAI API key, but model config is not OpenAI", tool.Name)
 		}
 		apiKey, err := a.getModelConfigApiKey(ctx, modelConfig)

@@ -33,8 +33,8 @@ providers:
     config:
       apiVersion: "2023-05-15"
       azureAdToken: ""
-      azureDeployment: ""
-      azureEndpoint: ""
+      azureDeployment: "gpt-4o-128k"
+      azureEndpoint: "https://chat.autox.corp.amdocs.azr/api/v1/proxy"
 
 controller:
   loglevel: "info"
@@ -73,7 +73,12 @@ app:
     limits:
       cpu: 1000m
       memory: 1Gi
-  env: [] # Additional environment variables for the app can be added here
+  env: []
+#    - name: https_proxy
+#      value: https://192.168.8.1:3128
+#    - name: no_proxy
+#      value: 0.42.0.0/16,0.42.0.0/16,127.0.0.1,*.corp.amdocs.com,localhost
+
 
 ui:
   image:
@@ -164,7 +169,7 @@ helm-agent:
   enabled: true
 
 cilium-crd-agent:
-  enabled: true
+  enabled: false
 
 kubescape-agent:
   enabled:
