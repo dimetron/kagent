@@ -1,8 +1,6 @@
 #https://www.docker.com/blog/faster-multi-platform-builds-dockerfile-cross-compilation-guide/
-ARG DOCKER_REGISTRY="illin4261.corp.amdocs.com:28090"
-ARG DOCKER_REGISTRY_GOOGLE="illin4261.corp.amdocs.com:28090"
-ARG TOOLS_UV_VERSION=0.7.2
-ARG LOCALPLATFORM
+ARG DOCKER_REGISTRY=ghcr.io
+ARG TOOLS_UV_VERSION=latest
 
 ### STAGE 1: base image
 FROM $DOCKER_REGISTRY/astral-sh/uv:${TOOLS_UV_VERSION}-bookworm-slim AS base-os
@@ -11,12 +9,7 @@ ARG TOOLS_NODE_VERSION
 #ENVIRONMENT VARIABLES
 ENV DEBIAN_FRONTEND=noninteractive
 
-RUN echo /etc/apt/apt.conf.d/99genproxy && \
-    echo "Acquire::http::Pipeline-Depth 0;"     > /etc/apt/apt.conf.d/99genproxy   && \
-    echo "Acquire::http::No-Cache=True;"        >> /etc/apt/apt.conf.d/99genproxy  && \
-    echo "Acquire::BrokenProxy=True;"           >> /etc/apt/apt.conf.d/99genproxy  && \
-    echo "Acquire::http::Timeout \"120\";"      >> /etc/apt/apt.conf.d/99genproxy  && \
-    echo "Acquire::http::Proxy \"http://10.232.233.70:8080\";" >> /etc/apt/apt.conf.d/99proxy   \
+RUN mkdir -p /etc/apt/keyrings \
     && apt-get update && apt-get install -y --no-install-recommends \
     git                       \
     ca-certificates           \
@@ -30,34 +23,29 @@ RUN echo /etc/apt/apt.conf.d/99genproxy && \
 
 FROM base-os AS base
 
-ENV NEXT_TELEMETRY_DISABLED=1
-ENV UV_CACHE_DIR=/app/python/.cache/uv
-ENV BUN_INSTALL_CACHE_DIR=/cache/bun
-ENV BUN_INSTALL=/usr/local/bun
-ENV NVM_DIR=/usr/local/nvm
-ENV NODE_ENV=production
-ENV NODE_PATH=$NVM_DIR/v$TOOLS_NODE_VERSION/lib/node_modules
-ENV PATH=$NVM_DIR/versions/node/v$TOOLS_NODE_VERSION/bin:$BUN_INSTALL/bin:$PATH
-
 # Install python
-RUN --mount=type=cache,target=/app/python/.cache/uv,rw  \
-    export https_proxy=http://10.232.233.70:8080  \
-    && uv python install 3.12 \
-    && uv version \
-    && uv cache dir
+RUN uv python install 3.12
 
-# Install bun
-RUN --mount=type=cache,target=/cache/bun,rw \
-    export https_proxy=http://10.232.233.70:8080  \
-    && curl -fsSL https://bun.sh/install | bash   \
-    && ln -sf $BUN_INSTALL/bin/bun /usr/bin/bun   \
-    && bun --version
+# Install nvm
+ENV NVM_DIR=/usr/local/nvm
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV PATH=$NVM_DIR/versions/node/v$TOOLS_NODE_VERSION/bin:$PATH
+ENV NODE_PATH=$NVM_DIR/v$TOOLS_NODE_VERSION/lib/node_modules
+
+# Install nvm with node and npm
+RUN mkdir -p  $NVM_DIR \
+    && curl https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh  | bash \
+    && . $NVM_DIR/nvm.sh \
+    && mkdir -p $NVM_DIR/versions \
+    && nvm install $TOOLS_NODE_VERSION \
+    && nvm use $TOOLS_NODE_VERSION \
+    && which node && node --version \
+    && ln -sf $NVM_DIR/versions/node/v$TOOLS_NODE_VERSION/bin/node /usr/bin/node
 
 ### STAGE 2: build + tools
-FROM --platform=$TARGETPLATFORM base AS python-builder
-ARG PROXY
-ARG TARGETARCH
+FROM --platform=$BUILDPLATFORM base-os AS builder
 
+ARG TARGETARCH
 ARG TOOLS_ISTIO_VERSION
 ARG TOOLS_ARGO_CD_VERSION
 
@@ -105,22 +93,18 @@ ARG TOOLS_KIND_VERSION
 ARG TOOLS_ISTIO_VERSION
 ARG TOOLS_ARGO_CD_VERSION
 ARG TOOLS_KUBECTL_VERSION
-ARG PROXY="http://10.232.233.70:8080"
-ARG LOCALPLATFORM
+ARG ARCH=${TARGETARCH:-amd64}
 
 #ENVIRONMENT VARIABLES
 ENV DEBIAN_FRONTEND=noninteractive
 ENV GO111MODULE=on
 ENV GOTOOLCHAIN=local
-ENV GONOSUMDB="bitbucket.corp.amdocs.com"
-ENV GOPRIVATE="bitbucket.corp.amdocs.com/*"
-ENV GOINSECURE="bitbucket.corp.amdocs.com/*"
-ENV GOPROXY="http://docker-registry-proxy.corp.amdocs.com:8081/repository/goproxy/,http://proxy.golang.org"
+ENV GOPROXY="http://proxy.golang.org"
 ENV PATH=$PATH:/usr/local/go/bin
 
 RUN --mount=type=cache,target=/cache,rw \
-    wget -e https_proxy=$PROXY  -q --show-progress -P /cache https://golang.org/dl/go${TOOLS_GO_VERSION}.linux-${LOCALPLATFORM}.tar.gz \
-    && tar     -C /usr/local -xzf /cache/go${TOOLS_GO_VERSION}.linux-${LOCALPLATFORM}.tar.gz
+    wget -q --show-progress -P /cache https://golang.org/dl/go${TOOLS_GO_VERSION}.linux-${ARCH}.tar.gz && \
+    tar     -C /usr/local -xzf /cache/go${TOOLS_GO_VERSION}.linux-${ARCH}.tar.gz
 
 ### STAGE 3 add tools
 FROM --platform=$BUILDPLATFORM node-python-golang AS tools-node-python-golang
@@ -137,8 +121,8 @@ RUN curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/s
 
 # Install Istioctl
 RUN curl -L https://istio.io/downloadIstio | ISTIO_VERSION=${TOOLS_ISTIO_VERSION} TARGET_ARCH=${ARCH} sh - \
-    && mv istio-${TOOLS_ISTIO_VERSION}/bin/istioctl /usr/local/bin/istioctl \
-    && rm -rf istio-$TOOLS_ISTIO_VERSION
+    && mv istio-*/bin/istioctl /usr/local/bin/istioctl \
+    && rm -rf istio-*
 
 # Install kind
 RUN curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.27.0/kind-$(uname)-${ARCH} \

@@ -17,6 +17,7 @@ jobs:
           - app
           - cli
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -24,15 +25,20 @@ jobs:
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+        with:
+          platforms: linux/amd64,linux/arm64
+          version: v0.23.0
+          use: 'true'
       - name: Run make build
         env:
-          DOCKER_BUILDER: "docker buildx"
+          DOCKER_BUILDKIT: 1
           DOCKER_BUILD_ARGS: >-
-            --load
             --cache-from=type=gha
             --cache-to=type=gha,mode=max
-            --build-arg=VERSION=${{ env.VERSION }}
+            --platform=linux/amd64,linux/arm64
+            --output=type=tar,dest=/dev/null
 
+          DOCKER_BUILDER: "docker buildx"
         run: make build-${{ matrix.image }}
         working-directory: ./
     # - name: Upload artifact
