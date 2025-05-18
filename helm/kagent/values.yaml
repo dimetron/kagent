@@ -28,13 +28,13 @@ providers:
     provider: AzureOpenAI
     model: "gpt-4.1-mini"
     apiKeySecretRef: kagent-azure-openai
-    apiKeySecretKey: OPENAI_API_KEY
+    apiKeySecretKey: AZUREOPENAI_API_KEY
     apiKey: ""
     config:
       apiVersion: "2023-05-15"
       azureAdToken: ""
-      azureDeployment: "gpt-4o-128k"
-      azureEndpoint: "https://chat.autox.corp.amdocs.azr/api/v1/proxy"
+      azureDeployment: ""
+      azureEndpoint: ""
 
 controller:
   loglevel: "info"
@@ -48,7 +48,7 @@ controller:
 
   image:
     registry: illin4261.corp.amdocs.com:28090/platform
-    repository: kagent-dev/kagent/controller
+    repository: kagent/controller
     tag: "" # Will default to global, then Chart version
     pullPolicy: IfNotPresent
   resources:
@@ -63,7 +63,7 @@ controller:
 app:
   image:
     registry: illin4261.corp.amdocs.com:28090/platform
-    repository: kagent-dev/kagent/app
+    repository: kagent/app
     tag: "" # Will default to global, then Chart version
     pullPolicy: IfNotPresent
   resources:
@@ -73,16 +73,12 @@ app:
     limits:
       cpu: 1000m
       memory: 1Gi
-  env:
-    - name: https_proxy
-      value: https://192.168.8.1:3128
-    - name: no_proxy
-      value: 0.42.0.0/16,0.42.0.0/16,127.0.0.1,*.corp.amdocs.com,localhost
+  env: [] # Additional environment variables for the app can be added here
 
 ui:
   image:
     registry: illin4261.corp.amdocs.com:28090/platform
-    repository: kagent-dev/kagent/ui
+    repository: kagent/ui
     tag: "" # Will default to global, then Chart version
     pullPolicy: IfNotPresent
   resources:
@@ -111,6 +107,10 @@ imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
 
+# -- Override the namespace
+# @default -- `.Release.Namespace`
+namespaceOverride: ""
+
 podAnnotations: {}
 
 podSecurityContext: {}
@@ -124,34 +124,6 @@ securityContext: {}
   # runAsNonRoot: true
   # runAsUser: 1000
 
-contrib:
-  agents:
-    k8s:
-      enabled: true
-    istio:
-      enabled: true
-    helm:
-      enabled: true
-    promql:
-      enabled: true
-    kubescape:
-      enabled: true
-    observability:
-      enabled: true
-      prometheus:
-        url: ""
-        username: ""
-        password: ""
-      grafana:
-        url: ""
-        username: ""
-        password: ""
-        apiKey: ""
-    argoRolloutsConversion:
-      enabled: true
-    kgateway:
-      enabled: true
-
 otel:
   tracing:
     enabled: false
@@ -160,3 +132,36 @@ otel:
         endpoint: http://localhost:4317
         timeout: 10
         insecure: true
+
+k8s-agent:
+  enabled: true
+
+kgateway-agent:
+  enabled: true
+
+istio-agent:
+  enabled: true
+
+promql-agent:
+  enabled: true
+
+observability-agent:
+  enabled: true
+  prometheus:
+    url: ""
+    username: ""
+    password: ""
+  grafana:
+    url: ""
+    username: ""
+    password: ""
+    apiKey: ""
+
+argo-rollouts-agent:
+  enabled: true
+
+helm-agent:
+  enabled: true
+
+cilium-crd-agent:
+  enabled: true

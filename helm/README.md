@@ -54,17 +54,12 @@ export AZURE_API_KEY=your-azure-api-key
 export KAGENT_DEFAULT_MODEL_PROVIDER=ollama
 export KAGENT_DEFAULT_MODEL_PROVIDER=azureOpenAI
 export KAGENT_DEFAULT_MODEL_PROVIDER=anthropic
-export KAGENT_DEFAULT_MODEL_PROVIDER=openAI
 
 # use local helm chart to install kagent
 export KAGENT_DEFAULT_MODEL_PROVIDER=openAI
 export KAGENT_HELM_REPO=./helm/
 make kagent-cli-install
 
-
-# On Mac enable the ollama host
-launchctl setenv OLLAMA_HOST "0.0.0.0"
-launchctl setenv OLLAMA_CONTEXT_LENGTH 8192
 ```
 
 ## Upgrading

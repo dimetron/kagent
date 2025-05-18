@@ -1,10 +1,11 @@
 # Image configuration
-# crane copy --insecure docker-registry-proxy.corp.amdocs.com/astral-sh/uv:0.7.2-bookworm-slim illin4261.corp.amdocs.com:28090/astral-sh/uv:0.7.2-bookworm-slim
-# crane copy --insecure docker-registry-proxy.corp.amdocs.com//distroless/static:nonroot illin4261.corp.amdocs.com:28090//distroless/static:nonroot
 DOCKER_REGISTRY ?= illin4261.corp.amdocs.com:28090
-DOCKER_REGISTRY_GOOGLE ?= illin4261.corp.amdocs.com:28090
-DOCKER_REPO ?= kagent-dev/kagent
-VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null | sed 's/-dirty//' | grep v || echo "v0.0.0-local")
+BASE_IMAGE_REGISTRY ?= docker-registry-proxy.corp.amdocs.com
+DOCKER_REPO ?= platform/kagent
+
+BUILD_DATE := $(shell date -u '+%Y-%m-%d')
+GIT_COMMIT := $(shell git rev-parse --short HEAD || echo "unknown")
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null | sed 's/-dirty//' | grep v || echo "v0.0.0-$(GIT_COMMIT)")
 
 CONTROLLER_IMAGE_NAME ?= controller
 UI_IMAGE_NAME ?= ui
@@ -19,29 +20,21 @@ UI_IMG ?= $(DOCKER_REGISTRY)/$(DOCKER_REPO)/$(UI_IMAGE_NAME):$(UI_IMAGE_TAG)
 APP_IMG ?= $(DOCKER_REGISTRY)/$(DOCKER_REPO)/$(APP_IMAGE_NAME):$(APP_IMAGE_TAG)
 
 # Retagged image variables for kind loading; the Helm chart uses these
-RETAGGED_DOCKER_REGISTRY = illin4261.corp.amdocs.com:28090/platform
+RETAGGED_DOCKER_REGISTRY = illin4261.corp.amdocs.com:28090
 RETAGGED_CONTROLLER_IMG = $(RETAGGED_DOCKER_REGISTRY)/$(DOCKER_REPO)/$(CONTROLLER_IMAGE_NAME):$(CONTROLLER_IMAGE_TAG)
 RETAGGED_UI_IMG = $(RETAGGED_DOCKER_REGISTRY)/$(DOCKER_REPO)/$(UI_IMAGE_NAME):$(UI_IMAGE_TAG)
 RETAGGED_APP_IMG = $(RETAGGED_DOCKER_REGISTRY)/$(DOCKER_REPO)/$(APP_IMAGE_NAME):$(APP_IMAGE_TAG)
-
-#DOCKER_BUILDER ?= docker
-#DOCKER_BUILD_ARGS ?=
-
-DOCKER_BUILDER ?= docker buildx
-DOCKER_BUILD_ARGS ?= --load --progress=plain
-
+DOCKER_BUILDER ?= docker
+DOCKER_BUILD_ARGS ?=
 KIND_CLUSTER_NAME ?= kagent
-
-PROXY ?= "http://genproxy:8080"
-NOPROXY ?= "*.corp.amdocs.com,localhost,"
 
 #take from go/go.mod
 AWK ?= $(shell command -v gawk || command -v awk)
 TOOLS_GO_VERSION ?= $(shell $(AWK) '/^go / { print $$2 }' go/go.mod)
-LOCALARCH=$(shell uname -m | sed 's/aarch64/arm64/g' | sed 's/x86_64/amd64/g')
 
 #tools versions
 TOOLS_UV_VERSION ?= 0.7.2
+TOOLS_BUN_VERSION ?= 1.2.12
 TOOLS_K9S_VERSION ?= 0.50.4
 TOOLS_KIND_VERSION ?= 0.27.0
 TOOLS_NODE_VERSION ?= 22.15.0
@@ -50,13 +43,10 @@ TOOLS_ARGO_CD_VERSION ?= 3.0.0
 TOOLS_KUBECTL_VERSION ?= 1.33.4
 
 # build args
-TOOLS_IMAGE_BUILD_ARGS =  --build-arg PROXY=$(PROXY)
-TOOLS_IMAGE_BUILD_ARGS =  --build-arg NOPROXY=$(NOPROXY)
-TOOLS_IMAGE_BUILD_ARGS += --build-arg LOCALARCH=$(LOCALARCH)
-TOOLS_IMAGE_BUILD_ARGS += --build-arg DOCKER_REGISTRY=$(DOCKER_REGISTRY)
-TOOLS_IMAGE_BUILD_ARGS += --build-arg DOCKER_REGISTRY_GOOGLE=$(DOCKER_REGISTRY_GOOGLE)
+TOOLS_IMAGE_BUILD_ARGS =  --build-arg BASE_IMAGE_REGISTRY=$(BASE_IMAGE_REGISTRY)
 TOOLS_IMAGE_BUILD_ARGS += --build-arg TOOLS_GO_VERSION=$(TOOLS_GO_VERSION)
 TOOLS_IMAGE_BUILD_ARGS += --build-arg TOOLS_UV_VERSION=$(TOOLS_UV_VERSION)
+TOOLS_IMAGE_BUILD_ARGS += --build-arg TOOLS_BUN_VERSION=$(TOOLS_BUN_VERSION)
 TOOLS_IMAGE_BUILD_ARGS += --build-arg TOOLS_K9S_VERSION=$(TOOLS_K9S_VERSION)
 TOOLS_IMAGE_BUILD_ARGS += --build-arg TOOLS_KIND_VERSION=$(TOOLS_KIND_VERSION)
 TOOLS_IMAGE_BUILD_ARGS += --build-arg TOOLS_NODE_VERSION=$(TOOLS_NODE_VERSION)
@@ -88,7 +78,17 @@ check-openai-key:
 		exit 1; \
 	fi
 
-# Build targets
+.PHONY: build-all  # build all all using buildx
+build-all: BUILDER_NAME ?= kagent-builder
+build-all: BUILDER ?=docker buildx --builder $(BUILDER_NAME)
+build-all: BUILD_ARGS ?= --platform linux/amd64,linux/arm64 --output type=tar,dest=/dev/null
+build-all:
+	#docker buildx rm $(BUILDER_NAME) || :
+	docker run --privileged --rm tonistiigi/binfmt --install all || :
+	docker buildx ls | grep $(BUILDER_NAME)  || docker buildx create --name $(BUILDER_NAME) --use || :
+	$(BUILDER) build $(BUILD_ARGS) $(TOOLS_IMAGE_BUILD_ARGS) -f go/Dockerfile ./go
+	$(BUILDER) build $(BUILD_ARGS) $(TOOLS_IMAGE_BUILD_ARGS) -f ui/Dockerfile ./ui
+	$(BUILDER) build $(BUILD_ARGS) $(TOOLS_IMAGE_BUILD_ARGS) -f python/Dockerfile ./python
 
 .PHONY: create-kind-cluster
 create-kind-cluster:
@@ -111,15 +111,8 @@ prune-kind-cluster:
 	docker exec $(KIND_CLUSTER_NAME)-control-plane crictl images --filter dangling=true --no-trunc --quiet | \
 	awk '{print $3}' | xargs -r docker exec $(KIND_CLUSTER_NAME)-control-plane crictl rmi || :
 
-.PHONY: buildx/create
-buildx/create:
-	tools/buildx/buildx-create.sh
-
-.PHONY: builds
-builds: build build-cli
-
 .PHONY: build
-build: buildx/create build-controller build-ui build-app
+build: build-controller build-ui build-app
 
 .PHONY: build-cli
 build-cli:
@@ -146,7 +139,7 @@ controller-manifests:
 
 .PHONY: build-controller
 build-controller: controller-manifests
-	$(DOCKER_BUILDER) build --progress=plain $(DOCKER_BUILD_ARGS) $(TOOLS_IMAGE_BUILD_ARGS) -t $(CONTROLLER_IMG) -f go/Dockerfile ./go
+	$(DOCKER_BUILDER) build $(DOCKER_BUILD_ARGS) $(TOOLS_IMAGE_BUILD_ARGS) -t $(CONTROLLER_IMG) -f go/Dockerfile ./go
 
 .PHONY: release-controller
 release-controller: DOCKER_BUILD_ARGS += --push --platform linux/amd64,linux/arm64
@@ -156,7 +149,7 @@ release-controller: build-controller
 .PHONY: build-ui
 build-ui:
 	# Build the combined UI and backend image
-	$(DOCKER_BUILDER) build --progress=plain $(DOCKER_BUILD_ARGS) $(TOOLS_IMAGE_BUILD_ARGS) -t $(UI_IMG) -f ui/Dockerfile ./ui
+	$(DOCKER_BUILDER) build $(DOCKER_BUILD_ARGS) $(TOOLS_IMAGE_BUILD_ARGS) -t $(UI_IMG) -f ui/Dockerfile ./ui
 
 .PHONY: release-ui
 release-ui: DOCKER_BUILD_ARGS += --push --platform linux/amd64,linux/arm64
@@ -165,8 +158,7 @@ release-ui: build-ui
 
 .PHONY: build-app
 build-app:
-	make -C python build #update lock file before docker build
-	$(DOCKER_BUILDER) build --progress=plain $(DOCKER_BUILD_ARGS) $(TOOLS_IMAGE_BUILD_ARGS) -t $(APP_IMG) -f python/Dockerfile ./python
+	$(DOCKER_BUILDER) build $(DOCKER_BUILD_ARGS) $(TOOLS_IMAGE_BUILD_ARGS) -t $(APP_IMG) -f python/Dockerfile ./python
 
 .PHONY: release-app
 release-app: DOCKER_BUILD_ARGS += --push --platform linux/amd64,linux/arm64
@@ -175,9 +167,15 @@ release-app: build-app
 
 .PHONY: kind-load-docker-images
 kind-load-docker-images: retag-docker-images
-	kind load docker-image --name $(KIND_CLUSTER_NAME) $(RETAGGED_CONTROLLER_IMG)	|| :
-	kind load docker-image --name $(KIND_CLUSTER_NAME) $(RETAGGED_UI_IMG)			|| :
-	kind load docker-image --name $(KIND_CLUSTER_NAME) $(RETAGGED_APP_IMG)			|| :
+	docker images | grep $(VERSION) || true
+	@if [ "$$(kubectl config current-context)" = "kind-$(KIND_CLUSTER_NAME)" ]; then 		\
+		@echo "Loading docker images into kind cluster $(KIND_CLUSTER_NAME)...";			\
+		kind load docker-image --name $(KIND_CLUSTER_NAME) $(RETAGGED_CONTROLLER_IMG) || :;	\
+		kind load docker-image --name $(KIND_CLUSTER_NAME) $(RETAGGED_UI_IMG)		  || :;	\
+		kind load docker-image --name $(KIND_CLUSTER_NAME) $(RETAGGED_APP_IMG)		  || :;	\
+	else \
+		echo "Not in kind cluster $(KIND_CLUSTER_NAME), skipping image loading."; \
+	fi
 
 .PHONY: retag-docker-images
 retag-docker-images: build
@@ -185,10 +183,30 @@ retag-docker-images: build
 	docker tag $(UI_IMG) $(RETAGGED_UI_IMG)
 	docker tag $(APP_IMG) $(RETAGGED_APP_IMG)
 
+.PHONY: helm-agents
+helm-agents:
+	VERSION=$(VERSION) envsubst < helm/agents/k8s/Chart-template.yaml > helm/agents/k8s/Chart.yaml
+	helm package helm/agents/k8s
+	VERSION=$(VERSION) envsubst < helm/agents/kgateway/Chart-template.yaml > helm/agents/kgateway/Chart.yaml
+	helm package helm/agents/kgateway
+	VERSION=$(VERSION) envsubst < helm/agents/istio/Chart-template.yaml > helm/agents/istio/Chart.yaml
+	helm package helm/agents/istio
+	VERSION=$(VERSION) envsubst < helm/agents/promql/Chart-template.yaml > helm/agents/promql/Chart.yaml
+	helm package helm/agents/promql
+	VERSION=$(VERSION) envsubst < helm/agents/observability/Chart-template.yaml > helm/agents/observability/Chart.yaml
+	helm package helm/agents/observability
+	VERSION=$(VERSION) envsubst < helm/agents/helm/Chart-template.yaml > helm/agents/helm/Chart.yaml
+	helm package helm/agents/helm
+	VERSION=$(VERSION) envsubst < helm/agents/argo-rollouts/Chart-template.yaml > helm/agents/argo-rollouts/Chart.yaml
+	helm package helm/agents/argo-rollouts
+	VERSION=$(VERSION) envsubst < helm/agents/cilium-crd/Chart-template.yaml > helm/agents/cilium-crd/Chart.yaml
+	helm package helm/agents/cilium-crd
+
 .PHONY: helm-version
-helm-version:
+helm-version: helm-agents
 	VERSION=$(VERSION) envsubst < helm/kagent-crds/Chart-template.yaml > helm/kagent-crds/Chart.yaml
 	VERSION=$(VERSION) envsubst < helm/kagent/Chart-template.yaml > helm/kagent/Chart.yaml
+	helm dependency update helm/kagent
 	helm package helm/kagent-crds
 	helm package helm/kagent
 
@@ -236,15 +254,22 @@ helm-uninstall:
 helm-publish: helm-version
 	helm push kagent-crds-$(VERSION).tgz oci://ghcr.io/kagent-dev/kagent/helm
 	helm push kagent-$(VERSION).tgz oci://ghcr.io/kagent-dev/kagent/helm
+	helm push helm-agent-$(VERSION).tgz oci://ghcr.io/kagent-dev/kagent/agents
+	helm push istio-agent-$(VERSION).tgz oci://ghcr.io/kagent-dev/kagent/agents
+	helm push promql-agent-$(VERSION).tgz oci://ghcr.io/kagent-dev/kagent/agents
+	helm push observability-agent-$(VERSION).tgz oci://ghcr.io/kagent-dev/kagent/agents
+	helm push argo-rollouts-agent-$(VERSION).tgz oci://ghcr.io/kagent-dev/kagent/agents
+	helm push cilium-crd-agent-$(VERSION).tgz oci://ghcr.io/kagent-dev/kagent/agents
+	helm push kgateway-agent-$(VERSION).tgz oci://ghcr.io/kagent-dev/kagent/agents
 
 .PHONY: kagent-cli-install
-kagent-cli-install: build-cli-local helm-version kind-load-docker-images
+kagent-cli-install: build-cli-local kind-load-docker-images helm-version
 kagent-cli-install:
 	KAGENT_HELM_REPO=./helm/ ./go/bin/kagent-local
 
 .PHONY: kagent-cli-port-forward
 kagent-cli-port-forward: use-kind-cluster
-	@echo "Port forwarding to KAgent CLI..."
+	@echo "Port forwarding to kagent CLI..."
 	kubectl port-forward -n kagent service/kagent 8081:8081 8082:80
 
 .PHONY: open-dev-container
