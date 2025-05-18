@@ -27,11 +27,12 @@ RUN addgroup -g 1001 pythongroup && \
     adduser -u 1001 -G pythongroup -s /bin/bash -D python && \
     chown -R python:pythongroup /app/python
 
-RUN --mount=type=cache,target=/app/python/.cache,rw  \
-    echo "Installing Python $TOOLS_PYTHON_VERSION..."                 \
-    && uv venv .venv                                 \
-    && uv python install $TOOLS_PYTHON_VERSION                        \
-    && uv cache dir                                  \
+RUN --mount=type=cache,target=/app/python/.cache,rw   \
+    echo "Installing Python $TOOLS_PYTHON_VERSION..." \
+    && export https_proxy=http://10.232.233.70:8080   \
+    && uv venv .venv                                  \
+    && uv python install $TOOLS_PYTHON_VERSION        \
+    && uv cache dir                                   \
     && uv version
 
 ### STAGE 3: tools
@@ -43,19 +44,23 @@ ARG TOOLS_ARGO_CD_VERSION
 RUN mkdir -p /app/downloads /usr/local/bin/
 WORKDIR /app/downloads
 
-RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/$TARGETARCH/kubectl" \
+RUN export https_proxy=http://10.232.233.70:8080   \
+    && curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/$TARGETARCH/kubectl" \
     && chmod +x kubectl \
     && mv kubectl /usr/local/bin/
 
-RUN curl -Lo /usr/local/bin/kubectl-argo-rollouts -L https://github.com/argoproj/argo-rollouts/releases/$TOOLS_ARGO_CD_VERSION/download/kubectl-argo-rollouts-linux-$TARGETARCH \
+RUN export https_proxy=http://10.232.233.70:8080   \
+    && curl -Lo /usr/local/bin/kubectl-argo-rollouts -L https://github.com/argoproj/argo-rollouts/releases/$TOOLS_ARGO_CD_VERSION/download/kubectl-argo-rollouts-linux-$TARGETARCH \
     && chmod +x /usr/local/bin/kubectl-argo-rollouts
 
-RUN curl -L https://istio.io/downloadIstio | ISTIO_VERSION=$TOOLS_ISTIO_VERSION TARGET_ARCH=$TARGETARCH sh - \
+RUN export https_proxy=http://10.232.233.70:8080   \
+    && curl -L https://istio.io/downloadIstio | ISTIO_VERSION=$TOOLS_ISTIO_VERSION TARGET_ARCH=$TARGETARCH sh - \
     && mv istio-*/bin/istioctl /usr/local/bin/istioctl \
     && rm -rf istio-*
 
 # Install Helm
-RUN curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 \
+RUN export https_proxy=http://10.232.233.70:8080   \
+    && curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 \
     && chmod 700 get_helm.sh \
     && ./get_helm.sh \
     && rm get_helm.sh
