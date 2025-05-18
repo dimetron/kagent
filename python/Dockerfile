@@ -82,17 +82,21 @@ COPY src src
 # Install dependencies
 RUN --mount=type=cache,target=/app/python/.cache                  \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    uv venv .venv && uv sync --locked
+    export https_proxy=http://10.232.233.70:8080                  \
+    && uv venv .venv && uv sync --locked
 
 # Generate configs
 RUN --mount=type=cache,target=/app/python/.cache                  \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    mkdir -p /app/python/.autogenstudio/configs && uv run tool_gen -o /app/python/.autogenstudio/configs
+    mkdir -p /app/python/.autogenstudio/configs                   \
+    export https_proxy=http://10.232.233.70:8080                  \
+    && uv run tool_gen -o /app/python/.autogenstudio/configs
 
 # Test if the tool is working and fetch all dependencies
 RUN --mount=type=cache,target=/app/python/.cache                  \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    uv run kagent-engine --help
+    export https_proxy=http://10.232.233.70:8080                  \
+    && uv run kagent-engine --help
 
 RUN chown -R python:pythongroup /app/python && \
     chmod -vR 755 /app/python/.venv/bin
