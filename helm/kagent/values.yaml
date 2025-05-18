@@ -73,12 +73,7 @@ app:
     limits:
       cpu: 1000m
       memory: 1Gi
-  env:
-    - name: https_proxy
-      value: https://192.168.8.1:3128
-    - name: no_proxy
-      value: 0.42.0.0/16,0.42.0.0/16,127.0.0.1,*.corp.amdocs.com,localhost
-
+  env: [] # Additional environment variables for the app can be added here
 
 ui:
   image:
