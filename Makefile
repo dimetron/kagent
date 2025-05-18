@@ -201,6 +201,8 @@ helm-agents:
 	helm package helm/agents/argo-rollouts
 	VERSION=$(VERSION) envsubst < helm/agents/cilium-crd/Chart-template.yaml > helm/agents/cilium-crd/Chart.yaml
 	helm package helm/agents/cilium-crd
+	VERSION=$(VERSION) envsubst < helm/agents/kubescape/Chart-template.yaml > helm/agents/kubescape/Chart.yaml
+	helm package helm/agents/kubescape
 
 .PHONY: helm-version
 helm-version: helm-agents
@@ -263,7 +265,7 @@ helm-publish: helm-version
 	helm push kgateway-agent-$(VERSION).tgz oci://ghcr.io/kagent-dev/kagent/agents
 
 .PHONY: kagent-cli-install
-kagent-cli-install: build-cli-local kind-load-docker-images helm-version
+kagent-cli-install: build-cli-local kind-load-docker-images
 kagent-cli-install:
 	KAGENT_HELM_REPO=./helm/ ./go/bin/kagent-local
 

@@ -1,0 +1,5 @@
+apiVersion: v2
+name: kubescape-agent
+description: A kubescape Agent for kagent
+type: application
+version: ${VERSION}

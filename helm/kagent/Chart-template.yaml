@@ -36,3 +36,7 @@ dependencies:
     version: ${VERSION}
     repository: file://../agents/cilium-crd
     condition: cilium-crd-agent.enabled
+  - name: kubescape-agent
+    version: ${VERSION}
+    repository: file://../agents/kubescape
+    condition: kubescape-agent.enabled
