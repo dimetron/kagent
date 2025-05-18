@@ -1,7 +1,7 @@
 # Image configuration
 DOCKER_REGISTRY ?= illin4261.corp.amdocs.com:28090
 BASE_IMAGE_REGISTRY ?= docker-registry-proxy.corp.amdocs.com
-DOCKER_REPO ?= kagent-dev/kagent
+DOCKER_REPO ?= platform/kagent
 
 BUILD_DATE := $(shell date -u '+%Y-%m-%d')
 GIT_COMMIT := $(shell git rev-parse --short HEAD || echo "unknown")

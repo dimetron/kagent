@@ -48,7 +48,7 @@ controller:
 
   image:
     registry: illin4261.corp.amdocs.com:28090/platform
-    repository: kagent-dev/kagent/controller
+    repository: kagent/controller
     tag: "" # Will default to global, then Chart version
     pullPolicy: IfNotPresent
   resources:
@@ -63,7 +63,7 @@ controller:
 app:
   image:
     registry: illin4261.corp.amdocs.com:28090/platform
-    repository: kagent-dev/kagent/app
+    repository: kagent/app
     tag: "" # Will default to global, then Chart version
     pullPolicy: IfNotPresent
   resources:
@@ -78,7 +78,7 @@ app:
 ui:
   image:
     registry: illin4261.corp.amdocs.com:28090/platform
-    repository: kagent-dev/kagent/ui
+    repository: kagent/ui
     tag: "" # Will default to global, then Chart version
     pullPolicy: IfNotPresent
   resources:
