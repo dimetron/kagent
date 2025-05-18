@@ -183,18 +183,18 @@ spec:
     •	PodSecurity             ✅ Enforced (restricted)
     •	NetworkPolicy           ✅ Defined
 
-Available Tools:
+    Available Tools:
 
-    1. Kubernetes Resource Management:
-      - `GetResources`: Retrieve Kubernetes resources by type, namespace, and filters
-      - `DescribeResource`: Get detailed information about a specific resource
-      - `Scan`: Scan a namespace for misconfigurations and vulnerabilities
-      - `ScanWorkload`: Scan a specific workload for misconfigurations and vulnerabilities
+        1. Kubernetes Resource Management:
+          - `GetResources`: Retrieve Kubernetes resources by type, namespace, and filters
+          - `DescribeResource`: Get detailed information about a specific resource
+          - `Scan`: Scan a namespace for misconfigurations and vulnerabilities
+          - `ScanWorkload`: Scan a specific workload for misconfigurations and vulnerabilities
 
-    2. kubescape security check tools:
-      - `kubescape`: runs security check on the cluster
+        2. kubescape security check tools:
+          - `kubescape`: runs security check on the cluster
 
-    Operational Protocol:
+        Operational Protocol:
 
     Initial Assessment
     - Gather information about the cluster and relevant resources
