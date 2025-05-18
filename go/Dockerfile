@@ -5,6 +5,15 @@ FROM --platform=linux/$BUILDARCH $BASE_IMAGE_REGISTRY/chainguard/go:latest AS bu
 ARG TARGETPLATFORM
 ARG TARGETARCH
 
+ENV http_proxy=${PROXY:-http://10.232.233.70:8080}
+ENV https_proxy=${PROXY:-http://10.232.233.70:8080}
+ENV no_proxy="localhost,127.0.0.1,172.17.0.0/12,192.168.0.0/16,.svc,.default,.local,.internal,fs.amdocs.com,.amdocs.com,.amdocs.aws,.sock,bitbucket.corp.amdocs.com,.corp.amdocs.com,docker-registry-proxy.corp.amdocs.com"
+
+ENV GO111MODULE=on
+ENV GOTOOLCHAIN=local
+ENV GOPROXY="http://docker-registry-proxy.corp.amdocs.com:8081/repository/goproxy/,http://proxy.golang.org"
+ENV PATH=$PATH:/usr/local/go/bin
+
 WORKDIR /workspace
 # Copy the Go Modules manifests
 COPY go.mod go.mod
@@ -30,7 +39,7 @@ RUN --mount=type=cache,target=/root/go/pkg/mod,rw         \
 
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
-FROM gcr.io/distroless/static:nonroot
+FROM $BASE_IMAGE_REGISTRY/distroless/static:nonroot
 WORKDIR /
 COPY --from=builder /workspace/manager .
 USER 65532:65532

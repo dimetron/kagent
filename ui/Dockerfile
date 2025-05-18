@@ -4,7 +4,8 @@ FROM --platform=linux/$BUILDARCH $BASE_IMAGE_REGISTRY/chainguard/wolfi-base:late
 
 ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
-RUN apk update \
+RUN export https_proxy=http://10.232.233.70:8080  \
+    && apk update \
     && apk add curl openssl unzip bash git ca-certificates nginx supervisor \
     && update-ca-certificates \
     && rm -rf /var/cache/apk/*
@@ -25,8 +26,10 @@ ENV PATH=$BUN_INSTALL/bin:$PATH
 
 # Install Bun (uses official install script)
 # brew install oven-sh/bun/bun
+#
 RUN --mount=type=cache,target=/cache/bun,rw \
     mkdir -p $BUN_INSTALL  \
+    && export https_proxy=http://10.232.233.70:8080  \
     && curl -fsSL https://bun.sh/install | bash -s "bun-v$TOOLS_BUN_VERSION" \
     && bun --version
 
@@ -38,14 +41,16 @@ WORKDIR /app/ui
 
 #copy the package.json
 COPY package*.json .
-RUN --mount=type=cache,target=/cache/bun,rw             \
+RUN --mount=type=cache,target=/cache/bun,rw         \
+    export https_proxy=http://10.232.233.70:8080 && \
     bun install
 
 #copy the rest of the files
 COPY . .
-RUN --mount=type=cache,target=/cache/bun,rw             \
-    bun install                                      \
-    && bun run build  --no-lint                         \
+RUN --mount=type=cache,target=/cache/bun,rw         \
+    export https_proxy=http://10.232.233.70:8080 && \
+    bun install                                     \
+    && bun run build  --no-lint                     \
     && mkdir -p /app/ui/public
 
 ### STAGE 3: final
