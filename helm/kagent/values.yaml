@@ -72,20 +72,19 @@ app:
   resources:
     requests:
       cpu: 100m
-      memory: 256Mi
+      memory: 512Mi
     limits:
-      cpu: 1000m
-      memory: 1Gi
-  env:
-    - name: AZURE_TRACING_GEN_AI_CONTENT_RECORDING_ENABLED
-      value: "true"
-
+      cpu: 2000m
+      memory: 2Gi
+  env: []
 #    - name: https_proxy
 #      value: https://192.168.8.1:3128
 #    - name: no_proxy
 #      value: 0.42.0.0/16,0.42.0.0/16,127.0.0.1,*.corp.amdocs.com,localhost
-
-
+#    - name: REQUESTS_CA_BUNDLE
+#      value: /app/python/amdcerts.pem
+#    - name: SSL_CERT_FILE
+#      value: /app/python/amdcerts.pem
 ui:
   image:
     registry: illin4261.corp.amdocs.com:28090/platform
@@ -141,7 +140,7 @@ securityContext: {}
 
 otel:
   tracing:
-    enabled: true
+    enabled: false
     exporter:
       otlp:
         endpoint: http://host.lima.internal:4317
@@ -180,6 +179,3 @@ helm-agent:
 
 cilium-crd-agent:
   enabled: false
-
-kubescape-agent:
-  enabled:
