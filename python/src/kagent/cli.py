@@ -1,7 +1,6 @@
 import typer
 from autogen_core import CancellationToken
 from mcp.server.fastmcp import FastMCP
-from opentelemetry.instrumentation.openai import OpenAIInstrumentor
 from pydantic import BaseModel
 
 from kagent.tools.argo._argo_rollouts_k8sgw_installation import (
@@ -97,8 +96,6 @@ from kagent.tools.prometheus._prometheus import (
 app = typer.Typer()
 
 mcp = FastMCP("KAgent")
-
-OpenAIInstrumentor().instrument()
 
 
 def add_typed_tool(cfg_type: type[BaseModel], tool: BaseTool):

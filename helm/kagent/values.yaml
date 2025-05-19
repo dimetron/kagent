@@ -31,10 +31,13 @@ providers:
     apiKeySecretKey: AZUREOPENAI_API_KEY
     apiKey: ""
     config:
-      apiVersion: "2023-05-15"
+      apiVersion: "2024-10-21"
       azureAdToken: ""
-      azureDeployment: "gpt-4o-128k"
+      azureDeployment: "gpt-4.1-mini"
       azureEndpoint: "https://chat.autox.corp.amdocs.azr/api/v1/proxy"
+      defaultHeaders:
+        username: "dmitriyr"
+        application: "kagent"
 
 controller:
   loglevel: "info"
@@ -73,7 +76,10 @@ app:
     limits:
       cpu: 1000m
       memory: 1Gi
-  env: []
+  env:
+    - name: AZURE_TRACING_GEN_AI_CONTENT_RECORDING_ENABLED
+      value: "true"
+
 #    - name: https_proxy
 #      value: https://192.168.8.1:3128
 #    - name: no_proxy
@@ -116,7 +122,11 @@ fullnameOverride: ""
 # @default -- `.Release.Namespace`
 namespaceOverride: ""
 
-podAnnotations: {}
+podAnnotations:
+  sidecar.istio.io/inject: "true"
+  #ignore otel outbound traffic
+  traffic.sidecar.istio.io/excludeOutboundPorts: "4317,4318,4319,8080,8081,8082,8083"
+  sidecar.istio.io/componentLogLevel: "http:debug,client:info,connection:info,conn_handler:info,pool:info"
 
 podSecurityContext: {}
   # fsGroup: 2000

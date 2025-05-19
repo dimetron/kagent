@@ -1,0 +1,28 @@
+#// Generate helm template with istio sidecar and virtual service for deployment
+
+apiVersion: networking.istio.io/v1beta1
+kind: ServiceEntry
+metadata:
+  name: external-autox
+spec:
+  hosts:
+    - chat.autox.corp.amdocs.azr
+  location: MESH_EXTERNAL
+  ports:
+    - number: 443
+      name: https
+      protocol: HTTPS
+  resolution: DNS
+---
+apiVersion: networking.istio.io/v1beta1
+kind: Sidecar
+metadata:
+  name: kagent-sidecar
+  namespace: kagent  # apply this per namespace or globally
+spec:
+  egress:
+    - hosts:
+        - "./*"              # allow services in the same namespace
+        - "istio-system/*"   # allow access to istio-system (e.g., for telemetry)
+        - "*/*"              # allow ServiceEntries (optional; can restrict more)
+

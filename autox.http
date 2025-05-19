@@ -1,0 +1,40 @@
+# test autox
+
+### api-key+username - OK
+POST https://chat.autox.corp.amdocs.azr/api/v1/proxy/openai/deployments/gpt-4.1-mini/chat/completions?api-version=2023-05-15
+Content-Type: application/json
+username: dmitriyr
+api-key: b38a5a7c-9c76-44ed-bfe6-8dd98296d6af
+
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": "How to use autox?"
+    }
+  ],
+  "temperature": 0.7,
+  "max_tokens": 100,
+  "top_p": 1,
+  "frequency_penalty": 0,
+  "presence_penalty": 0
+}
+
+### user inside api-key - KO
+POST https://chat.autox.corp.amdocs.azr/api/v1/proxy/openai/deployments/gpt-4.1-mini/chat/completions?api-version=2023-05-15
+Content-Type: application/json
+api-key: ZG1pdHJpeXI6YjM4YTVhN2MtOWM3Ni00NGVkLWJmZTYtOGRkOTgyOTZkNmFmCg==
+
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": "How to use autox?"
+    }
+  ],
+  "temperature": 0.7,
+  "max_tokens": 100,
+  "top_p": 1,
+  "frequency_penalty": 0,
+  "presence_penalty": 0
+}

@@ -4,12 +4,9 @@ from typing import Optional
 
 import typer
 import uvicorn
-from opentelemetry.instrumentation.openai import OpenAIInstrumentor
 from typing_extensions import Annotated
 
 from .version import VERSION
-
-OpenAIInstrumentor().instrument()
 
 app = typer.Typer()
 
