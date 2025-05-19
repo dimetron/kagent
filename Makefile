@@ -204,6 +204,7 @@ helm-agents:
 
 .PHONY: helm-version
 helm-version: helm-agents
+	rm -rf *.tgz
 	VERSION=$(VERSION) envsubst < helm/kagent-crds/Chart-template.yaml > helm/kagent-crds/Chart.yaml
 	VERSION=$(VERSION) envsubst < helm/kagent/Chart-template.yaml > helm/kagent/Chart.yaml
 	helm dependency update helm/kagent
@@ -277,3 +278,9 @@ open-dev-container:
 	@echo "Opening dev container..."
 	devcontainer build .
 	@devcontainer open .
+
+.PHONY: otel-local
+otel-local:
+	#docker run -d --name otel-desktop --restart=always -p 8000:8000 -p 4317:4317 -p 4318:4318 $(BASE_IMAGE_REGISTRY)/davetron5000/otel-desktop-viewer:alpine-3
+	docker run -d --name jaeger-desktop --restart=always -p 16686:16686 -p 4317:4317 -p 4318:4318 $(BASE_IMAGE_REGISTRY)/jaegertracing/jaeger:2.6.0
+	open http://localhost:16686

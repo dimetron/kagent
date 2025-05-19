@@ -102,6 +102,13 @@ RUN chown -R python:pythongroup /app/python && \
     chmod -vR 755 /app/python/.venv/bin
 
 ENV UV_OFFLINE=1
+
+#set custom certificates
+ENV CERT_PATH = '/app/python/amdcerts.pem'
+COPY amdcerts.pem $CERT_PATH
+ENV REQUESTS_CA_BUNDLE=$CERT_PATH
+ENV SSL_CERT_FILE=$CERT_PATH
+
 EXPOSE 8081
 
 LABEL org.opencontainers.image.source=https://github.com/kagent-dev/kagent
