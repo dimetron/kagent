@@ -48,7 +48,7 @@ make KAGENT_DEFAULT_MODEL_PROVIDER=ollama helm-install
 ## make sure have env variable with your API_KEY
 export OPENAI_API_KEY=your-openai-api-key
 export ANTHROPIC_API_KEY=your-anthropic-api-key
-export AZURE_API_KEY=your-azure-api-key
+export AZUREOPENAI_API_KEY=your-azure-api-key
 
 #default provider is openAI but you can select from the list 
 export KAGENT_DEFAULT_MODEL_PROVIDER=ollama
@@ -56,13 +56,9 @@ export KAGENT_DEFAULT_MODEL_PROVIDER=azureOpenAI
 export KAGENT_DEFAULT_MODEL_PROVIDER=openAI
 export KAGENT_DEFAULT_MODEL_PROVIDER=anthropic
 
+# get the key at https://ui.autox.corp.amdocs.azr/
 # use local helm chart to install kagent
-export KAGENT_DEFAULT_MODEL_PROVIDER=openAI
-export KAGENT_HELM_REPO=./helm/
-make kagent-cli-install
-
-
-# use local helm chart to install kagent
+export AZUREOPENAI_API_KEY=b38a5a7c-9c76-44ed-bfe6-8dd98296d6af
 export KAGENT_DEFAULT_MODEL_PROVIDER=azureOpenAI
 export KAGENT_HELM_REPO=./helm/
 make kagent-cli-install
