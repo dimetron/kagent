@@ -18,7 +18,7 @@ spec:
   {{- if $model.apiKeySecretKey }}
   apiKeySecretKey: {{.apiKeySecretKey}}
   {{- end }}
-  {{- if .defaultHeaders }}
+  {{- if $model.defaultHeaders }}
   defaultHeaders:
   {{- toYaml .defaultHeaders | nindent 4 }}
   {{- end }}
