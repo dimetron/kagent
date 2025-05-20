@@ -10,7 +10,7 @@ async def _kubescape_scan(
     ns: Annotated[Optional[str], "The namespace of the pod to get proxy configuration for"] = None,
 ) -> str:
     return _run_kubescape_command(
-        f"scan framework cis-v1.10.0 --format json --exclude-namespaces kube-system {'--include-namespaces ' + ns if ns else ''}"
+        f"scan framework all --format json --exclude-namespaces kube-system {'--include-namespaces ' + ns if ns else ''}"
     )
 
 
