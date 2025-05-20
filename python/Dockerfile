@@ -7,7 +7,7 @@ ENV LC_ALL=C.UTF-8
 RUN export https_proxy=http://10.232.233.70:8080  \
     && apk update  \
     && apk add     \
-    curl openssl unzip bash git ca-certificates
+    curl openssl unzip bash git ca-certificates jq
 
 ### STAGE 2: python
 FROM base-os AS python-os
@@ -81,7 +81,7 @@ COPY --from=python-builder /usr/local/bin/kubectl-argo-rollouts /usr/local/bin/k
 COPY --from=python-builder /usr/local/bin/kubescape /usr/local/bin/kubescape
 
 RUN export https_proxy=http://10.232.233.70:8080                  \
-    && /usr/local/bin/kubescape download framework
+    && /usr/local/bin/kubescape download artifacts
 
 COPY pyproject.toml .
 COPY .python-version .

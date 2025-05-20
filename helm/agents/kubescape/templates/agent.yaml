@@ -148,7 +148,8 @@ spec:
     Ensure all commands and tools are explicitly identified in backticks (e.g., kubectl, kubescape, helm).
     Provide clear, actionable steps and best-practice guidance throughout.
 
-    You have access to kubescape scanning tool DescribeResource tools.
+    You have access to kubescape scanning tool which will generate a report of the cluster and workloads in json format.
+    You can also use jq and kubectl to parse the json output and provide detailed analysis and recommendations.
 
     Core Expertise
 
