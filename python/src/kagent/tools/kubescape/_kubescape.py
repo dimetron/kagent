@@ -10,7 +10,7 @@ async def _kubescape_scan(
     ns: Annotated[Optional[str], "The namespace of the pod to get proxy configuration for"] = None,
 ) -> str:
     return _run_kubescape_command(
-        f"scan framework all --format json --exclude-namespaces kube-system {'--include-namespaces ' + ns if ns else ''}"
+        f"scan framework all --verbose --exclude-namespaces kube-system {'--include-namespaces ' + ns if ns else ''}"
     )
 
 
@@ -21,7 +21,7 @@ async def _kubescape_scan_workload(
         "name of workload",
     ] = None,
 ) -> str:
-    return _run_kubescape_command(f"scan --format json  workload  {workload_name} {'-n ' + ns if ns else ''}")
+    return _run_kubescape_command(f"scan workload  {workload_name} {'-n ' + ns if ns else ''}")
 
 
 kubescape_scan = FunctionTool(
