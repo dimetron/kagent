@@ -26,7 +26,6 @@ ENV PATH=$BUN_INSTALL/bin:$PATH
 
 # Install Bun (uses official install script)
 # brew install oven-sh/bun/bun
-#
 RUN --mount=type=cache,target=/cache/bun,rw \
     mkdir -p $BUN_INSTALL  \
     && export https_proxy=http://10.232.233.70:8080  \

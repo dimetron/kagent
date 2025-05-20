@@ -6,7 +6,7 @@ global:
 
 # https://kagent.dev/docs/getting-started/configuring-providers
 providers:
-  default: openAI
+  default: azureOpenAI
   openAI:
     provider: OpenAI
     model: "gpt-4.1-mini"
@@ -26,21 +26,21 @@ providers:
     apiKey: ""
   azureOpenAI:
     provider: AzureOpenAI
-    model: "gpt-4.1-mini"
+    model: "gpt-4.1"
     apiKeySecretRef: kagent-azure-openai
     apiKeySecretKey: AZUREOPENAI_API_KEY
     apiKey: ""
+    defaultHeaders:
+      username: "dmitriyr"
+      application: "kagent"
     config:
       apiVersion: "2024-10-21"
       azureAdToken: ""
-      azureDeployment: "gpt-4.1-mini"
+      azureDeployment: "gpt-4.1"
       azureEndpoint: "https://chat.autox.corp.amdocs.azr/api/v1/proxy"
-      defaultHeaders:
-        username: "dmitriyr"
-        application: "kagent"
 
 controller:
-  loglevel: "info"
+  loglevel: "debug"
 
   # -- Namespaces the controller should watch.
   # If empty, the controller will watch ONLY release namespace.

@@ -58,6 +58,7 @@ export KAGENT_DEFAULT_MODEL_PROVIDER=anthropic
 
 # get the key at https://ui.autox.corp.amdocs.azr/
 # use local helm chart to install kagent
+export AZUREOPENAI_API_KEY=your-azure-api-key
 export KAGENT_DEFAULT_MODEL_PROVIDER=azureOpenAI
 export KAGENT_HELM_REPO=./helm/
 make kagent-cli-install
