@@ -4,9 +4,7 @@ FROM $BASE_IMAGE_REGISTRY/chainguard/wolfi-base:latest AS base-os
 
 ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
-RUN export https_proxy=http://10.232.233.70:8080  \
-    && apk update  \
-    && apk add     \
+RUN apk update && apk add  \
     curl openssl unzip bash git ca-certificates
 
 ### STAGE 2: python
@@ -15,8 +13,7 @@ ARG TOOLS_PYTHON_VERSION=3.12
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
-RUN export https_proxy=http://10.232.233.70:8080  \
-    && apk update && apk add python3 uv
+RUN apk update && apk add python3 uv
 
 ENV GIT_LFS_SKIP_SMUDGE=1
 ENV UV_LINK_MODE=copy
@@ -27,12 +24,11 @@ RUN addgroup -g 1001 pythongroup && \
     adduser -u 1001 -G pythongroup -s /bin/bash -D python && \
     chown -R python:pythongroup /app/python
 
-RUN --mount=type=cache,target=/app/python/.cache,rw   \
-    echo "Installing Python $TOOLS_PYTHON_VERSION..." \
-    && export https_proxy=http://10.232.233.70:8080   \
-    && uv venv .venv                                  \
-    && uv python install $TOOLS_PYTHON_VERSION        \
-    && uv cache dir                                   \
+RUN --mount=type=cache,target=/app/python/.cache,rw  \
+    echo "Installing Python $TOOLS_PYTHON_VERSION..."                 \
+    && uv venv .venv                                 \
+    && uv python install $TOOLS_PYTHON_VERSION                        \
+    && uv cache dir                                  \
     && uv version
 
 ### STAGE 3: tools
@@ -44,23 +40,19 @@ ARG TOOLS_ARGO_CD_VERSION
 RUN mkdir -p /app/downloads /usr/local/bin/
 WORKDIR /app/downloads
 
-RUN export https_proxy=http://10.232.233.70:8080   \
-    && curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/$TARGETARCH/kubectl" \
+RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/$TARGETARCH/kubectl" \
     && chmod +x kubectl \
     && mv kubectl /usr/local/bin/
 
-RUN export https_proxy=http://10.232.233.70:8080   \
-    && curl -Lo /usr/local/bin/kubectl-argo-rollouts -L https://github.com/argoproj/argo-rollouts/releases/$TOOLS_ARGO_CD_VERSION/download/kubectl-argo-rollouts-linux-$TARGETARCH \
+RUN curl -Lo /usr/local/bin/kubectl-argo-rollouts -L https://github.com/argoproj/argo-rollouts/releases/$TOOLS_ARGO_CD_VERSION/download/kubectl-argo-rollouts-linux-$TARGETARCH \
     && chmod +x /usr/local/bin/kubectl-argo-rollouts
 
-RUN export https_proxy=http://10.232.233.70:8080   \
-    && curl -L https://istio.io/downloadIstio | ISTIO_VERSION=$TOOLS_ISTIO_VERSION TARGET_ARCH=$TARGETARCH sh - \
+RUN curl -L https://istio.io/downloadIstio | ISTIO_VERSION=$TOOLS_ISTIO_VERSION TARGET_ARCH=$TARGETARCH sh - \
     && mv istio-*/bin/istioctl /usr/local/bin/istioctl \
     && rm -rf istio-*
 
 # Install Helm
-RUN export https_proxy=http://10.232.233.70:8080   \
-    && curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 \
+RUN curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 \
     && chmod 700 get_helm.sh \
     && ./get_helm.sh \
     && rm get_helm.sh
@@ -82,21 +74,17 @@ COPY src src
 # Install dependencies
 RUN --mount=type=cache,target=/app/python/.cache                  \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    export https_proxy=http://10.232.233.70:8080                  \
-    && uv venv .venv && uv sync --locked
+    uv venv .venv && uv sync --locked
 
 # Generate configs
 RUN --mount=type=cache,target=/app/python/.cache                  \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    mkdir -p /app/python/.autogenstudio/configs                   \
-    export https_proxy=http://10.232.233.70:8080                  \
-    && uv run tool_gen -o /app/python/.autogenstudio/configs
+    mkdir -p /root/.autogenstudio/configs && uv run tool_gen -o /root/.autogenstudio/configs
 
 # Test if the tool is working and fetch all dependencies
 RUN --mount=type=cache,target=/app/python/.cache                  \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    export https_proxy=http://10.232.233.70:8080                  \
-    && uv run kagent-engine --help
+    uv run kagent-engine --help
 
 RUN chown -R python:pythongroup /app/python && \
     chmod -vR 755 /app/python/.venv/bin
