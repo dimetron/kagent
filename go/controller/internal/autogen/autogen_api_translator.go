@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 	"slices"
 	"strconv"
 	"strings"
@@ -46,6 +47,10 @@ var (
 	toolsProvidersRequiringOpenaiApiKey = []string{
 		"kagent.tools.docs.QueryTool",
 	}
+)
+
+var (
+	apiTranslatorLog = log.Log.WithName("apiTranslator")
 )
 
 type ApiTranslator interface {
@@ -892,7 +897,7 @@ func (a *apiTranslator) createModelClientForProvider(ctx context.Context, modelC
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert Anthropic config: %w", err)
 		}
-
+		a.applyDefaultHeaders(modelConfig, &config.BaseClientConfig)
 		return &api.Component{
 			Provider:      "autogen_ext.models.anthropic.AnthropicChatCompletionClient",
 			ComponentType: "model",
@@ -941,16 +946,8 @@ func (a *apiTranslator) createModelClientForProvider(ctx context.Context, modelC
 					config.TopP = topP
 				}
 			}
-
-			if len(azureConfig.DefaultHeaders) > 0 {
-				headers := make(map[string]string)
-				for k, v := range azureConfig.DefaultHeaders {
-					headers[k] = v
-				}
-				config.DefaultHeaders = headers
-			}
 		}
-
+		a.applyDefaultHeaders(modelConfig, &config.BaseClientConfig)
 		return &api.Component{
 			Provider:      "autogen_ext.models.openai.AzureOpenAIChatCompletionClient",
 			ComponentType: "model",
@@ -1022,6 +1019,7 @@ func (a *apiTranslator) createModelClientForProvider(ctx context.Context, modelC
 			}
 		}
 
+		a.applyDefaultHeaders(modelConfig, &config.BaseClientConfig)
 		return &api.Component{
 			Provider:      "autogen_ext.models.openai.OpenAIChatCompletionClient",
 			ComponentType: "model",
@@ -1047,14 +1045,7 @@ func (a *apiTranslator) createModelClientForProvider(ctx context.Context, modelC
 			}
 		}
 
-		if len(modelConfig.Spec.DefaultHeaders) > 0 {
-			headers := make(map[string]string)
-			for k, v := range modelConfig.Spec.DefaultHeaders {
-				headers[k] = v
-			}
-			config.DefaultHeaders = headers
-		}
-
+		a.applyDefaultHeaders(modelConfig, &config.BaseClientConfig)
 		return &api.Component{
 			Provider:      "autogen_ext.models.ollama.OllamaChatCompletionClient",
 			ComponentType: "model",
@@ -1064,6 +1055,16 @@ func (a *apiTranslator) createModelClientForProvider(ctx context.Context, modelC
 
 	default:
 		return nil, fmt.Errorf("unsupported model provider: %s", modelConfig.Spec.Provider)
+	}
+}
+
+func (a *apiTranslator) applyDefaultHeaders(modelConfig *v1alpha1.ModelConfig, config *api.BaseClientConfig) {
+	if len(modelConfig.Spec.DefaultHeaders) > 0 {
+		headers := make(map[string]string)
+		for k, v := range modelConfig.Spec.DefaultHeaders {
+			headers[k] = v
+		}
+		config.DefaultHeaders = headers
 	}
 }
 
