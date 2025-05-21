@@ -141,6 +141,11 @@ controller-manifests:
 build-controller: controller-manifests
 	$(DOCKER_BUILDER) build $(DOCKER_BUILD_ARGS) $(TOOLS_IMAGE_BUILD_ARGS) -t $(CONTROLLER_IMG) -f go/Dockerfile ./go
 
+.PHONY: release
+release: release-controller
+release: release-app
+release: release-ui
+
 .PHONY: release-controller
 release-controller: DOCKER_BUILD_ARGS += --push --platform linux/amd64,linux/arm64
 release-controller: DOCKER_BUILDER = docker buildx
@@ -266,7 +271,8 @@ helm-publish: helm-version
 .PHONY: kagent-cli-install
 kagent-cli-install: build-cli-local kind-load-docker-images helm-version
 kagent-cli-install:
-	KAGENT_HELM_REPO=./helm/ ./go/bin/kagent-local
+	KAGENT_HELM_REPO=./helm/ ./go/bin/kagent-local install
+	KAGENT_HELM_REPO=./helm/ ./go/bin/kagent-local dashboard
 
 .PHONY: kagent-cli-port-forward
 kagent-cli-port-forward: use-kind-cluster
@@ -276,8 +282,8 @@ kagent-cli-port-forward: use-kind-cluster
 .PHONY: open-dev-container
 open-dev-container:
 	@echo "Opening dev container..."
-	devcontainer build .
-	@devcontainer open .
+	devcontainer build --workspace-folder .
+	@devcontainer open --workspace-folder .
 
 .PHONY: otel-local
 otel-local:

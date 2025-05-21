@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 	"slices"
 	"strconv"
 	"strings"
@@ -33,10 +32,6 @@ var (
 	toolsProvidersRequiringOpenaiApiKey = []string{
 		"kagent.tools.docs.QueryTool",
 	}
-)
-
-var (
-	apiTranslatorLog = log.Log.WithName("apiTranslator")
 )
 
 type ApiTranslator interface {
@@ -845,7 +840,6 @@ func addOpenaiApiKeyToConfig(
 
 // createModelClientForProvider creates a model client component based on the model provider
 func (a *apiTranslator) createModelClientForProvider(ctx context.Context, modelConfig *v1alpha1.ModelConfig, stream bool) (*api.Component, error) {
-
 	switch modelConfig.Spec.Provider {
 	case v1alpha1.Anthropic:
 		apiKey, err := a.getModelConfigApiKey(ctx, modelConfig)
