@@ -26,11 +26,13 @@ RETAGGED_UI_IMG = $(RETAGGED_DOCKER_REGISTRY)/$(DOCKER_REPO)/$(UI_IMAGE_NAME):$(
 RETAGGED_APP_IMG = $(RETAGGED_DOCKER_REGISTRY)/$(DOCKER_REPO)/$(APP_IMAGE_NAME):$(APP_IMAGE_TAG)
 DOCKER_BUILDER ?= docker
 DOCKER_BUILD_ARGS ?=
-KIND_CLUSTER_NAME ?= kagent
+KIND_CLUSTER_NAME ?= platform-kagent
+KUBE_CONFIG ?= ~/.kube/config-$(KIND_CLUSTER_NAME)
 
 #take from go/go.mod
 AWK ?= $(shell command -v gawk || command -v awk)
 TOOLS_GO_VERSION ?= $(shell $(AWK) '/^go / { print $$2 }' go/go.mod)
+GOTOOLCHAIN=local
 
 #tools versions
 TOOLS_UV_VERSION ?= 0.7.2
@@ -289,6 +291,5 @@ open-dev-container:
 
 .PHONY: otel-local
 otel-local:
-	#docker run -d --name otel-desktop --restart=always -p 8000:8000 -p 4317:4317 -p 4318:4318 $(BASE_IMAGE_REGISTRY)/davetron5000/otel-desktop-viewer:alpine-3
 	docker run -d --name jaeger-desktop --restart=always -p 16686:16686 -p 4317:4317 -p 4318:4318 $(BASE_IMAGE_REGISTRY)/jaegertracing/jaeger:2.6.0
 	open http://localhost:16686
