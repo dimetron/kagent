@@ -1,7 +1,7 @@
 # Image configuration
-DOCKER_REGISTRY ?= illin4261.corp.amdocs.com:28090
-BASE_IMAGE_REGISTRY ?= docker-registry-proxy.corp.amdocs.com
-DOCKER_REPO ?= platform/kagent
+DOCKER_REGISTRY ?= ghcr.io
+BASE_IMAGE_REGISTRY ?= cgr.dev
+DOCKER_REPO ?= kagent-dev/kagent
 
 BUILD_DATE := $(shell date -u '+%Y-%m-%d')
 GIT_COMMIT := $(shell git rev-parse --short HEAD || echo "unknown")
@@ -20,7 +20,7 @@ UI_IMG ?= $(DOCKER_REGISTRY)/$(DOCKER_REPO)/$(UI_IMAGE_NAME):$(UI_IMAGE_TAG)
 APP_IMG ?= $(DOCKER_REGISTRY)/$(DOCKER_REPO)/$(APP_IMAGE_NAME):$(APP_IMAGE_TAG)
 
 # Retagged image variables for kind loading; the Helm chart uses these
-RETAGGED_DOCKER_REGISTRY = illin4261.corp.amdocs.com:28090
+RETAGGED_DOCKER_REGISTRY = cr.kagent.dev
 RETAGGED_CONTROLLER_IMG = $(RETAGGED_DOCKER_REGISTRY)/$(DOCKER_REPO)/$(CONTROLLER_IMAGE_NAME):$(CONTROLLER_IMAGE_TAG)
 RETAGGED_UI_IMG = $(RETAGGED_DOCKER_REGISTRY)/$(DOCKER_REPO)/$(UI_IMAGE_NAME):$(UI_IMAGE_TAG)
 RETAGGED_APP_IMG = $(RETAGGED_DOCKER_REGISTRY)/$(DOCKER_REPO)/$(APP_IMAGE_NAME):$(APP_IMAGE_TAG)
@@ -188,6 +188,18 @@ retag-docker-images: build
 	docker tag $(UI_IMG) $(RETAGGED_UI_IMG)
 	docker tag $(APP_IMG) $(RETAGGED_APP_IMG)
 
+.PHONY: helm-cleanup
+helm-cleanup:
+	rm -f *.tgz
+
+.PHONY: helm-test
+helm-test: helm-version
+	mkdir -p tmp
+	echo $$(helm template kagent ./helm/kagent/ --namespace kagent --set providers.default=ollama																	| tee tmp/ollama.yaml 		| grep ^kind: | wc -l)
+	echo $$(helm template kagent ./helm/kagent/ --namespace kagent --set providers.default=openAI       --set providers.openAI.apiKey=your-openai-api-key 			| tee tmp/openAI.yaml 		| grep ^kind: | wc -l)
+	echo $$(helm template kagent ./helm/kagent/ --namespace kagent --set providers.default=anthropic    --set providers.anthropic.apiKey=your-anthropic-api-key 	| tee tmp/anthropic.yaml 	| grep ^kind: | wc -l)
+	echo $$(helm template kagent ./helm/kagent/ --namespace kagent --set providers.default=azureOpenAI  --set providers.azureOpenAI.apiKey=your-openai-api-key		| tee tmp/azureOpenAI.yaml	| grep ^kind: | wc -l)
+
 .PHONY: helm-agents
 helm-agents:
 	VERSION=$(VERSION) envsubst < helm/agents/k8s/Chart-template.yaml > helm/agents/k8s/Chart.yaml
@@ -208,8 +220,7 @@ helm-agents:
 	helm package helm/agents/cilium-crd
 
 .PHONY: helm-version
-helm-version: helm-agents
-	rm -rf *.tgz
+helm-version: helm-cleanup helm-agents
 	VERSION=$(VERSION) envsubst < helm/kagent-crds/Chart-template.yaml > helm/kagent-crds/Chart.yaml
 	VERSION=$(VERSION) envsubst < helm/kagent/Chart-template.yaml > helm/kagent/Chart.yaml
 	helm dependency update helm/kagent
