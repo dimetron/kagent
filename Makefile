@@ -1,7 +1,7 @@
 # Image configuration
-DOCKER_REGISTRY ?= illin4261.corp.amdocs.com:28090
-BASE_IMAGE_REGISTRY ?= docker-registry-proxy.corp.amdocs.com
-DOCKER_REPO ?= platform/kagent
+DOCKER_REGISTRY ?= ghcr.io
+BASE_IMAGE_REGISTRY ?= cgr.dev
+DOCKER_REPO ?= kagent-dev/kagent
 
 BUILD_DATE := $(shell date -u '+%Y-%m-%d')
 GIT_COMMIT := $(shell git rev-parse --short HEAD || echo "unknown")
@@ -20,19 +20,17 @@ UI_IMG ?= $(DOCKER_REGISTRY)/$(DOCKER_REPO)/$(UI_IMAGE_NAME):$(UI_IMAGE_TAG)
 APP_IMG ?= $(DOCKER_REGISTRY)/$(DOCKER_REPO)/$(APP_IMAGE_NAME):$(APP_IMAGE_TAG)
 
 # Retagged image variables for kind loading; the Helm chart uses these
-RETAGGED_DOCKER_REGISTRY = illin4261.corp.amdocs.com:28090
+RETAGGED_DOCKER_REGISTRY = cr.kagent.dev
 RETAGGED_CONTROLLER_IMG = $(RETAGGED_DOCKER_REGISTRY)/$(DOCKER_REPO)/$(CONTROLLER_IMAGE_NAME):$(CONTROLLER_IMAGE_TAG)
 RETAGGED_UI_IMG = $(RETAGGED_DOCKER_REGISTRY)/$(DOCKER_REPO)/$(UI_IMAGE_NAME):$(UI_IMAGE_TAG)
 RETAGGED_APP_IMG = $(RETAGGED_DOCKER_REGISTRY)/$(DOCKER_REPO)/$(APP_IMAGE_NAME):$(APP_IMAGE_TAG)
 DOCKER_BUILDER ?= docker
 DOCKER_BUILD_ARGS ?=
-KIND_CLUSTER_NAME ?= platform-kagent
-KUBE_CONFIG ?= ~/.kube/config-$(KIND_CLUSTER_NAME)
+KIND_CLUSTER_NAME ?= kagent
 
 #take from go/go.mod
 AWK ?= $(shell command -v gawk || command -v awk)
 TOOLS_GO_VERSION ?= $(shell $(AWK) '/^go / { print $$2 }' go/go.mod)
-GOTOOLCHAIN=local
 
 #tools versions
 TOOLS_UV_VERSION ?= 0.7.2
@@ -143,11 +141,6 @@ controller-manifests:
 build-controller: controller-manifests
 	$(DOCKER_BUILDER) build $(DOCKER_BUILD_ARGS) $(TOOLS_IMAGE_BUILD_ARGS) -t $(CONTROLLER_IMG) -f go/Dockerfile ./go
 
-.PHONY: release
-release: release-controller
-release: release-app
-release: release-ui
-
 .PHONY: release-controller
 release-controller: DOCKER_BUILD_ARGS += --push --platform linux/amd64,linux/arm64
 release-controller: DOCKER_BUILDER = docker buildx
@@ -175,14 +168,9 @@ release-app: build-app
 .PHONY: kind-load-docker-images
 kind-load-docker-images: retag-docker-images
 	docker images | grep $(VERSION) || true
-	@if [ "$$(kubectl config current-context)" = "kind-$(KIND_CLUSTER_NAME)" ]; then 		\
-		@echo "Loading docker images into kind cluster $(KIND_CLUSTER_NAME)...";			\
-		kind load docker-image --name $(KIND_CLUSTER_NAME) $(RETAGGED_CONTROLLER_IMG) || :;	\
-		kind load docker-image --name $(KIND_CLUSTER_NAME) $(RETAGGED_UI_IMG)		  || :;	\
-		kind load docker-image --name $(KIND_CLUSTER_NAME) $(RETAGGED_APP_IMG)		  || :;	\
-	else \
-		echo "Not in kind cluster $(KIND_CLUSTER_NAME), skipping image loading."; \
-	fi
+	kind load docker-image --name $(KIND_CLUSTER_NAME) $(RETAGGED_CONTROLLER_IMG)
+	kind load docker-image --name $(KIND_CLUSTER_NAME) $(RETAGGED_UI_IMG)
+	kind load docker-image --name $(KIND_CLUSTER_NAME) $(RETAGGED_APP_IMG)
 
 .PHONY: retag-docker-images
 retag-docker-images: build
@@ -223,9 +211,8 @@ helm-agents:
 	VERSION=$(VERSION) envsubst < helm/agents/kubescape/Chart-template.yaml > helm/agents/kubescape/Chart.yaml
 	helm package helm/agents/kubescape
 
-.PHONY: helm-cleanup helm-version
-helm-version: helm-agents
-	rm -rf *.tgz
+.PHONY: helm-version
+helm-version: helm-cleanup helm-agents
 	VERSION=$(VERSION) envsubst < helm/kagent-crds/Chart-template.yaml > helm/kagent-crds/Chart.yaml
 	VERSION=$(VERSION) envsubst < helm/kagent/Chart-template.yaml > helm/kagent/Chart.yaml
 	helm dependency update helm/kagent

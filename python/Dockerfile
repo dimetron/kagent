@@ -70,9 +70,10 @@ RUN export https_proxy=http://10.232.233.70:8080   \
     && curl -Ls https://raw.githubusercontent.com/kubescape/kubescape/master/install.sh | bash \
     && ls /usr/local/bin/
 
-
 ### STAGE 4: final
 FROM python-os AS final
+
+RUN apk update && apk add nodejs npm
 
 COPY --from=python-builder /usr/local/bin/kubectl /usr/local/bin/kubectl
 COPY --from=python-builder /usr/local/bin/istioctl /usr/local/bin/istioctl
