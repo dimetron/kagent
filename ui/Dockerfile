@@ -21,6 +21,10 @@ ENV CYPRESS_INSTALL_BINARY=0
 ENV NODE_PATH=/cache/node_modules
 ENV PATH=$BUN_INSTALL/bin:$PATH
 
+ENV http_proxy=${PROXY:-http://10.232.233.70:8080}
+ENV https_proxy=${PROXY:-http://10.232.233.70:8080}
+ENV no_proxy="localhost,127.0.0.1,172.17.0.0/12,192.168.0.0/16,.svc,.default,.local,.internal,fs.amdocs.com,.amdocs.com,.amdocs.aws,.sock,bitbucket.corp.amdocs.com,.corp.amdocs.com,docker-registry-proxy.corp.amdocs.com"
+
 # Install Bun (uses official install script)
 # brew install oven-sh/bun/bun
 RUN --mount=type=cache,target=/cache/bun,rw \

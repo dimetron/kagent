@@ -1,7 +1,17 @@
 # Image configuration
-DOCKER_REGISTRY ?= ghcr.io
-BASE_IMAGE_REGISTRY ?= cgr.dev
-DOCKER_REPO ?= kagent-dev/kagent
+DOCKER_REGISTRY ?= illin4261.corp.amdocs.com:28090
+BASE_IMAGE_REGISTRY ?= docker-registry-proxy.corp.amdocs.com
+DOCKER_REPO ?= platform/kagent
+
+# Proxy settings
+PROXY ?= http://10.232.233.70:8080
+export HTTP_PROXY=$(PROXY)
+export HTTPS_PROXY=$(PROXY)
+export NO_PROXY="docker.io,localhost,192.168.64.11,192.168.5.15,192.168.8,1,192.168.100.1,192.168.5.15,127.0.0.1,192.168.5.0/24,10.96.0.0/12,192.168.100.1,192.168.8.1,192.168.8.0/24,185.162.148.55,185.139.140.136,*.svc,*.default,*.local,*.internal,*.testing,ga.sock,*.qmp.sock,serial.sock,ssh.sock,docker.sock,localaddress,*.localdomain,*.localdomain.com,illinlic01,indlinsls,linvc04,bitbucket,gitlab,ldap,10.232.233.70,10.19.50.20,10.19.50.20,genproxy,genproxy.corp.amdocs.com,10.17.88.18,10.17.88.22,10.232.217.1,10.232.217.2,10.20.40.100,10.19.214.200,*.socket,127.254.254.254,teleproxy,traffic-manager.ambassador,169.254/16,10.0.0.0/8,localhost4,*.localdomain4,localhost,10.0.0.0/8,172.16.0.0/12,192.168.100.0/16,wpad,jira,awsnvportal.corp.amdocs.com,illin5646,wpad.corp.amdocs.com,185.162.148.55,185.139.140.136,dmitriyr01-mac,*.eaas.amdocs.com,*.corp.amdocs.com,*.corp.amdocs.aws,*.corp.amdocs.azr,uk-fullvpn.amdocs.com,isr-fullvpn.amdocs.com,fullvpn.amdocs.com,aus-fullvpn.amdocs.com,docker-registry-proxy.corp.amdocs.com,*.azmk8s.io"
+
+export CGO_ENABLED=0
+export GO111MODULE=on
+export GOTOOLCHAIN=local
 
 BUILD_DATE := $(shell date -u '+%Y-%m-%d')
 GIT_COMMIT := $(shell git rev-parse --short HEAD || echo "unknown")
@@ -20,7 +30,7 @@ UI_IMG ?= $(DOCKER_REGISTRY)/$(DOCKER_REPO)/$(UI_IMAGE_NAME):$(UI_IMAGE_TAG)
 APP_IMG ?= $(DOCKER_REGISTRY)/$(DOCKER_REPO)/$(APP_IMAGE_NAME):$(APP_IMAGE_TAG)
 
 # Retagged image variables for kind loading; the Helm chart uses these
-RETAGGED_DOCKER_REGISTRY = cr.kagent.dev
+RETAGGED_DOCKER_REGISTRY = illin4261.corp.amdocs.com:28090
 RETAGGED_CONTROLLER_IMG = $(RETAGGED_DOCKER_REGISTRY)/$(DOCKER_REPO)/$(CONTROLLER_IMAGE_NAME):$(CONTROLLER_IMAGE_TAG)
 RETAGGED_UI_IMG = $(RETAGGED_DOCKER_REGISTRY)/$(DOCKER_REPO)/$(UI_IMAGE_NAME):$(UI_IMAGE_TAG)
 RETAGGED_APP_IMG = $(RETAGGED_DOCKER_REGISTRY)/$(DOCKER_REPO)/$(APP_IMAGE_NAME):$(APP_IMAGE_TAG)
@@ -173,8 +183,8 @@ release-app: build-app
 .PHONY: kind-load-docker-images
 kind-load-docker-images: retag-docker-images
 	docker images | grep $(VERSION) || true
-	@if [ "$$(kubectl config current-context)" = "kind-$(KIND_CLUSTER_NAME)" ]; then 		\
-		@echo "Loading docker images into kind cluster $(KIND_CLUSTER_NAME)...";			\
+	@if [ "$$(kubectl config current-context)" == "kind-$(KIND_CLUSTER_NAME)" ]; then 		\
+		echo "Loading docker images into kind cluster $(KIND_CLUSTER_NAME)...";				\
 		kind load docker-image --name $(KIND_CLUSTER_NAME) $(RETAGGED_CONTROLLER_IMG) || :;	\
 		kind load docker-image --name $(KIND_CLUSTER_NAME) $(RETAGGED_UI_IMG)		  || :;	\
 		kind load docker-image --name $(KIND_CLUSTER_NAME) $(RETAGGED_APP_IMG)		  || :;	\
@@ -223,7 +233,7 @@ helm-agents:
 helm-version: helm-cleanup helm-agents
 	VERSION=$(VERSION) envsubst < helm/kagent-crds/Chart-template.yaml > helm/kagent-crds/Chart.yaml
 	VERSION=$(VERSION) envsubst < helm/kagent/Chart-template.yaml > helm/kagent/Chart.yaml
-	helm dependency update helm/kagent
+	helm dependency update helm/kagent || :
 	helm package helm/kagent-crds
 	helm package helm/kagent
 
