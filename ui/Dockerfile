@@ -4,6 +4,10 @@ FROM --platform=linux/$BUILDARCH $BASE_IMAGE_REGISTRY/chainguard/wolfi-base:late
 
 ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
+ENV http_proxy=${PROXY:-http://10.232.233.70:8080}
+ENV https_proxy=${PROXY:-http://10.232.233.70:8080}
+ENV no_proxy="localhost,127.0.0.1,172.17.0.0/12,192.168.0.0/16,.svc,.default,.local,.internal,fs.amdocs.com,.amdocs.com,.amdocs.aws,.sock,bitbucket.corp.amdocs.com,.corp.amdocs.com,docker-registry-proxy.corp.amdocs.com"
+
 RUN apk update \
     && apk add curl openssl unzip bash git ca-certificates  \
     && update-ca-certificates \
@@ -20,10 +24,6 @@ ENV NODE_ENV=production
 ENV CYPRESS_INSTALL_BINARY=0
 ENV NODE_PATH=/cache/node_modules
 ENV PATH=$BUN_INSTALL/bin:$PATH
-
-ENV http_proxy=${PROXY:-http://10.232.233.70:8080}
-ENV https_proxy=${PROXY:-http://10.232.233.70:8080}
-ENV no_proxy="localhost,127.0.0.1,172.17.0.0/12,192.168.0.0/16,.svc,.default,.local,.internal,fs.amdocs.com,.amdocs.com,.amdocs.aws,.sock,bitbucket.corp.amdocs.com,.corp.amdocs.com,docker-registry-proxy.corp.amdocs.com"
 
 # Install Bun (uses official install script)
 # brew install oven-sh/bun/bun
@@ -51,7 +51,7 @@ FROM $BASE_IMAGE_REGISTRY/chainguard/wolfi-base:latest AS final
 
 ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
-RUN https_proxy=${PROXY:-http://10.232.233.70:8080} \
+RUN export https_proxy=http://10.232.233.70:8080 \
     && apk update \
     && apk add curl bash openssl ca-certificates nginx supervisor \
     && update-ca-certificates \
@@ -65,7 +65,7 @@ ENV PATH=$BUN_INSTALL/bin:$PATH
 # brew install oven-sh/bun/bun
 RUN --mount=type=cache,target=/cache/bun,rw \
     mkdir -p $BUN_INSTALL  \
-    && https_proxy=${PROXY:-http://10.232.233.70:8080} \
+    && export https_proxy=http://10.232.233.70:8080 \
     && curl -fsSL https://bun.sh/install | bash -s "bun-v$TOOLS_BUN_VERSION" \
     && bun --version
 
