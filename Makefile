@@ -1,7 +1,22 @@
 # Image configuration
-DOCKER_REGISTRY ?= ghcr.io
-BASE_IMAGE_REGISTRY ?= cgr.dev
-DOCKER_REPO ?= kagent-dev/kagent
+DOCKER_REGISTRY ?= illin4261.corp.amdocs.com:28090
+BASE_IMAGE_REGISTRY ?= docker-registry-proxy.corp.amdocs.com
+DOCKER_REPO ?= platform/kagent
+
+#buildx configuration
+BUILDER_NAME ?= kagent-builder
+BUILDKIT_VERSION = v0.11.0
+LOCALARCH ?= $(shell uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/')
+
+# Proxy settings
+PROXY ?= http://10.232.233.70:8080
+export HTTP_PROXY=$(PROXY)
+export HTTPS_PROXY=$(PROXY)
+export NO_PROXY="docker.io,localhost,192.168.64.11,192.168.5.15,192.168.8,1,192.168.100.1,192.168.5.15,127.0.0.1,192.168.5.0/24,10.96.0.0/12,192.168.100.1,192.168.8.1,192.168.8.0/24,185.162.148.55,185.139.140.136,*.svc,*.default,*.local,*.internal,*.testing,ga.sock,*.qmp.sock,serial.sock,ssh.sock,docker.sock,localaddress,*.localdomain,*.localdomain.com,illinlic01,indlinsls,linvc04,bitbucket,gitlab,ldap,10.232.233.70,10.19.50.20,10.19.50.20,genproxy,genproxy.corp.amdocs.com,10.17.88.18,10.17.88.22,10.232.217.1,10.232.217.2,10.20.40.100,10.19.214.200,*.socket,127.254.254.254,teleproxy,traffic-manager.ambassador,169.254/16,10.0.0.0/8,localhost4,*.localdomain4,localhost,10.0.0.0/8,172.16.0.0/12,192.168.100.0/16,wpad,jira,awsnvportal.corp.amdocs.com,illin5646,wpad.corp.amdocs.com,185.162.148.55,185.139.140.136,dmitriyr01-mac,*.eaas.amdocs.com,*.corp.amdocs.com,*.corp.amdocs.aws,*.corp.amdocs.azr,uk-fullvpn.amdocs.com,isr-fullvpn.amdocs.com,fullvpn.amdocs.com,aus-fullvpn.amdocs.com,docker-registry-proxy.corp.amdocs.com,*.azmk8s.io"
+
+export CGO_ENABLED=0
+export GO111MODULE=on
+export GOTOOLCHAIN=local
 
 BUILD_DATE := $(shell date -u '+%Y-%m-%d')
 GIT_COMMIT := $(shell git rev-parse --short HEAD || echo "unknown")
@@ -20,7 +35,7 @@ UI_IMG ?= $(DOCKER_REGISTRY)/$(DOCKER_REPO)/$(UI_IMAGE_NAME):$(UI_IMAGE_TAG)
 APP_IMG ?= $(DOCKER_REGISTRY)/$(DOCKER_REPO)/$(APP_IMAGE_NAME):$(APP_IMAGE_TAG)
 
 # Retagged image variables for kind loading; the Helm chart uses these
-RETAGGED_DOCKER_REGISTRY = cr.kagent.dev
+RETAGGED_DOCKER_REGISTRY = illin4261.corp.amdocs.com:28090
 RETAGGED_CONTROLLER_IMG = $(RETAGGED_DOCKER_REGISTRY)/$(DOCKER_REPO)/$(CONTROLLER_IMAGE_NAME):$(CONTROLLER_IMAGE_TAG)
 RETAGGED_UI_IMG = $(RETAGGED_DOCKER_REGISTRY)/$(DOCKER_REPO)/$(UI_IMAGE_NAME):$(UI_IMAGE_TAG)
 RETAGGED_APP_IMG = $(RETAGGED_DOCKER_REGISTRY)/$(DOCKER_REPO)/$(APP_IMAGE_NAME):$(APP_IMAGE_TAG)
@@ -43,7 +58,8 @@ TOOLS_ARGO_CD_VERSION ?= 3.0.0
 TOOLS_KUBECTL_VERSION ?= 1.33.4
 
 # build args
-TOOLS_IMAGE_BUILD_ARGS =  --build-arg BASE_IMAGE_REGISTRY=$(BASE_IMAGE_REGISTRY)
+TOOLS_IMAGE_BUILD_ARGS =  --build-arg LOCALARCH=${LOCALARCH}
+TOOLS_IMAGE_BUILD_ARGS += --build-arg BASE_IMAGE_REGISTRY=$(BASE_IMAGE_REGISTRY)
 TOOLS_IMAGE_BUILD_ARGS += --build-arg TOOLS_GO_VERSION=$(TOOLS_GO_VERSION)
 TOOLS_IMAGE_BUILD_ARGS += --build-arg TOOLS_UV_VERSION=$(TOOLS_UV_VERSION)
 TOOLS_IMAGE_BUILD_ARGS += --build-arg TOOLS_BUN_VERSION=$(TOOLS_BUN_VERSION)
@@ -78,14 +94,20 @@ check-openai-key:
 		exit 1; \
 	fi
 
+.PHONY: clean
+clean:
+	docker buildx rm $(BUILDER_NAME) || :
+	
+.PHONY: buildx-create
+buildx-create:
+	docker buildx inspect $(BUILDER_NAME)  || docker buildx create --driver-opt "network=host,image=docker-registry-proxy.corp.amdocs.com/moby/buildkit:$(BUILDKIT_VERSION)" --config build/buildkitd.toml --name $(BUILDER_NAME) --use
+	docker buildx use $(BUILDER_NAME) || true
+
 .PHONY: build-all  # build all all using buildx
 build-all: BUILDER_NAME ?= kagent-builder
-build-all: BUILDER ?=docker buildx --builder $(BUILDER_NAME)
+build-all: BUILDER ?=docker buildx --builder $(BUILDER_NAME) --push
 build-all: BUILD_ARGS ?= --platform linux/amd64,linux/arm64 --output type=tar,dest=/dev/null
-build-all:
-	#docker buildx rm $(BUILDER_NAME) || :
-	docker run --privileged --rm tonistiigi/binfmt --install all || :
-	docker buildx ls | grep $(BUILDER_NAME)  || docker buildx create --name $(BUILDER_NAME) --use || :
+build-all: buildx-create
 	$(BUILDER) build $(BUILD_ARGS) $(TOOLS_IMAGE_BUILD_ARGS) -f go/Dockerfile ./go
 	$(BUILDER) build $(BUILD_ARGS) $(TOOLS_IMAGE_BUILD_ARGS) -f ui/Dockerfile ./ui
 	$(BUILDER) build $(BUILD_ARGS) $(TOOLS_IMAGE_BUILD_ARGS) -f python/Dockerfile ./python
@@ -141,6 +163,14 @@ controller-manifests:
 build-controller: controller-manifests
 	$(DOCKER_BUILDER) build $(DOCKER_BUILD_ARGS) $(TOOLS_IMAGE_BUILD_ARGS) -t $(CONTROLLER_IMG) -f go/Dockerfile ./go
 
+.PHONY: release
+release: BUILDER ?=docker buildx
+release: BUILD_ARGS ?= --platform linux/amd64,linux/arm64 --builder $(BUILDER_NAME)
+release: buildx-create
+release: release-controller
+release: release-app
+release: release-ui
+
 .PHONY: release-controller
 release-controller: DOCKER_BUILD_ARGS += --push --platform linux/amd64,linux/arm64
 release-controller: DOCKER_BUILDER = docker buildx
@@ -168,9 +198,14 @@ release-app: build-app
 .PHONY: kind-load-docker-images
 kind-load-docker-images: retag-docker-images
 	docker images | grep $(VERSION) || true
-	kind load docker-image --name $(KIND_CLUSTER_NAME) $(RETAGGED_CONTROLLER_IMG)
-	kind load docker-image --name $(KIND_CLUSTER_NAME) $(RETAGGED_UI_IMG)
-	kind load docker-image --name $(KIND_CLUSTER_NAME) $(RETAGGED_APP_IMG)
+	@if [ "$$(kubectl config current-context)" == "kind-$(KIND_CLUSTER_NAME)" ]; then 		\
+		echo "Loading docker images into kind cluster $(KIND_CLUSTER_NAME)...";				\
+		kind load docker-image --name $(KIND_CLUSTER_NAME) $(RETAGGED_CONTROLLER_IMG) || :;	\
+		kind load docker-image --name $(KIND_CLUSTER_NAME) $(RETAGGED_UI_IMG)		  || :;	\
+		kind load docker-image --name $(KIND_CLUSTER_NAME) $(RETAGGED_APP_IMG)		  || :;	\
+	else \
+		echo "Not in kind cluster $(KIND_CLUSTER_NAME), skipping image loading."; \
+	fi
 
 .PHONY: retag-docker-images
 retag-docker-images: build
@@ -208,14 +243,12 @@ helm-agents:
 	helm package helm/agents/argo-rollouts
 	VERSION=$(VERSION) envsubst < helm/agents/cilium-crd/Chart-template.yaml > helm/agents/cilium-crd/Chart.yaml
 	helm package helm/agents/cilium-crd
-	VERSION=$(VERSION) envsubst < helm/agents/kubescape/Chart-template.yaml > helm/agents/kubescape/Chart.yaml
-	helm package helm/agents/kubescape
 
 .PHONY: helm-version
 helm-version: helm-cleanup helm-agents
 	VERSION=$(VERSION) envsubst < helm/kagent-crds/Chart-template.yaml > helm/kagent-crds/Chart.yaml
 	VERSION=$(VERSION) envsubst < helm/kagent/Chart-template.yaml > helm/kagent/Chart.yaml
-	helm dependency update helm/kagent
+	helm dependency update helm/kagent || :
 	helm package helm/kagent-crds
 	helm package helm/kagent
 
@@ -290,5 +323,6 @@ open-dev-container:
 
 .PHONY: otel-local
 otel-local:
+	#docker run -d --name otel-desktop --restart=always -p 8000:8000 -p 4317:4317 -p 4318:4318 $(BASE_IMAGE_REGISTRY)/davetron5000/otel-desktop-viewer:alpine-3
 	docker run -d --name jaeger-desktop --restart=always -p 16686:16686 -p 4317:4317 -p 4318:4318 $(BASE_IMAGE_REGISTRY)/jaegertracing/jaeger:2.6.0
 	open http://localhost:16686

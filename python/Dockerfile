@@ -70,10 +70,13 @@ RUN export https_proxy=http://10.232.233.70:8080   \
     && curl -Ls https://raw.githubusercontent.com/kubescape/kubescape/master/install.sh | bash \
     && ls /usr/local/bin/
 
+
 ### STAGE 4: final
 FROM python-os AS final
+ARG TARGETARCH
 
-RUN apk update && apk add nodejs npm
+RUN export https_proxy=http://10.232.233.70:8080 \
+    && apk update && apk add nodejs npm
 
 COPY --from=python-builder /usr/local/bin/kubectl /usr/local/bin/kubectl
 COPY --from=python-builder /usr/local/bin/istioctl /usr/local/bin/istioctl
@@ -115,10 +118,10 @@ RUN chown -R python:pythongroup /app/python && \
 ENV UV_OFFLINE=1
 
 #set custom certificates
-ENV CERT_PATH='/app/python/amdcerts.pem'
+ENV CERT_PATH = '/app/python/amdcerts.pem'
+COPY amdcerts.pem $CERT_PATH
 ENV REQUESTS_CA_BUNDLE=$CERT_PATH
 ENV SSL_CERT_FILE=$CERT_PATH
-COPY amdcerts.pem $CERT_PATH
 
 EXPOSE 8081
 
