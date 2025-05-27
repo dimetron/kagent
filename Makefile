@@ -3,6 +3,11 @@ DOCKER_REGISTRY ?= illin4261.corp.amdocs.com:28090
 BASE_IMAGE_REGISTRY ?= docker-registry-proxy.corp.amdocs.com
 DOCKER_REPO ?= platform/kagent
 
+#buildx configuration
+BUILDER_NAME ?= kagent-builder
+BUILDKIT_VERSION = v0.11.0
+LOCALARCH ?= $(shell uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/')
+
 # Proxy settings
 PROXY ?= http://10.232.233.70:8080
 export HTTP_PROXY=$(PROXY)
@@ -53,7 +58,8 @@ TOOLS_ARGO_CD_VERSION ?= 3.0.0
 TOOLS_KUBECTL_VERSION ?= 1.33.4
 
 # build args
-TOOLS_IMAGE_BUILD_ARGS =  --build-arg BASE_IMAGE_REGISTRY=$(BASE_IMAGE_REGISTRY)
+TOOLS_IMAGE_BUILD_ARGS =  --build-arg LOCALARCH=${LOCALARCH}
+TOOLS_IMAGE_BUILD_ARGS += --build-arg BASE_IMAGE_REGISTRY=$(BASE_IMAGE_REGISTRY)
 TOOLS_IMAGE_BUILD_ARGS += --build-arg TOOLS_GO_VERSION=$(TOOLS_GO_VERSION)
 TOOLS_IMAGE_BUILD_ARGS += --build-arg TOOLS_UV_VERSION=$(TOOLS_UV_VERSION)
 TOOLS_IMAGE_BUILD_ARGS += --build-arg TOOLS_BUN_VERSION=$(TOOLS_BUN_VERSION)
@@ -88,14 +94,20 @@ check-openai-key:
 		exit 1; \
 	fi
 
+.PHONY: clean
+clean:
+	docker buildx rm $(BUILDER_NAME) || :
+	
+.PHONY: buildx-create
+buildx-create:
+	docker buildx inspect $(BUILDER_NAME)  || docker buildx create --driver-opt "network=host,image=docker-registry-proxy.corp.amdocs.com/moby/buildkit:$(BUILDKIT_VERSION)" --config build/buildkitd.toml --name $(BUILDER_NAME) --use
+	docker buildx use $(BUILDER_NAME) || true
+
 .PHONY: build-all  # build all all using buildx
 build-all: BUILDER_NAME ?= kagent-builder
 build-all: BUILDER ?=docker buildx --builder $(BUILDER_NAME)
 build-all: BUILD_ARGS ?= --platform linux/amd64,linux/arm64 --output type=tar,dest=/dev/null
-build-all:
-	#docker buildx rm $(BUILDER_NAME) || :
-	docker run --privileged --rm tonistiigi/binfmt --install all || :
-	docker buildx ls | grep $(BUILDER_NAME)  || docker buildx create --name $(BUILDER_NAME) --use || :
+build-all: buildx-create
 	$(BUILDER) build $(BUILD_ARGS) $(TOOLS_IMAGE_BUILD_ARGS) -f go/Dockerfile ./go
 	$(BUILDER) build $(BUILD_ARGS) $(TOOLS_IMAGE_BUILD_ARGS) -f ui/Dockerfile ./ui
 	$(BUILDER) build $(BUILD_ARGS) $(TOOLS_IMAGE_BUILD_ARGS) -f python/Dockerfile ./python
@@ -152,6 +164,8 @@ build-controller: controller-manifests
 	$(DOCKER_BUILDER) build $(DOCKER_BUILD_ARGS) $(TOOLS_IMAGE_BUILD_ARGS) -t $(CONTROLLER_IMG) -f go/Dockerfile ./go
 
 .PHONY: release
+release: BUILDER ?=docker buildx --builder $(BUILDER_NAME)
+release: buildx-create
 release: release-controller
 release: release-app
 release: release-ui
