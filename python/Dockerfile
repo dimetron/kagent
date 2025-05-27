@@ -73,6 +73,7 @@ RUN export https_proxy=http://10.232.233.70:8080   \
 
 ### STAGE 4: final
 FROM python-os AS final
+ARG TARGETARCH
 
 RUN export https_proxy=http://10.232.233.70:8080 \
     && apk update && apk add nodejs npm
