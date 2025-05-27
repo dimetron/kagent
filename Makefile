@@ -105,7 +105,7 @@ buildx-create:
 
 .PHONY: build-all  # build all all using buildx
 build-all: BUILDER_NAME ?= kagent-builder
-build-all: BUILDER ?=docker buildx --builder $(BUILDER_NAME)
+build-all: BUILDER ?=docker buildx --builder $(BUILDER_NAME) --push
 build-all: BUILD_ARGS ?= --platform linux/amd64,linux/arm64 --output type=tar,dest=/dev/null
 build-all: buildx-create
 	$(BUILDER) build $(BUILD_ARGS) $(TOOLS_IMAGE_BUILD_ARGS) -f go/Dockerfile ./go
@@ -164,7 +164,8 @@ build-controller: controller-manifests
 	$(DOCKER_BUILDER) build $(DOCKER_BUILD_ARGS) $(TOOLS_IMAGE_BUILD_ARGS) -t $(CONTROLLER_IMG) -f go/Dockerfile ./go
 
 .PHONY: release
-release: BUILDER ?=docker buildx --builder $(BUILDER_NAME)
+release: BUILDER ?=docker buildx
+release: BUILD_ARGS ?= --platform linux/amd64,linux/arm64 --builder $(BUILDER_NAME)
 release: buildx-create
 release: release-controller
 release: release-app
