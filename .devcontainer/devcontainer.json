@@ -13,8 +13,8 @@
     }
   },
   "features": {
-    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {},
-    "ghcr.io/mpriscella/features/kind:1": {}
+    "docker-registry-proxy.corp.amdocs.com/devcontainers/features/docker-outside-of-docker:1": {},
+    "docker-registry-proxy.corp.amdocs.com/mpriscella/features/kind:1": {}
   },
   "customizations": {
     "vscode": {

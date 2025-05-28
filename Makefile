@@ -4,7 +4,7 @@ BASE_IMAGE_REGISTRY ?= docker-registry-proxy.corp.amdocs.com
 DOCKER_REPO ?= platform/kagent
 
 #buildx configuration
-BUILDER_NAME ?= kagent-builder
+BUILDER_NAME ?= container-builder
 BUILDKIT_VERSION = v0.11.0
 LOCALARCH ?= $(shell uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/')
 
@@ -100,7 +100,7 @@ clean:
 	
 .PHONY: buildx-create
 buildx-create:
-	docker buildx inspect $(BUILDER_NAME)  || docker buildx create --driver-opt "network=host,image=docker-registry-proxy.corp.amdocs.com/moby/buildkit:$(BUILDKIT_VERSION)" --config build/buildkitd.toml --name $(BUILDER_NAME) --use
+	docker buildx inspect $(BUILDER_NAME)  || docker buildx create --driver-opt "network=host,image=docker-registry-proxy.corp.amdocs.com/moby/buildkit:$(BUILDKIT_VERSION)" --config .devcontainer/buildkitd.toml --name $(BUILDER_NAME) --use
 	docker buildx use $(BUILDER_NAME) || true
 
 .PHONY: build-all  # build all all using buildx
@@ -114,7 +114,8 @@ build-all: buildx-create
 
 .PHONY: create-kind-cluster
 create-kind-cluster:
-	kind create cluster --name $(KIND_CLUSTER_NAME)
+	docker pull $(BASE_IMAGE_REGISTRY)/kindest/node:v1.32.5 || true
+	kind create cluster --name $(KIND_CLUSTER_NAME) --image $(BASE_IMAGE_REGISTRY)/kindest/node:v1.32.5
 
 .PHONY: use-kind-cluster
 use-kind-cluster:
@@ -311,9 +312,9 @@ kagent-cli-install:
 	KAGENT_HELM_REPO=./helm/ ./go/bin/kagent-local dashboard
 
 .PHONY: kagent-cli-port-forward
-kagent-cli-port-forward: use-kind-cluster
+kagent-cli-port-forward:
 	@echo "Port forwarding to kagent CLI..."
-	kubectl port-forward -n kagent service/kagent 8081:8081 8082:80
+	kubectl port-forward -n kagent service/kagent 8082:80
 
 .PHONY: open-dev-container
 open-dev-container:

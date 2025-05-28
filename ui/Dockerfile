@@ -42,7 +42,8 @@ RUN --mount=type=cache,target=/cache/bun,rw             \
 #copy the rest of the files
 COPY . .
 RUN --mount=type=cache,target=/cache/bun,rw             \
-    bun install                                      \
+    export https_proxy=http://10.232.233.70:8080        \
+    && bun install                                      \
     && bun run build  --no-lint                         \
     && mkdir -p /app/ui/public
 
@@ -69,7 +70,7 @@ RUN --mount=type=cache,target=/cache/bun,rw \
     && curl -fsSL https://bun.sh/install | bash -s "bun-v$TOOLS_BUN_VERSION" \
     && bun --version
 
-RUN mkdir -p /app/ui /run/nginx /var/lib/nginx/tmp/     \
+RUN mkdir -p /app/ui/ /run/nginx /var/lib/nginx/tmp/ \
     && addgroup -g 1001    nginx                        \
     && adduser  -u 1001 -G nginx -s /bin/bash -D nextjs \
     && adduser  -u 1002 -G nginx -s /bin/bash -D nginx  \
@@ -83,8 +84,8 @@ WORKDIR /app/ui
 COPY --from=base-os /app/ui/next.config.ts ./
 COPY --from=base-os /app/ui/public ./public
 COPY --from=base-os /app/ui/package.json ./package.json
-COPY --from=base-os --chown=nextjs:nginx /app/ui/.next/standalone ./
-COPY --from=base-os --chown=nextjs:nginx /app/ui/.next/static ./.next/static
+#COPY --from=base-os --chown=nextjs:nginx /app/ui/.next/standalone ./
+#COPY --from=base-os --chown=nextjs:nginx /app/ui/.next/static ./.next/static
 
 # Ensure correct permissions
 RUN chown -R nextjs:nginx /app/ui && \
