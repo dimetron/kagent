@@ -1,0 +1,15 @@
+{
+  "lockfileVersion": 1,
+  "workspaces": {
+    "": {
+      "dependencies": {
+        "node": "^22.16.0",
+      },
+    },
+  },
+  "packages": {
+    "node": ["node@22.16.0", "", { "dependencies": { "node-bin-setup": "^1.0.0" }, "bin": { "node": "bin/node" } }, "sha512-rJlZ29rJLShrkDJrvLUfuxMJT5in2o1C0PhOPjZI9yHnctqk9m85sSyoAdhkN98Xb14NeobmCiIKFWqT2E1+bA=="],
+
+    "node-bin-setup": ["node-bin-setup@1.1.4", "", {}, "sha512-vWNHOne0ZUavArqPP5LJta50+S8R261Fr5SvGul37HbEDcowvLjwdvd0ZeSr0r2lTSrPxl6okq9QUw8BFGiAxA=="],
+  }
+}
