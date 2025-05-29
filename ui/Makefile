@@ -4,14 +4,21 @@
 
 all: build
 
+.PHONY: install
+install:
+	rm -f package-lock.json
+	bun install nextjs
+	bun install node
+	bun install
+
 .PHONY: outdated
 outdated:
-	npm outdated || true
+	bun install --lock-frozen
+	bun outdated || true
 
 .PHONY: update
 update: outdated
 	@echo "Updating UI lock file..."
-	npm update
 	bun install
 	bun update
 	@echo "Updating UI lock file done."
