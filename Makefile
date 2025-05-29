@@ -10,9 +10,8 @@ LOCALARCH ?= $(shell uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/')
 
 # Proxy settings
 PROXY ?= http://10.232.233.70:8080
-export HTTP_PROXY=$(PROXY)
-export HTTPS_PROXY=$(PROXY)
-export NO_PROXY="docker.io,localhost,192.168.64.11,192.168.5.15,192.168.8,1,192.168.100.1,192.168.5.15,127.0.0.1,192.168.5.0/24,10.96.0.0/12,192.168.100.1,192.168.8.1,192.168.8.0/24,185.162.148.55,185.139.140.136,*.svc,*.default,*.local,*.internal,*.testing,ga.sock,*.qmp.sock,serial.sock,ssh.sock,docker.sock,localaddress,*.localdomain,*.localdomain.com,illinlic01,indlinsls,linvc04,bitbucket,gitlab,ldap,10.232.233.70,10.19.50.20,10.19.50.20,genproxy,genproxy.corp.amdocs.com,10.17.88.18,10.17.88.22,10.232.217.1,10.232.217.2,10.20.40.100,10.19.214.200,*.socket,127.254.254.254,teleproxy,traffic-manager.ambassador,169.254/16,10.0.0.0/8,localhost4,*.localdomain4,localhost,10.0.0.0/8,172.16.0.0/12,192.168.100.0/16,wpad,jira,awsnvportal.corp.amdocs.com,illin5646,wpad.corp.amdocs.com,185.162.148.55,185.139.140.136,dmitriyr01-mac,*.eaas.amdocs.com,*.corp.amdocs.com,*.corp.amdocs.aws,*.corp.amdocs.azr,uk-fullvpn.amdocs.com,isr-fullvpn.amdocs.com,fullvpn.amdocs.com,aus-fullvpn.amdocs.com,docker-registry-proxy.corp.amdocs.com,*.azmk8s.io"
+export https_proxy=$(PROXY)
+export no_proxy="docker.io,localhost,192.168.64.11,192.168.5.15,192.168.8,1,192.168.100.1,192.168.5.15,127.0.0.1,192.168.5.0/24,10.96.0.0/12,192.168.100.1,192.168.8.1,192.168.8.0/24,185.162.148.55,185.139.140.136,*.svc,*.default,*.local,*.internal,*.testing,ga.sock,*.qmp.sock,serial.sock,ssh.sock,docker.sock,localaddress,*.localdomain,*.localdomain.com,illinlic01,indlinsls,linvc04,bitbucket,gitlab,ldap,10.232.233.70,10.19.50.20,10.19.50.20,genproxy,genproxy.corp.amdocs.com,10.17.88.18,10.17.88.22,10.232.217.1,10.232.217.2,10.20.40.100,10.19.214.200,*.socket,127.254.254.254,teleproxy,traffic-manager.ambassador,169.254/16,10.0.0.0/8,localhost4,*.localdomain4,localhost,10.0.0.0/8,172.16.0.0/12,192.168.100.0/16,wpad,jira,awsnvportal.corp.amdocs.com,illin5646,wpad.corp.amdocs.com,185.162.148.55,185.139.140.136,dmitriyr01-mac,*.eaas.amdocs.com,*.corp.amdocs.com,*.corp.amdocs.aws,*.corp.amdocs.azr,uk-fullvpn.amdocs.com,isr-fullvpn.amdocs.com,fullvpn.amdocs.com,aus-fullvpn.amdocs.com,docker-registry-proxy.corp.amdocs.com,*.azmk8s.io"
 
 export CGO_ENABLED=0
 export GO111MODULE=on
@@ -39,8 +38,10 @@ RETAGGED_DOCKER_REGISTRY = illin4261.corp.amdocs.com:28090
 RETAGGED_CONTROLLER_IMG = $(RETAGGED_DOCKER_REGISTRY)/$(DOCKER_REPO)/$(CONTROLLER_IMAGE_NAME):$(CONTROLLER_IMAGE_TAG)
 RETAGGED_UI_IMG = $(RETAGGED_DOCKER_REGISTRY)/$(DOCKER_REPO)/$(UI_IMAGE_NAME):$(UI_IMAGE_TAG)
 RETAGGED_APP_IMG = $(RETAGGED_DOCKER_REGISTRY)/$(DOCKER_REPO)/$(APP_IMAGE_NAME):$(APP_IMAGE_TAG)
-DOCKER_BUILDER ?= docker
-DOCKER_BUILD_ARGS ?=
+
+#buildx parameters
+DOCKER_BUILDER ?= docker buildx
+DOCKER_BUILD_ARGS ?= --load --sbom false --provenance false --platform linux/$(LOCALARCH) --builder $(BUILDER_NAME)
 KIND_CLUSTER_NAME ?= kagent
 
 #take from go/go.mod
@@ -58,7 +59,8 @@ TOOLS_ARGO_CD_VERSION ?= 3.0.0
 TOOLS_KUBECTL_VERSION ?= 1.33.4
 
 # build args
-TOOLS_IMAGE_BUILD_ARGS =  --build-arg LOCALARCH=${LOCALARCH}
+TOOLS_IMAGE_BUILD_ARGS =  --build-arg PROXY=$(PROXY)
+TOOLS_IMAGE_BUILD_ARGS += --build-arg LOCALARCH=$(LOCALARCH)
 TOOLS_IMAGE_BUILD_ARGS += --build-arg BASE_IMAGE_REGISTRY=$(BASE_IMAGE_REGISTRY)
 TOOLS_IMAGE_BUILD_ARGS += --build-arg TOOLS_GO_VERSION=$(TOOLS_GO_VERSION)
 TOOLS_IMAGE_BUILD_ARGS += --build-arg TOOLS_UV_VERSION=$(TOOLS_UV_VERSION)
@@ -164,7 +166,7 @@ controller-manifests:
 	cp go/config/crd/bases/* helm/kagent-crds/templates/
 
 .PHONY: build-controller
-build-controller: controller-manifests
+build-controller: controller-manifests buildx-create
 	$(DOCKER_BUILDER) build $(DOCKER_BUILD_ARGS) $(TOOLS_IMAGE_BUILD_ARGS) -t $(CONTROLLER_IMG) -f go/Dockerfile ./go
 
 .PHONY: release
@@ -181,7 +183,7 @@ release-controller: DOCKER_BUILDER = docker buildx
 release-controller: build-controller
 
 .PHONY: build-ui
-build-ui:
+build-ui: buildx-create
 	# Build the combined UI and backend image
 	$(DOCKER_BUILDER) build $(DOCKER_BUILD_ARGS) $(TOOLS_IMAGE_BUILD_ARGS) -t $(UI_IMG) -f ui/Dockerfile ./ui
 
@@ -191,7 +193,7 @@ release-ui: DOCKER_BUILDER = docker buildx
 release-ui: build-ui
 
 .PHONY: build-app
-build-app:
+build-app: buildx-create
 	$(DOCKER_BUILDER) build $(DOCKER_BUILD_ARGS) $(TOOLS_IMAGE_BUILD_ARGS) -t $(APP_IMG) -f python/Dockerfile ./python
 
 .PHONY: release-app
