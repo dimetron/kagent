@@ -4,10 +4,14 @@
 
 all: build
 
+.PHONY: outdated
+outdated:
+	npm outdated || true
+
 .PHONY: update
-update:
+update: outdated
 	@echo "Updating UI lock file..."
-	rm -f package-lock.json
+	npm update
 	bun install
 	bun update
 	@echo "Updating UI lock file done."
