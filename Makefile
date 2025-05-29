@@ -94,6 +94,9 @@ check-openai-key:
 		exit 1; \
 	fi
 
+.PHONY: builds
+builds: build
+
 .PHONY: clean
 clean:
 	docker buildx rm $(BUILDER_NAME) || :
