@@ -57,7 +57,6 @@ RUN export https_proxy=http://10.232.233.70:8080 \
     && update-ca-certificates \
     && rm -rf /var/cache/apk/*
 
-
 ARG TOOLS_BUN_VERSION
 ENV BUN_INSTALL=/usr/local/bun
 ENV PATH=$BUN_INSTALL/bin:$PATH

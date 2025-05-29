@@ -164,8 +164,8 @@ build-controller: controller-manifests
 	$(DOCKER_BUILDER) build $(DOCKER_BUILD_ARGS) $(TOOLS_IMAGE_BUILD_ARGS) -t $(CONTROLLER_IMG) -f go/Dockerfile ./go
 
 .PHONY: release
-release: BUILDER ?=docker buildx
-release: BUILD_ARGS ?= --platform linux/amd64,linux/arm64 --builder $(BUILDER_NAME)
+release: DOCKER_BUILDER = docker buildx
+release: DOCKER_BUILD_ARGS = --platform linux/amd64,linux/arm64 --push --builder $(BUILDER_NAME)
 release: buildx-create
 release: release-controller
 release: release-app
