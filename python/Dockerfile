@@ -103,7 +103,7 @@ RUN --mount=type=cache,target=/app/python/.cache                  \
 RUN --mount=type=cache,target=/app/python/.cache                  \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     mkdir -p /app/python/.autogenstudio/configs                   \
-    export https_proxy=http://10.232.233.70:8080                  \
+    && export https_proxy=http://10.232.233.70:8080               \
     && uv run tool_gen -o /app/python/.autogenstudio/configs
 
 # Test if the tool is working and fetch all dependencies
