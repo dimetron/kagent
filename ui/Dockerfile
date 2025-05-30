@@ -4,10 +4,6 @@ FROM --platform=linux/$BUILDARCH $BASE_IMAGE_REGISTRY/chainguard/wolfi-base:late
 
 ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
-ENV http_proxy=${PROXY:-http://10.232.233.70:8080}
-ENV https_proxy=${PROXY:-http://10.232.233.70:8080}
-ENV no_proxy="localhost,127.0.0.1,172.17.0.0/12,192.168.0.0/16,.svc,.default,.local,.internal,fs.amdocs.com,.amdocs.com,.amdocs.aws,.sock,bitbucket.corp.amdocs.com,.corp.amdocs.com,docker-registry-proxy.corp.amdocs.com"
-
 RUN apk update \
     && apk add curl openssl unzip bash git ca-certificates  \
     && update-ca-certificates \
@@ -36,8 +32,9 @@ WORKDIR /app/ui
 
 #copy the package.json
 COPY package*.json .
-RUN --mount=type=cache,target=/cache/bun,rw             \
-    bun install
+RUN --mount=type=cache,target=/cache/bun,rw          \
+    export https_proxy=http://10.232.233.70:8080  \
+    && bun install
 
 #copy the rest of the files
 COPY . .

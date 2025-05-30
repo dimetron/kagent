@@ -97,7 +97,22 @@ check-openai-key:
 	fi
 
 .PHONY: builds
-builds: build
+builds: build scan-cve
+
+.PHONY: report/cve
+report/cve:
+#	echo "Pulling images for CVE scan ..."
+#	crane copy --insecure $(CONTROLLER_IMG) docker:$(CONTROLLER_IMG)
+#	crane copy --insecure $(APP_IMG)       docker:$(APP_IMG)
+#	crane copy --insecure $(UI_IMG)        docker:$(UI_IMG)
+	echo "Running CVE scan :: CVE -> CSV ... reports/$(SEMVER)/"
+	grype docker:$(CONTROLLER_IMG) -o template -t reports/report.tmpl.csv --file reports/$(SEMVER)/controller-cve.csv
+	grype docker:$(APP_IMG)        -o template -t reports/report.tmpl.csv --file reports/$(SEMVER)/app-cve.csv
+	grype docker:$(UI_IMG)         -o template -t reports/report.tmpl.csv --file reports/$(SEMVER)/ui-cve.csv
+	echo "Running CVE scan :: CVE -> HTML ... reports/$(VERSION)/"
+	grype docker:$(CONTROLLER_IMG) -o template -t reports/report.tmpl.html --file reports/$(SEMVER)/controller-cve.html
+	grype docker:$(APP_IMG)        -o template -t reports/report.tmpl.html --file reports/$(SEMVER)/app-cve.html
+	grype docker:$(UI_IMG)         -o template -t reports/report.tmpl.html --file reports/$(SEMVER)/ui-cve.html
 
 .PHONY: clean
 clean:
@@ -107,15 +122,6 @@ clean:
 buildx-create:
 	docker buildx inspect $(BUILDER_NAME)  || docker buildx create --driver-opt "network=host,image=docker-registry-proxy.corp.amdocs.com/moby/buildkit:$(BUILDKIT_VERSION)" --config .devcontainer/buildkitd.toml --name $(BUILDER_NAME) --use
 	docker buildx use $(BUILDER_NAME) || true
-
-.PHONY: build-all  # build all all using buildx
-build-all: BUILDER_NAME ?= kagent-builder
-build-all: BUILDER ?=docker buildx --builder $(BUILDER_NAME) --push
-build-all: BUILD_ARGS ?= --platform linux/amd64,linux/arm64 --output type=tar,dest=/dev/null
-build-all: buildx-create
-	$(BUILDER) build $(BUILD_ARGS) $(TOOLS_IMAGE_BUILD_ARGS) -f go/Dockerfile ./go
-	$(BUILDER) build $(BUILD_ARGS) $(TOOLS_IMAGE_BUILD_ARGS) -f ui/Dockerfile ./ui
-	$(BUILDER) build $(BUILD_ARGS) $(TOOLS_IMAGE_BUILD_ARGS) -f python/Dockerfile ./python
 
 .PHONY: create-kind-cluster
 create-kind-cluster:

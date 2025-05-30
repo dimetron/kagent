@@ -9,6 +9,7 @@ install:
 	rm -f package-lock.json
 	bun install nextjs
 	bun install node
+	bun install npm
 	bun install
 
 .PHONY: outdated
