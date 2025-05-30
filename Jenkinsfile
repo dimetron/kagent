@@ -134,7 +134,6 @@ pipeline {
                 sh """
                   cd $HOME_PATH;
                   source $HOME/.bash_profile
-                  source hack/git/.profile
                   export GOPATH=$HOME/workspace/${jobName}
                   docker login ${env.PLATFORM_DOCKER_REPO}   -u '$NEXUS_CRED_USER' -p '$NEXUS_CRED_PASS';
                   make TAG=${env.BRANCH_SIMPLE_NAME} GO_VERSION=${env.BASE_GO_VERSION} checkout/tags
@@ -184,7 +183,6 @@ pipeline {
             sh """
             cd $HOME_PATH;
             source $HOME/.bash_profile
-            source hack/git/.profile
             export GOPATH=$HOME/workspace/${jobName}
             make TAG=${env.BRANCH_SIMPLE_NAME} GO_VERSION=${env.BASE_GO_VERSION} clean/go clean/yarn
             """
@@ -263,7 +261,6 @@ pipeline {
             sh """
             cd $HOME_PATH;
             source $HOME/.bash_profile
-            source hack/git/.profile
             export GOPATH=$HOME/workspace/${jobName}
             make GO_VERSION=${env.BASE_GO_VERSION} \
                  VERSION=${SEMVER} TAG=${env.BRANCH_SIMPLE_NAME} \
@@ -282,7 +279,6 @@ pipeline {
                 sh """
                 cd $HOME_PATH;
                 source $HOME/.bash_profile
-                source hack/git/.profile
                 export GOPATH=$HOME/workspace/${jobName}
                 make TAG=${env.BRANCH_SIMPLE_NAME} SEMVER=${SEMVER} GO_VERSION=${env.BASE_GO_VERSION} HUBS=${env.PLATFORM_DOCKER_REPO}/platform/kagent cve/scan
                 """
@@ -315,7 +311,6 @@ pipeline {
             echo "INFO: Building charts ${SEMVER}"
             cd $HOME_PATH;
             source $HOME/.bash_profile
-            source hack/git/.profile
             export GOPATH=$HOME/workspace/${jobName}
 
             make GO_VERSION=${env.BASE_GO_VERSION} \
