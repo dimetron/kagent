@@ -117,6 +117,7 @@ report/cve:
 .PHONY: clean
 clean:
 	docker buildx rm $(BUILDER_NAME) || :
+	docker system prune -f --volumes || :
 	
 .PHONY: buildx-create
 buildx-create:
