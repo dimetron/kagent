@@ -35,7 +35,7 @@ pipeline {
     jobName = "${JOB_NAME.replaceAll(/\/\w+%2F/,'/').toLowerCase()}"
     BRANCH_SIMPLE_NAME = getBranchSimpleName(env.BRANCH_NAME)
     BRANCH_SIMPLE_BUILD_NAME = "${BRANCH_SIMPLE_NAME}-${BUILD_NUMBER}"
-    SEMVER = "1.26.0-rc${BUILD_NUMBER}"
+    SEMVER = "0.3.12-rc${BUILD_NUMBER}"
     DROP_VERSION = "25.06.00.00"
     TESTE2E = "OCP"
     HOME_PATH = "$HOME/workspace/${jobName}/src/bitbucket.corp.amdocs.com/plto/platform-kagent"
@@ -161,7 +161,6 @@ pipeline {
                 sh """
                 cd $HOME_PATH;
                 source $HOME/.bash_profile
-                source hack/git/.profile
                 export GOPATH=$HOME/workspace/${jobName}
                 make SEMVER=${SEMVER} GO_VERSION=${env.BASE_GO_VERSION} HUBS=${env.PLATFORM_DOCKER_REPO}/platform/kagent builds
                 """
