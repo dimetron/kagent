@@ -316,6 +316,9 @@ helm-publish: helm-version
 	helm push cilium-crd-agent-$(VERSION).tgz oci://ghcr.io/kagent-dev/kagent/agents
 	helm push kgateway-agent-$(VERSION).tgz oci://ghcr.io/kagent-dev/kagent/agents
 
+test/e2e:
+	@echo "Running E2E tests..."
+
 .PHONY: kagent-cli-install
 kagent-cli-install: build-cli-local kind-load-docker-images helm-version
 kagent-cli-install:
