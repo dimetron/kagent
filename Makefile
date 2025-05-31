@@ -16,6 +16,7 @@ export no_proxy="docker.io,localhost,192.168.64.11,192.168.5.15,192.168.8,1,192.
 export CGO_ENABLED=0
 export GO111MODULE=on
 export GOTOOLCHAIN=local
+export BUILDX_NO_DEFAULT_ATTESTATIONS=1
 
 BUILD_DATE := $(shell date -u '+%Y-%m-%d')
 GIT_COMMIT := $(shell git rev-parse --short HEAD || echo "unknown")
@@ -41,8 +42,7 @@ RETAGGED_APP_IMG = $(RETAGGED_DOCKER_REGISTRY)/$(DOCKER_REPO)/$(APP_IMAGE_NAME):
 
 #buildx parameters
 DOCKER_BUILDER ?= docker buildx
-BUILDX_NO_DEFAULT_ATTESTATIONS=true
-DOCKER_BUILD_ARGS ?= --progress=plain --sbom false --attest type=provenance,mode=min --platform linux/$(LOCALARCH) --builder $(BUILDER_NAME)
+DOCKER_BUILD_ARGS ?= --progress=plain --sbom=false --provenance=false --platform linux/$(LOCALARCH) --builder $(BUILDER_NAME)
 KIND_CLUSTER_NAME ?= kagent
 
 #take from go/go.mod
