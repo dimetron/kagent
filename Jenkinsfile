@@ -136,7 +136,6 @@ pipeline {
                   source $HOME/.bash_profile
                   export GOPATH=$HOME/workspace/${jobName}
                   docker login ${env.PLATFORM_DOCKER_REPO}   -u '$NEXUS_CRED_USER' -p '$NEXUS_CRED_PASS';
-                  make TAG=${env.BRANCH_SIMPLE_NAME} GO_VERSION=${env.BASE_GO_VERSION} checkout/tags
                 """
             }
             echo 'Git checkout done'

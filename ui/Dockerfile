@@ -32,15 +32,15 @@ WORKDIR /app/ui
 
 #copy the package.json
 COPY package*.json .
-RUN --mount=type=cache,target=/cache/bun,rw          \
-    export https_proxy=http://10.232.233.70:8080  \
-    && bun install
+RUN --mount=type=cache,target=/cache/bun,rw             \
+    export https_proxy=http://10.232.233.70:8080        \
+    && bun install --lock-frozen
 
 #copy the rest of the files
 COPY . .
 RUN --mount=type=cache,target=/cache/bun,rw             \
     export https_proxy=http://10.232.233.70:8080        \
-    && bun install                                      \
+    && bun install --lock-frozen                        \
     && bun run build  --no-lint                         \
     && mkdir -p /app/ui/public
 
