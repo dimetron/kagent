@@ -5,7 +5,7 @@ DOCKER_REPO ?= platform/kagent
 
 #buildx configuration
 BUILDER_NAME ?= container-builder
-BUILDKIT_VERSION = v0.11.0
+BUILDKIT_VERSION = v0.22.0
 LOCALARCH ?= $(shell uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/')
 
 # Proxy settings
@@ -41,7 +41,7 @@ RETAGGED_APP_IMG = $(RETAGGED_DOCKER_REGISTRY)/$(DOCKER_REPO)/$(APP_IMAGE_NAME):
 
 #buildx parameters
 DOCKER_BUILDER ?= docker buildx
-DOCKER_BUILD_ARGS ?= --load --sbom false --provenance false --platform linux/$(LOCALARCH) --builder $(BUILDER_NAME)
+DOCKER_BUILD_ARGS ?= --progress=plain --sbom false --provenance false --platform linux/$(LOCALARCH) --builder $(BUILDER_NAME)
 KIND_CLUSTER_NAME ?= kagent
 
 #take from go/go.mod
@@ -97,14 +97,14 @@ check-openai-key:
 	fi
 
 .PHONY: builds
-builds: build scan-cve
+builds: release scan-cve
 
 .PHONY: report/cve
 report/cve:
-#	echo "Pulling images for CVE scan ..."
-#	crane copy --insecure $(CONTROLLER_IMG) docker:$(CONTROLLER_IMG)
-#	crane copy --insecure $(APP_IMG)       docker:$(APP_IMG)
-#	crane copy --insecure $(UI_IMG)        docker:$(UI_IMG)
+	echo "Pulling images for CVE scan ..."
+	crane copy --insecure $(CONTROLLER_IMG) docker:$(CONTROLLER_IMG)
+	crane copy --insecure $(APP_IMG)       docker:$(APP_IMG)
+	crane copy --insecure $(UI_IMG)        docker:$(UI_IMG)
 	echo "Running CVE scan :: CVE -> CSV ... reports/$(SEMVER)/"
 	grype docker:$(CONTROLLER_IMG) -o template -t reports/report.tmpl.csv --file reports/$(SEMVER)/controller-cve.csv
 	grype docker:$(APP_IMG)        -o template -t reports/report.tmpl.csv --file reports/$(SEMVER)/app-cve.csv
@@ -177,8 +177,7 @@ build-controller: controller-manifests buildx-create
 	$(DOCKER_BUILDER) build $(DOCKER_BUILD_ARGS) $(TOOLS_IMAGE_BUILD_ARGS) -t $(CONTROLLER_IMG) -f go/Dockerfile ./go
 
 .PHONY: release
-release: DOCKER_BUILDER = docker buildx
-release: DOCKER_BUILD_ARGS = --platform linux/amd64,linux/arm64 --push --builder $(BUILDER_NAME)
+builds: DOCKER_BUILD_ARGS ?= --push --progress=plain --sbom false --provenance false --platform linux/$(LOCALARCH) --builder $(BUILDER_NAME)
 release: buildx-create
 release: release-controller
 release: release-app
