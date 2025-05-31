@@ -20,8 +20,7 @@ outdated:
 .PHONY: update
 update: outdated
 	@echo "Updating UI lock file..."
-	bun install
-	bun update
+	bun install --save-text-lockfile
 	@echo "Updating UI lock file done."
 
 .PHONY: build

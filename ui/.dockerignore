@@ -3,6 +3,7 @@ env/
 .git/
 .gitignore
 .coverage
+cypress
 htmlcov/
 workspace/
 node_modules/
