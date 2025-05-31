@@ -177,7 +177,7 @@ build-controller: controller-manifests buildx-create
 	$(DOCKER_BUILDER) build $(DOCKER_BUILD_ARGS) $(TOOLS_IMAGE_BUILD_ARGS) -t $(CONTROLLER_IMG) -f go/Dockerfile ./go
 
 .PHONY: release
-builds: DOCKER_BUILD_ARGS ?= --push --progress=plain --sbom false --provenance false --platform linux/$(LOCALARCH) --builder $(BUILDER_NAME)
+builds: DOCKER_BUILD_ARGS ?= --progress=plain --sbom false --provenance=false --sbom=false --provenance=false --builder $BUILDX_NAME  --builder $(BUILDER_NAME)
 release: buildx-create
 release: release-controller
 release: release-app
