@@ -4,9 +4,10 @@ FROM --platform=linux/$BUILDARCH $BASE_IMAGE_REGISTRY/chainguard/wolfi-base:late
 
 ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
-RUN export https_proxy=http://10.232.233.70:8080        \
+
+RUN export https_proxy=http://10.232.233.70:8080 \
     && apk update \
-    && apk add curl openssl unzip bash git ca-certificates  \
+    && apk add curl bash openssl ca-certificates nginx supervisor \
     && update-ca-certificates \
     && rm -rf /var/cache/apk/*
 
@@ -50,6 +51,7 @@ FROM $BASE_IMAGE_REGISTRY/chainguard/wolfi-base:latest AS final
 
 ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
+
 RUN export https_proxy=http://10.232.233.70:8080 \
     && apk update \
     && apk add curl bash openssl ca-certificates nginx supervisor \
