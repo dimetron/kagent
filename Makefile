@@ -148,7 +148,8 @@ prune-kind-cluster:
 	awk '{print $3}' | xargs -r docker exec $(KIND_CLUSTER_NAME)-control-plane crictl rmi || :
 
 .PHONY: build
-build: build-controller build-ui build-app
+build: DOCKER_BUILD_ARGS += --load
+build:  build-controller build-ui build-app
 
 .PHONY: build-cli
 build-cli:

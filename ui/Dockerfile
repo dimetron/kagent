@@ -4,7 +4,8 @@ FROM --platform=linux/$BUILDARCH $BASE_IMAGE_REGISTRY/chainguard/wolfi-base:late
 
 ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
-RUN apk update \
+RUN export https_proxy=http://10.232.233.70:8080        \
+    && apk update \
     && apk add curl openssl unzip bash git ca-certificates  \
     && update-ca-certificates \
     && rm -rf /var/cache/apk/*
