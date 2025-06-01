@@ -161,7 +161,8 @@ pipeline {
                     source $HOME/.bash_profile
                     export GOPATH=$HOME/workspace/${jobName}
                     make SEMVER=${SEMVER} GO_VERSION=${env.BASE_GO_VERSION} HUBS=${env.PLATFORM_DOCKER_REPO}/platform/kagent build-controller
-                """
+                    """
+                },
                 kagent-app: {
                     echo 'Docker Building..'
                     sh """
@@ -170,7 +171,8 @@ pipeline {
                     source $HOME/.bash_profile
                     export GOPATH=$HOME/workspace/${jobName}
                     make SEMVER=${SEMVER} GO_VERSION=${env.BASE_GO_VERSION} HUBS=${env.PLATFORM_DOCKER_REPO}/platform/kagent build-app
-                """
+                    """
+                },
                 kagent-ui: {
                     echo 'Docker Building..'
                     sh """
@@ -179,7 +181,8 @@ pipeline {
                     source $HOME/.bash_profile
                     export GOPATH=$HOME/workspace/${jobName}
                     make SEMVER=${SEMVER} GO_VERSION=${env.BASE_GO_VERSION} HUBS=${env.PLATFORM_DOCKER_REPO}/platform/kagent build-ui
-                """
+                    """
+                }
               }
            )
         }
