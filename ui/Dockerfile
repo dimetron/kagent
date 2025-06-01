@@ -41,13 +41,13 @@ COPY bunfig.toml   .
 
 RUN --mount=type=cache,target=/cache/bun,rw           \
     echo "Installing dependencies ..."                \
-    && timeout 10 bun install --production
+    && bun install --production --verbose
 
 #copy the rest of the files
 COPY . .
 RUN --mount=type=cache,target=/cache/bun,rw           \
     mkdir -p /app/ui/public                           \
-    && timeout 10 bun install --production            \
+    && bun install --production --verbose  \
     && bun run build  --no-lint
 
 ### STAGE 3: final

@@ -64,11 +64,14 @@
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
     "msw": "^2.8.7",
-    "postcss": "^8.5.4",
+    "postcss": "8.4.31",
     "tailwindcss": "^3.4.17",
     "ts-jest": "^29.3.4",
     "ts-node": "^10.9.2",
     "typescript": "5.8.3",
     "@jest/globals": "^29.7.0"
+  },
+  "engines": {
+    "bun": ">=1.2.12"
   }
 }
