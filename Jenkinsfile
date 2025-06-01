@@ -183,7 +183,6 @@ pipeline {
                     make SEMVER=${SEMVER} GO_VERSION=${env.BASE_GO_VERSION} HUBS=${env.PLATFORM_DOCKER_REPO}/platform/kagent build-ui
                     """
                 }
-              }
            )
         }
     }
