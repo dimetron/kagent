@@ -1,5 +1,7 @@
 [install]
 
+registry = "http://docker-registry-proxy.corp.amdocs.com:8081/repository/npm-external/"
+
 # equivalent to `--production` flag
 production = true
 

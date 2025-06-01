@@ -10,12 +10,13 @@ install:
 
 .PHONY: outdated
 outdated:
-	bun install
+	npm outdated || true
 	bun outdated || true
 
 .PHONY: update
 update: outdated
 	@echo "Updating UI lock file..."
+	npm update
 	bun install --save-text-lockfile
 	@echo "Updating UI lock file done."
 
