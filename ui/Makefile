@@ -6,15 +6,11 @@ all: build
 
 .PHONY: install
 install:
-	rm -f package-lock.json
-	bun install nextjs
-	bun install node
-	bun install npm
 	bun install
 
 .PHONY: outdated
 outdated:
-	bun install --lock-frozen
+	bun install
 	bun outdated || true
 
 .PHONY: update
@@ -25,8 +21,7 @@ update: outdated
 
 .PHONY: build
 build: update
-	rm -f bun.lockb
-	bun install   --frozen-lockfile --production
+	bun install   --production
 	bun run build --no-lint
 
 .PHONY: clean

@@ -1,25 +1,19 @@
 [install]
 
-# whether to install optionalDependencies
-optional = false
+# equivalent to `--production` flag
+production = true
 
 # whether to install devDependencies
-dev = false
+dev = true
+
+# whether to install optionalDependencies
+optional = true
 
 # whether to install peerDependencies
 peer = false
 
-# equivalent to `--production` flag
-production = true
-
 # equivalent to `--save-text-lockfile` flag
-saveTextLockfile = false
+saveTextLockfile = true
 
 # equivalent to `--frozen-lockfile` flag
 frozenLockfile = false
-
-# equivalent to `--dry-run` flag
-dryRun = false
-
-# equivalent to `--concurrent-scripts` flag
-concurrentScripts = 8 # (cpu count or GOMAXPROCS) x2

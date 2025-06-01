@@ -2,18 +2,20 @@
 ARG BASE_IMAGE_REGISTRY=cgr.dev
 ARG LOCALARCH=amd64
 FROM --platform=linux/$LOCALARCH $BASE_IMAGE_REGISTRY/chainguard/wolfi-base:latest AS base-os
+ARG TOOLS_BUN_VERSION
+ARG TARGETARCH
+ARG PROXY
 
 ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
+ENV http_proxy=${PROXY}
+ENV https_proxy=${PROXY}
+ENV no_proxy="localhost,127.0.0.1,172.17.0.0/12,192.168.0.0/16,.svc,.default,.local,.internal,fs.amdocs.com,.amdocs.com,.amdocs.aws,.sock,bitbucket.corp.amdocs.com,.corp.amdocs.com,docker-registry-proxy.corp.amdocs.com"
 
-RUN export HTTPS_PROXY=http://10.232.233.70:8080 \
-    && apk update \
-    && apk add git curl bash openssl ca-certificates nginx supervisor \
+RUN apk update \
+    && apk add curl bash openssl ca-certificates nginx supervisor \
     && update-ca-certificates \
     && rm -rf /var/cache/apk/*
-
-ARG TOOLS_BUN_VERSION
-ARG TARGETARCH
 
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV BUN_INSTALL_CACHE_DIR=/cache/bun
@@ -24,9 +26,10 @@ ENV CYPRESS_INSTALL_BINARY=0
 ENV NODE_PATH=/cache/node_modules
 ENV PATH=$BUN_INSTALL/bin:$PATH
 
+# Install Bun (uses official install script)
+# brew install oven-sh/bun/bun
 RUN --mount=type=cache,target=/cache/bun,rw \
-    mkdir -p $BUN_INSTALL  \
-    && export HTTPS_PROXY=http://10.232.233.70:8080 \
+    mkdir -p $BUN_INSTALL  /app/ui \
     && curl -fsSL https://bun.sh/install | bash -s "bun-v$TOOLS_BUN_VERSION" \
     && bun --version
 
@@ -34,43 +37,50 @@ WORKDIR /app/ui
 
 #copy the package.json
 COPY package*.json .
-
-RUN --mount=type=cache,target=/cache/bun,rw                \
-    export HTTPS_PROXY=http://10.232.233.70:8080           \
-    && bun install --verbose --ignore-scripts --production
+RUN --mount=type=cache,target=/cache/bun,rw             \
+    bun install --production --verbose
 
 #copy the rest of the files
 COPY . .
-RUN --mount=type=cache,target=/cache/bun,rw                \
-    export HTTPS_PROXY=http://10.232.233.70:8080           \
-    && bun install --production --verbose                  \
-    && bun run build  --no-lint                            \
+RUN --mount=type=cache,target=/cache/bun,rw             \
+    bun install --production --verbose                  \
+    && bun run build  --no-lint                         \
     && mkdir -p /app/ui/public
 
 ### STAGE 3: final
 FROM $BASE_IMAGE_REGISTRY/chainguard/wolfi-base:latest AS final
+ARG TOOLS_BUN_VERSION
+ARG TARGETARCH
+ARG PROXY
 
 ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
+ENV http_proxy=${PROXY}
+ENV https_proxy=${PROXY}
+ENV no_proxy="localhost,127.0.0.1,172.17.0.0/12,192.168.0.0/16,.svc,.default,.local,.internal,fs.amdocs.com,.amdocs.com,.amdocs.aws,.sock,bitbucket.corp.amdocs.com,.corp.amdocs.com,docker-registry-proxy.corp.amdocs.com"
 
-RUN export HTTPS_PROXY=http://10.232.233.70:8080 \
-    && apk update \
+RUN apk update \
     && apk add curl bash openssl ca-certificates nginx supervisor \
     && update-ca-certificates \
     && rm -rf /var/cache/apk/*
 
-
-ARG TOOLS_BUN_VERSION
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV BUN_INSTALL_CACHE_DIR=/cache/bun
 ENV BUN_INSTALL=/usr/local/bun
+ENV NVM_DIR=/usr/local/nvm
+ENV NODE_ENV=production
+ENV CYPRESS_INSTALL_BINARY=0
+ENV NODE_PATH=/cache/node_modules
 ENV PATH=$BUN_INSTALL/bin:$PATH
-# Install Bun in native arch for running (uses official install script)
+
+# Install Bun (uses official install script)
 # brew install oven-sh/bun/bun
 RUN --mount=type=cache,target=/cache/bun,rw \
-    mkdir -p $BUN_INSTALL  \
-    && export HTTPS_PROXY=http://10.232.233.70:8080 \
+    mkdir -p $BUN_INSTALL  /app/ui \
     && curl -fsSL https://bun.sh/install | bash -s "bun-v$TOOLS_BUN_VERSION" \
-    && bun --version
+    && bun --version \
 
+# Copy the built application from the base image
 RUN mkdir -p /app/ui /run/nginx /var/lib/nginx/tmp/     \
     && addgroup -g 1001    nginx                        \
     && adduser  -u 1001 -G nginx -s /bin/bash -D nextjs \
