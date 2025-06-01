@@ -6,10 +6,6 @@ FROM --platform=linux/$LOCALARCH $BASE_IMAGE_REGISTRY/chainguard/wolfi-base:late
 ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
 
-ENV HTTP_PROXY=http://10.232.233.70:8080
-ENV HTTPS_PROXY=http://10.232.233.70:8080
-ENV no_proxy="localhost,127.0.0.1,172.17.0.0/12,192.168.0.0/16,.svc,.default,.local,.internal,fs.amdocs.com,.amdocs.com,.amdocs.aws,.sock,bitbucket.corp.amdocs.com,.corp.amdocs.com,docker-registry-proxy.corp.amdocs.com"
-
 RUN export HTTPS_PROXY=http://10.232.233.70:8080 \
     && apk update \
     && apk add git curl bash openssl ca-certificates nginx supervisor \

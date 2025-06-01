@@ -143,13 +143,13 @@ pipeline {
     }
 
      stage('Get Latest Commit') {
-            steps {
-                script {
-                    env.GIT_COMMIT_HASH = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
-                    echo "Latest Git Commit Hash: ${env.GIT_COMMIT_HASH}"
-                }
+        steps {
+            script {
+                env.GIT_COMMIT_HASH = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
+                echo "Latest Git Commit Hash: ${env.GIT_COMMIT_HASH}"
             }
         }
+    }
 
     stage('Build') {
         steps {
