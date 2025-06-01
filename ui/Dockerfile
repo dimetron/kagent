@@ -42,14 +42,14 @@ COPY bun.lock bun.lock
 
 RUN --mount=type=cache,target=/cache/bun,rw                \
     export HTTPS_PROXY=http://10.232.233.70:8080           \
-    && bun install --verbose
+    && bun install --verbose --ignore-scripts --production
 
 #copy the rest of the files
 COPY . .
 RUN --mount=type=cache,target=/cache/bun,rw                \
     export HTTPS_PROXY=http://10.232.233.70:8080           \
-    && bun install --production --verbose \
-    && bun run build  --no-lint     --verbose              \
+    && bun install --production --verbose                  \
+    && bun run build  --no-lint                            \
     && mkdir -p /app/ui/public
 
 ### STAGE 3: final
