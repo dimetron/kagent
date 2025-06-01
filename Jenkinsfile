@@ -154,7 +154,7 @@ pipeline {
     stage('Build') {
         steps {
             parallel(
-              kagent-controller: {
+              controller: {
                     echo 'Docker Building..'
                     sh """
                     cd $HOME_PATH;
@@ -163,7 +163,7 @@ pipeline {
                     make SEMVER=${SEMVER} GO_VERSION=${env.BASE_GO_VERSION} HUBS=${env.PLATFORM_DOCKER_REPO}/platform/kagent build-controller
                     """
                 },
-                kagent-app: {
+                app: {
                     echo 'Docker Building..'
                     sh """
                     sleep 5
@@ -173,7 +173,7 @@ pipeline {
                     make SEMVER=${SEMVER} GO_VERSION=${env.BASE_GO_VERSION} HUBS=${env.PLATFORM_DOCKER_REPO}/platform/kagent build-app
                     """
                 },
-                kagent-ui: {
+                ui: {
                     echo 'Docker Building..'
                     sh """
                     sleep 10
