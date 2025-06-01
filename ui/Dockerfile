@@ -34,7 +34,6 @@ WORKDIR /app/ui
 
 #copy the package.json
 COPY package*.json .
-COPY bun.lock bun.lock
 
 RUN --mount=type=cache,target=/cache/bun,rw                \
     export HTTPS_PROXY=http://10.232.233.70:8080           \
