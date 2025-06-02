@@ -1,7 +1,6 @@
 ### STAGE 1: base image
 ARG BASE_IMAGE_REGISTRY=cgr.dev
-ARG LOCALARCH=amd64
-FROM --platform=linux/$LOCALARCH $BASE_IMAGE_REGISTRY/chainguard/wolfi-base:latest AS base-os
+FROM $BASE_IMAGE_REGISTRY/chainguard/wolfi-base:latest AS base-os
 ARG TOOLS_BUN_VERSION
 ARG TARGETARCH
 ARG PROXY
@@ -12,9 +11,9 @@ ENV http_proxy=${PROXY}
 ENV https_proxy=${PROXY}
 ENV no_proxy="localhost,127.0.0.1,172.17.0.0/12,192.168.0.0/16,.svc,.default,.local,.internal,fs.amdocs.com,.amdocs.com,.amdocs.aws,.sock,bitbucket.corp.amdocs.com,.corp.amdocs.com,docker-registry-proxy.corp.amdocs.com"
 
-RUN apk update \
+RUN export https_proxy=${PROXY} \
+    && apk update \
     && apk add curl bash openssl ca-certificates nginx supervisor \
-    && update-ca-certificates \
     && rm -rf /var/cache/apk/*
 
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -59,9 +58,9 @@ ENV http_proxy=${PROXY}
 ENV https_proxy=${PROXY}
 ENV no_proxy="localhost,127.0.0.1,172.17.0.0/12,192.168.0.0/16,.svc,.default,.local,.internal,fs.amdocs.com,.amdocs.com,.amdocs.aws,.sock,bitbucket.corp.amdocs.com,.corp.amdocs.com,docker-registry-proxy.corp.amdocs.com"
 
-RUN apk update \
+RUN export https_proxy=${PROXY} \
+    && apk update \
     && apk add curl bash openssl ca-certificates nginx supervisor \
-    && update-ca-certificates \
     && rm -rf /var/cache/apk/*
 
 ENV NEXT_TELEMETRY_DISABLED=1
