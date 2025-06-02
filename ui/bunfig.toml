@@ -2,6 +2,10 @@
 
 registry = "http://docker-registry-proxy.corp.amdocs.com:8081/repository/npm-external/"
 
+#proxy = "http://192.168.81:3128"
+
+no_proxy = "localhost,127.0.0.1"
+
 # equivalent to `--production` flag
 production = true
 
@@ -15,7 +19,7 @@ optional = true
 peer = false
 
 # equivalent to `--save-text-lockfile` flag
-saveTextLockfile = true
+saveTextLockfile = false
 
 # equivalent to `--frozen-lockfile` flag
-frozenLockfile = false
+frozenLockfile = true
