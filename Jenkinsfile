@@ -55,6 +55,7 @@ pipeline {
              script {
                 manager.addShortText("NODE: ${HST}", "black", "white", "1px", "green");
                 manager.addShortText("TAG: ${BRANCH_SIMPLE_BUILD_NAME}", "black", "white", "1px", "green");
+                sh """docker  system prune -f --volumes || true"""
             }
         }
     }

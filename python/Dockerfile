@@ -21,6 +21,7 @@ RUN export https_proxy=http://10.232.233.70:8080  \
 ENV GIT_LFS_SKIP_SMUDGE=1
 ENV UV_LINK_MODE=copy
 ENV UV_PROJECT_ENVIRONMENT="/app/python/.venv"
+ENV UV_CACHE_DIR="/app/python/.cache/uv"
 
 WORKDIR /app/python
 RUN addgroup -g 1001 pythongroup && \
@@ -75,8 +76,15 @@ RUN export https_proxy=http://10.232.233.70:8080   \
 FROM python-os AS final
 ARG TARGETARCH
 
+ENV UV_CACHE_DIR=/app/python/.cache/uv
+ENV GIT_LFS_SKIP_SMUDGE=1
+ENV UV_LINK_MODE=copy
+ENV UV_PROJECT_ENVIRONMENT="/app/python/.venv"
+ENV UV_CACHE_DIR="/app/python/.cache/uv"
+
 RUN export https_proxy=http://10.232.233.70:8080 \
-    && apk update && apk add nodejs npm
+    && apk update && apk add nodejs npm \
+    && mkdir -p /app/python/.cache/uv
 
 COPY --from=python-builder /usr/local/bin/kubectl /usr/local/bin/kubectl
 COPY --from=python-builder /usr/local/bin/istioctl /usr/local/bin/istioctl

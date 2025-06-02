@@ -113,7 +113,9 @@ service:
       port: 8083
       targetPort: 8083
 
-imagePullSecrets: []
+imagePullSecrets:
+  - name: amdocs-nexus-pull-secret
+
 nameOverride: ""
 fullnameOverride: ""
 
