@@ -37,18 +37,15 @@ WORKDIR /app/ui
 
 #copy the package.json
 COPY package*.json .
-COPY bunfig.toml   .
+RUN --mount=type=cache,target=/cache/bun,rw             \
+    bun install --verbose
 
-RUN --mount=type=cache,target=/cache/bun,rw           \
-    echo "Installing dependencies ..."                \
-    && bun install --verbose
-
-#copy the rest of the files
-COPY . .
-RUN --mount=type=cache,target=/cache/bun,rw           \
-    mkdir -p /app/ui/public                           \
-    && bun install --verbose  \
-    && bun run build  --no-lint
+#copy the rest of the UI files
+COPY ./ .
+RUN --mount=type=cache,target=/cache/bun,rw     \
+    bun install --verbose                       \
+    && bun run build  --no-lint                 \
+    && mkdir -p /app/ui/public
 
 ### STAGE 3: final
 FROM $BASE_IMAGE_REGISTRY/chainguard/wolfi-base:latest AS final
@@ -83,7 +80,6 @@ RUN --mount=type=cache,target=/cache/bun,rw \
     && curl -fsSL https://bun.sh/install | bash -s "bun-v$TOOLS_BUN_VERSION" \
     && bun --version
 
-# Copy the built application from the base image
 RUN mkdir -p /app/ui /run/nginx /var/lib/nginx/tmp/     \
     && addgroup -g 1001    nginx                        \
     && adduser  -u 1001 -G nginx -s /bin/bash -D nextjs \

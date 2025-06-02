@@ -15,18 +15,15 @@ outdated:
 
 .PHONY: update
 update: outdated
-	rm -rf bun.lock
-	rm -rf package-lock.json
-	rm -rf node_modules
 	@echo "Updating UI lock file..."
-	bun install --save-exact
+	bun install
 	npm update
 	@echo "Updating UI lock file done."
 
 .PHONY: build
 build: update
 	bun install   --production
-	bun run build --no-lint
+	bun run build 2>&1
 
 .PHONY: clean
 clean:
