@@ -2,9 +2,9 @@
 
 registry = "http://docker-registry-proxy.corp.amdocs.com:8081/repository/npm-external/"
 
-#proxy = "http://192.168.81:3128"
+proxy = "http://genproxy.corp.amdocs.com:8080"
 
-no_proxy = "localhost,127.0.0.1"
+no_proxy = "localhost,127.0.0.1,corp.amdocs.com"
 
 # equivalent to `--production` flag
 production = true

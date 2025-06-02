@@ -8,6 +8,3 @@ workspace/
 node_modules/
 .next/
 bun.lock
-cypress/
-cypress.config.ts
-jest.*
