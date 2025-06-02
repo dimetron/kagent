@@ -15,8 +15,9 @@ outdated:
 
 .PHONY: update
 update: outdated
-	rm -f bun.lock
-	rm -f package-lock.json
+	rm -rf bun.lock
+	rm -rf package-lock.json
+	rm -rf node_modules
 	@echo "Updating UI lock file..."
 	bun install --save-exact
 	npm update
