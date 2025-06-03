@@ -35,9 +35,10 @@ RUN --mount=type=cache,target=/cache/bun,rw \
 WORKDIR /app/ui
 
 #copy the package.json
-COPY package*.json .
-RUN --mount=type=cache,target=/cache/bun,rw             \
-    bun install --verbose
+#COPY package*.json .
+#COPY bunfig.toml   .
+#RUN --mount=type=cache,target=/cache/bun,rw             \
+#    bun install --verbose
 
 #copy the rest of the UI files
 COPY ./ .
@@ -105,5 +106,7 @@ EXPOSE 80
 LABEL org.opencontainers.image.source=https://github.com/kagent-dev/kagent
 LABEL org.opencontainers.image.description="Kagent app is the UI and apiserver for running agents."
 LABEL org.opencontainers.image.authors="Kagent Creators 🤖"
+
+USER nextjs
 
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]

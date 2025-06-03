@@ -15,21 +15,23 @@ outdated:
 
 .PHONY: update
 update: outdated
-#	@echo "Updating UI lock file..."
-#	bun install
-#	npm update
-#	@echo "Updating UI lock file done."
+	npm install
+	bun install
+	@echo "Updating UI lock file done."
 
 .PHONY: build
-build: update
-	rm -f bun.lock
-	bun install   --production
-	bun run build --no-lint 2>&1
+build:
+	npm add -d tailwindcss postcss autoprefixer
+	bun install
+	bunx tailwindcss init -p
+	bun pm ls > bun.all.txt
+	bun run build --no-lint || bun run build -d 2>&1
 
 .PHONY: clean
 clean:
+	rm -rf .next
 	rm -rf node_modules
-	rm -f bun.lockb
+	rm -f bun.lock
 	rm -rf dist
 	rm -rf .bun
 	rm -rf .cache

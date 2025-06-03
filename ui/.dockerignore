@@ -10,4 +10,3 @@ node_modules/
 bun.lock
 cypress/
 cypress.config.ts
-jest.*
