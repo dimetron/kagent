@@ -1,6 +1,6 @@
 [install]
 
-#registry = "http://docker-registry-proxy.corp.amdocs.com:8081/repository/npm-external/"
+registry = "http://docker-registry-proxy.corp.amdocs.com:8081/repository/npm-external/"
 
 proxy = "http://10.232.233.70:8080"
 

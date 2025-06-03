@@ -11,19 +11,20 @@ install:
 .PHONY: outdated
 outdated:
 	npm outdated || true
-	bun outdated || true
+	#bun outdated || true
 
 .PHONY: update
 update: outdated
-	@echo "Updating UI lock file..."
-	bun install
-	npm update
-	@echo "Updating UI lock file done."
+#	@echo "Updating UI lock file..."
+#	bun install
+#	npm update
+#	@echo "Updating UI lock file done."
 
 .PHONY: build
 build: update
+	rm -f bun.lock
 	bun install   --production
-	bun run build 2>&1
+	bun run build --no-lint 2>&1
 
 .PHONY: clean
 clean:
