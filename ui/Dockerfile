@@ -47,7 +47,6 @@ COPY ./ .
 RUN --mount=type=cache,target=/cache/bun,rw           \
     export https_proxy=http://10.232.233.70:8080      \
     && bun install --production --verbose             \
-    && bun add tailwindcss postcss autoprefixer       \
     && bun run build  --no-lint                       \
     && mkdir -p /app/ui/public
 
