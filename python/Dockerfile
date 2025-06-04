@@ -104,7 +104,11 @@ COPY src src
 RUN --mount=type=cache,target=/app/python/.cache                  \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     export https_proxy=http://10.232.233.70:8080                  \
-    && uv venv .venv && uv sync --locked
+    && uv venv .venv && uv sync --locked                          \
+    && uv pip install setuptools \
+    && uv pip install hatchling \
+    && uv pip install hatch
+
 
 # Generate configs
 RUN --mount=type=cache,target=/app/python/.cache                  \
