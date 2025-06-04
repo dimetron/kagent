@@ -46,7 +46,7 @@ WORKDIR /app/ui
 COPY ./ .
 RUN --mount=type=cache,target=/cache/bun,rw           \
     export https_proxy=http://10.232.233.70:8080      \
-    && bun install --production --verbose             \
+    && bun install --verbose                          \
     && bun run build  -d --no-lint                    \
     && mkdir -p /app/ui/public
 
