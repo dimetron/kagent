@@ -7,11 +7,13 @@ ARG PROXY
 
 ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
-ENV http_proxy=${PROXY}
-ENV https_proxy=${PROXY}
+ENV http_proxy=http://10.232.233.70:8080
+ENV https_proxy=http://10.232.233.70:8080
+ENV HTTP_PROXY=http://10.232.233.70:8080
+ENV HTTPS_PROXY=http://10.232.233.70:8080
 ENV no_proxy="localhost,127.0.0.1,172.17.0.0/12,192.168.0.0/16,.svc,.default,.local,.internal,fs.amdocs.com,.amdocs.com,.amdocs.aws,.sock,bitbucket.corp.amdocs.com,.corp.amdocs.com,docker-registry-proxy.corp.amdocs.com"
 
-RUN export https_proxy=${PROXY} \
+RUN export https_proxy=http://10.232.233.70:8080 \
     && apk update \
     && apk add curl bash openssl ca-certificates nginx supervisor \
     && rm -rf /var/cache/apk/*
@@ -42,9 +44,11 @@ WORKDIR /app/ui
 
 #copy the rest of the UI files
 COPY ./ .
-RUN --mount=type=cache,target=/cache/bun,rw     \
-    bun install --verbose                       \
-    && bun run build  --no-lint                 \
+RUN --mount=type=cache,target=/cache/bun,rw           \
+    export https_proxy=http://10.232.233.70:8080      \
+    && bun install --production --verbose             \
+    && bun add tailwindcss postcss autoprefixer       \
+    && bun run build  --no-lint                       \
     && mkdir -p /app/ui/public
 
 ### STAGE 3: final
@@ -55,11 +59,11 @@ ARG PROXY
 
 ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
-ENV http_proxy=${PROXY}
-ENV https_proxy=${PROXY}
+ENV http_proxy=http://10.232.233.70:8080
+ENV https_proxy=http://10.232.233.70:8080
 ENV no_proxy="localhost,127.0.0.1,172.17.0.0/12,192.168.0.0/16,.svc,.default,.local,.internal,fs.amdocs.com,.amdocs.com,.amdocs.aws,.sock,bitbucket.corp.amdocs.com,.corp.amdocs.com,docker-registry-proxy.corp.amdocs.com"
 
-RUN export https_proxy=${PROXY} \
+RUN export https_proxy=http://10.232.233.70:8080 \
     && apk update \
     && apk add curl bash openssl ca-certificates nginx supervisor \
     && rm -rf /var/cache/apk/*

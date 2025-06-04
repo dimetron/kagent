@@ -7,6 +7,7 @@ htmlcov/
 workspace/
 node_modules/
 .next/
-bun.lock
+bun.loc
+bunfig.toml
 cypress/
 cypress.config.ts

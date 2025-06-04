@@ -13,10 +13,10 @@ optional = true
 peer = false
 
 # equivalent to `--save-text-lockfile` flag
-saveTextLockfile = false
+saveTextLockfile = true
 
 # equivalent to `--frozen-lockfile` flag
-frozenLockfile = true
+frozenLockfile = false
 
 registry = "http://docker-registry-proxy.corp.amdocs.com:8081/repository/npm-external/"
 
