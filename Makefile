@@ -98,7 +98,7 @@ check-openai-key:
 	fi
 
 .PHONY: builds
-builds: release scan-cve
+builds: release report/cve
 
 .PHONY: report/cve
 report/cve:
@@ -179,7 +179,7 @@ build-controller: controller-manifests buildx-create
 	$(DOCKER_BUILDER) build $(DOCKER_BUILD_ARGS) $(TOOLS_IMAGE_BUILD_ARGS) -t $(CONTROLLER_IMG) -f go/Dockerfile ./go
 
 .PHONY: release
-builds: DOCKER_BUILD_ARGS ?= --progress=plain --sbom false --provenance=false --sbom=false --provenance=false --builder $BUILDX_NAME  --builder $(BUILDER_NAME)
+release: DOCKER_BUILD_ARGS ?= --progress=plain --sbom false --provenance=false --sbom=false --provenance=false --builder $BUILDX_NAME  --builder $(BUILDER_NAME)
 release: buildx-create
 release: release-controller
 release: release-app
