@@ -7,7 +7,7 @@ ENV LC_ALL=C.UTF-8
 
 RUN export https_proxy=http://10.232.233.70:8080 \
     && apk update \
-    && apk add curl openssl unzip bash git ca-certificates \
+    && apk add curl openssl unzip bash git ca-certificates nginx supervisor \
     && rm -rf /var/cache/apk/*
 
 ARG TOOLS_BUN_VERSION
@@ -20,6 +20,7 @@ ENV NVM_DIR=/usr/local/nvm
 ENV NODE_ENV=production
 ENV CYPRESS_INSTALL_BINARY=0
 ENV NODE_PATH=/cache/node_modules
+ENV NODE_TLS_REJECT_UNAUTHORIZED=0
 ENV PATH=$BUN_INSTALL/bin:$PATH
 
 # Install Bun (uses official install script)
@@ -40,7 +41,8 @@ RUN --mount=type=cache,target=/cache/bun,rw             \
 #copy the rest of the files
 COPY . .
 RUN --mount=type=cache,target=/cache/bun,rw             \
-    bun install                                         \
+    export https_proxy=http://10.232.233.70:8080        \
+    && bun install                                      \
     && bun run build  --no-lint                         \
     && mkdir -p /app/ui/public
 
@@ -52,7 +54,7 @@ ENV LC_ALL=C.UTF-8
 
 RUN export https_proxy=http://10.232.233.70:8080 \
     && apk update \
-    && apk add curl bash openssl ca-certificates nginx supervisor \
+    && apk add curl openssl unzip bash git ca-certificates nginx supervisor \
     && rm -rf /var/cache/apk/*
 
 
