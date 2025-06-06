@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist } from "next/font/google";
+import { GeistSans } from 'geist/font/sans';
 import "./globals.css";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AgentsProvider } from "@/components/AgentsProvider";
@@ -9,10 +9,8 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import { Toaster } from "@/components/ui/sonner";
 import { AppInitializer } from "@/components/AppInitializer";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
+
+
 
 export const metadata: Metadata = {
   title: "kagent.dev | Solo.io",
@@ -23,7 +21,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <TooltipProvider>
       <AgentsProvider>
         <html lang="en" className="">
-          <body className={`${geistSans.className} flex flex-col h-screen overflow-hidden`}>
+          <body className={`${GeistSans.className} flex flex-col h-screen overflow-hidden`}>
             <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
               <AppInitializer>
                 <Header />
