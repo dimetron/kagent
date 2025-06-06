@@ -41,7 +41,7 @@ COPY . .
 RUN --mount=type=cache,target=/cache/bun,rw                     \
     echo "Installing dependencies..."                           \
     && bun install                                              \
-    && bun install -D tailwindcss @tailwindcss/postcss postcss  \
+    && bun install -D @tailwindcss/postcss                      \
     && bun run build  --no-lint --debug                         \
     && mkdir -p /app/ui/public
 

@@ -25,7 +25,7 @@ update: outdated
 
 .PHONY: build
 build:
-	npm install -D tailwindcss @tailwindcss/postcss postcss
+	npm install -D @tailwindcss/postcss geist
 	rm -rf bun.lock
 	bun install
 	bun run build --no-lint || bun run build -d 2>&1
