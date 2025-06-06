@@ -44,15 +44,13 @@ WORKDIR /app/ui
 
 #copy the rest of the UI files
 COPY ./ .
-RUN --mount=type=cache,target=/cache/bun,rw          \
-    export https_proxy=http://10.232.233.70:8080     \
-    && bun install --verbose
+RUN --mount=type=cache,target=/cache/bun,rw             \
+    bun install --verbose
 
-RUN --mount=type=cache,target=/cache/bun,rw          \
+RUN --mount=type=cache,target=/cache/bun,rw             \
     export https_proxy=http://10.232.233.70:8080        \
     && mkdir -p /app/ui/public                          \
-    && bun run build --no-lint  --debug  &2>1           \
-    && find .
+    && bun run build --no-lint  --debug  &2>1
 
 ### STAGE 3: final
 FROM $BASE_IMAGE_REGISTRY/chainguard/wolfi-base:latest AS final

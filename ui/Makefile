@@ -24,7 +24,10 @@ update: outdated
 	@echo "Updating UI lock file done."
 
 .PHONY: build
-build: update
+build:
+	npm install -D tailwindcss @tailwindcss/postcss postcss
+	rm -rf bun.lock
+	bun install
 	bun run build --no-lint || bun run build -d 2>&1
 
 .PHONY: clean
