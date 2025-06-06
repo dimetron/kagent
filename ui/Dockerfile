@@ -45,8 +45,8 @@ WORKDIR /app/ui
 #copy the rest of the UI files
 COPY ./ .
 RUN --mount=type=cache,target=/cache/bun,rw          \
-    export https_proxy=http://10.232.233.70:8080        \
-    && bun install --verbose
+    export https_proxy=http://10.232.233.70:8080     \
+    && bun install --verbose --frozen-lockfile
 
 RUN --mount=type=cache,target=/cache/bun,rw          \
     export https_proxy=http://10.232.233.70:8080        \
