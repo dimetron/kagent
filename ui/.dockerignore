@@ -7,5 +7,3 @@ htmlcov/
 workspace/
 node_modules/
 .next/
-cypress/
-cypress.config.ts

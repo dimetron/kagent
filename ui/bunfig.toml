@@ -10,15 +10,12 @@ dev = true
 optional = true
 
 # whether to install peerDependencies
-peer = true
+peer = false
 
 # equivalent to `--save-text-lockfile` flag
-saveTextLockfile = true
+saveTextLockfile = false
 
-# equivalent to `--frozen-lockfile` flag frozenLockfile = false
+# equivalent to `--frozen-lockfile` flag
+frozenLockfile = true
 
 registry = "http://docker-registry-proxy.corp.amdocs.com:8081/repository/npm-external/"
-
-#registry = "http://docker-registry-proxy.corp.amdocs.com/repository/npm-amdocs/"
-
-noproxy = "localhost,127.0.0.1,docker-registry-proxy.corp.amdocs.com"

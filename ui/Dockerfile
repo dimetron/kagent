@@ -3,15 +3,9 @@ ARG BASE_IMAGE_REGISTRY=cgr.dev
 FROM $BASE_IMAGE_REGISTRY/chainguard/wolfi-base:latest AS base-os
 ARG TOOLS_BUN_VERSION
 ARG TARGETARCH
-ARG PROXY
 
 ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
-ENV http_proxy=http://10.232.233.70:8080
-ENV https_proxy=http://10.232.233.70:8080
-ENV HTTP_PROXY=http://10.232.233.70:8080
-ENV HTTPS_PROXY=http://10.232.233.70:8080
-ENV no_proxy="localhost,127.0.0.1,172.17.0.0/12,192.168.0.0/16,.svc,.default,.local,.internal,fs.amdocs.com,.amdocs.com,.amdocs.aws,.sock,bitbucket.corp.amdocs.com,.corp.amdocs.com,docker-registry-proxy.corp.amdocs.com"
 
 RUN export https_proxy=http://10.232.233.70:8080 \
     && apk update \
@@ -50,19 +44,15 @@ RUN --mount=type=cache,target=/cache/bun,rw             \
 RUN --mount=type=cache,target=/cache/bun,rw             \
     export https_proxy=http://10.232.233.70:8080        \
     && mkdir -p /app/ui/public                          \
-    && bun run build --no-lint  --debug  &2>1
+    && bun run build --no-lint
 
 ### STAGE 3: final
 FROM $BASE_IMAGE_REGISTRY/chainguard/wolfi-base:latest AS final
 ARG TOOLS_BUN_VERSION
 ARG TARGETARCH
-ARG PROXY
 
 ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
-ENV http_proxy=http://10.232.233.70:8080
-ENV https_proxy=http://10.232.233.70:8080
-ENV no_proxy="localhost,127.0.0.1,172.17.0.0/12,192.168.0.0/16,.svc,.default,.local,.internal,fs.amdocs.com,.amdocs.com,.amdocs.aws,.sock,bitbucket.corp.amdocs.com,.corp.amdocs.com,docker-registry-proxy.corp.amdocs.com"
 
 RUN export https_proxy=http://10.232.233.70:8080 \
     && apk update \
