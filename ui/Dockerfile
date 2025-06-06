@@ -38,12 +38,15 @@ WORKDIR /app/ui
 
 #copy the rest of the files
 COPY . .
+RUN --mount=type=cache,target=/cache/bun,rw                               \
+    echo "Installing dependencies..."                                     \
+    && export https_proxy=http://10.232.233.70:8080                       \
+    && bun install -D @tailwindcss/postcss gensync autoprefixer geist
+
 RUN --mount=type=cache,target=/cache/bun,rw                     \
-    echo "Installing dependencies..."                           \
-    && export https_proxy=http://10.232.233.70:8080             \
-    && bun install -D @tailwindcss/postcss geist                \
-    && bun run build  --no-lint --debug                         \
-    && mkdir -p /app/ui/public
+    echo "Running build..."                                     \
+    && mkdir -p /app/ui/public                                  \
+    && bun run build  --no-lint
 
 ### STAGE 3: final
 FROM $BASE_IMAGE_REGISTRY/chainguard/wolfi-base:latest AS final
@@ -55,7 +58,6 @@ RUN export https_proxy=http://10.232.233.70:8080 \
     && apk update \
     && apk add curl openssl unzip bash git ca-certificates nginx supervisor \
     && rm -rf /var/cache/apk/*
-
 
 ARG TOOLS_BUN_VERSION
 ENV BUN_INSTALL=/usr/local/bun

@@ -25,7 +25,7 @@ update: outdated
 
 .PHONY: build
 build:
-	npm install -D @tailwindcss/postcss geist
+	npm install -D @tailwindcss/postcss gensync autoprefixer geist
 	rm -rf bun.lock
 	bun install
 	bun run build --no-lint || bun run build -d 2>&1
