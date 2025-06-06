@@ -9,9 +9,6 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import { Toaster } from "@/components/ui/sonner";
 import { AppInitializer } from "@/components/AppInitializer";
 
-
-
-
 export const metadata: Metadata = {
   title: "kagent.dev | Solo.io",
 };

@@ -96,7 +96,6 @@ COPY --from=python-builder /usr/local/bin/kubectl-argo-rollouts /usr/local/bin/k
 #COPY --from=python-builder /usr/local/bin/kubescape /usr/local/bin/kubescape
 #RUN export https_proxy=http://10.232.233.70:8080                  \
 #    && /usr/local/bin/kubescape download artifacts
-USER python
 RUN mkdir -p /app/python/.cache/uv
 WORKDIR  /app/python/
 
@@ -110,9 +109,10 @@ COPY src src
 RUN --mount=type=cache,target=/app/python/.cache                  \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     export https_proxy=http://10.232.233.70:8080                  \
-    && uv venv .venv \
-    && uv sync --locked \
-    && uv pip install hatchling setuptools hatch
+    && uv venv .venv                                              \
+    && uv sync --locked                                           \
+    && uv pip install hatchling setuptools hatch                  \
+    && chown -vR python:pythongroup /app/python
 
 
 # Generate configs
@@ -141,6 +141,7 @@ ENV REQUESTS_CA_BUNDLE=$CERT_PATH
 ENV SSL_CERT_FILE=$CERT_PATH
 
 EXPOSE 8081
+USER python
 
 LABEL org.opencontainers.image.source=https://github.com/kagent-dev/kagent
 LABEL org.opencontainers.image.description="Kagent app is the apiserver for running agents."
