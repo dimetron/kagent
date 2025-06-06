@@ -40,8 +40,8 @@ WORKDIR /app/ui
 COPY . .
 RUN --mount=type=cache,target=/cache/bun,rw                     \
     echo "Installing dependencies..."                           \
-    && bun install                                              \
-    && bun install -D @tailwindcss/postcss                      \
+    && export https_proxy=http://10.232.233.70:8080             \
+    && bun install -D @tailwindcss/postcss geist                \
     && bun run build  --no-lint --debug                         \
     && mkdir -p /app/ui/public
 
