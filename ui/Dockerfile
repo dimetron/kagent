@@ -19,7 +19,7 @@ RUN export https_proxy=http://10.232.233.70:8080 \
     && rm -rf /var/cache/apk/*
 
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV BUN_INSTALL_CACHE_DIR=/cache/bun
+ENV BUN_INSTALL_CACHE_DIR=/app/ui/cache
 ENV BUN_INSTALL=/usr/local/bun
 ENV NVM_DIR=/usr/local/nvm
 ENV NODE_ENV=production
@@ -29,7 +29,7 @@ ENV PATH=$BUN_INSTALL/bin:$PATH
 
 # Install Bun (uses official install script)
 # brew install oven-sh/bun/bun
-RUN --mount=type=cache,target=/cache/bun,rw \
+RUN --mount=type=cache,target=/app/ui/cache,rw \
     mkdir -p $BUN_INSTALL  /app/ui \
     && curl -fsSL https://bun.sh/install | bash -s "bun-v$TOOLS_BUN_VERSION" \
     && bun --version
@@ -39,15 +39,18 @@ WORKDIR /app/ui
 #copy the package.json
 #COPY package*.json .
 #COPY bunfig.toml   .
-#RUN --mount=type=cache,target=/cache/bun,rw             \
+#RUN --mount=type=cache,target=/app/ui/cache,rw             \
 #    bun install --verbose
 
 #copy the rest of the UI files
 COPY ./ .
-RUN --mount=type=cache,target=/cache/bun,rw           \
-    export https_proxy=http://10.232.233.70:8080      \
-    && bun install --verbose                          \
-    && bun run build  -d --no-lint                    \
+RUN --mount=type=cache,target=/app/ui/cache,rw           \
+    export https_proxy=http://10.232.233.70:8080         \
+    && bun install --verbose
+
+RUN --mount=type=cache,target=/app/ui/cache,rw            \
+    export https_proxy=http://10.232.233.70:8080          \
+    && bun run build --no-lint  --debug                   \
     && mkdir -p /app/ui/public
 
 ### STAGE 3: final
@@ -68,7 +71,7 @@ RUN export https_proxy=http://10.232.233.70:8080 \
     && rm -rf /var/cache/apk/*
 
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV BUN_INSTALL_CACHE_DIR=/cache/bun
+ENV BUN_INSTALL_CACHE_DIR=/app/ui/cache
 ENV BUN_INSTALL=/usr/local/bun
 ENV NVM_DIR=/usr/local/nvm
 ENV NODE_ENV=production
@@ -78,7 +81,7 @@ ENV PATH=$BUN_INSTALL/bin:$PATH
 
 # Install Bun (uses official install script)
 # brew install oven-sh/bun/bun
-RUN --mount=type=cache,target=/cache/bun,rw \
+RUN --mount=type=cache,target=/app/ui/cache,rw \
     mkdir -p $BUN_INSTALL  /app/ui \
     && curl -fsSL https://bun.sh/install | bash -s "bun-v$TOOLS_BUN_VERSION" \
     && bun --version

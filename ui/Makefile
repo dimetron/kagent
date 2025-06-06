@@ -15,16 +15,16 @@ outdated:
 
 .PHONY: update
 update: outdated
+	npm audit fix --force || true
+	npm update    --force || true
+	npm outdated || true
 	npm install
+	rm -rf bun.lock .next node_modules/.cache
 	bun install
 	@echo "Updating UI lock file done."
 
 .PHONY: build
-build:
-	npm add -d tailwindcss postcss autoprefixer
-	bun install
-	bunx tailwindcss init -p
-	bun pm ls > bun.all.txt
+build: update
 	bun run build --no-lint || bun run build -d 2>&1
 
 .PHONY: clean

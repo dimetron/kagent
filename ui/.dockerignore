@@ -11,4 +11,3 @@ bun.loc
 bunfig.toml
 cypress/
 cypress.config.ts
-jest.*
