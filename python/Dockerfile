@@ -39,6 +39,11 @@ RUN --mount=type=cache,target=/app/python/.cache,rw  \
 ### STAGE 3: tools
 FROM python-os AS python-builder
 ARG TARGETARCH
+
+ARG TOOLS_BUN_VERSION
+ENV BUN_INSTALL_CACHE_DIR=/cache/bun
+ENV BUN_INSTALL=/usr/local/bun
+ENV PATH=$BUN_INSTALL/bin:$PATH
 ARG TOOLS_ISTIO_VERSION
 ARG TOOLS_ARGO_CD_VERSION
 
@@ -74,8 +79,7 @@ RUN export https_proxy=http://10.232.233.70:8080   \
 
 ### STAGE 4: final
 FROM python-os AS final
-ARG TARGETARCH
-
+#
 ENV GIT_LFS_SKIP_SMUDGE=1
 ENV UV_LINK_MODE=copy
 ENV UV_PROJECT_ENVIRONMENT="/app/python/.venv"
@@ -104,10 +108,9 @@ COPY src src
 RUN --mount=type=cache,target=/app/python/.cache                  \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     export https_proxy=http://10.232.233.70:8080                  \
-    && uv venv .venv && uv sync --locked                          \
-    && uv pip install setuptools \
-    && uv pip install hatchling \
-    && uv pip install hatch
+    && uv venv .venv \
+    && uv sync --locked \
+    && uv pip install hatchling setuptools hatch
 
 
 # Generate configs
