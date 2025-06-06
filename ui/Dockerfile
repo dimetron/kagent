@@ -19,7 +19,7 @@ RUN export https_proxy=http://10.232.233.70:8080 \
     && rm -rf /var/cache/apk/*
 
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV BUN_INSTALL_CACHE_DIR=/app/ui/cache
+ENV BUN_INSTALL_CACHE_DIR=/cache/bun
 ENV BUN_INSTALL=/usr/local/bun
 ENV NVM_DIR=/usr/local/nvm
 ENV NODE_ENV=production
@@ -29,7 +29,7 @@ ENV PATH=$BUN_INSTALL/bin:$PATH
 
 # Install Bun (uses official install script)
 # brew install oven-sh/bun/bun
-RUN --mount=type=cache,target=/app/ui/cache,rw \
+RUN --mount=type=cache,target=/cache/bun,rw \
     mkdir -p $BUN_INSTALL  /app/ui \
     && curl -fsSL https://bun.sh/install | bash -s "bun-v$TOOLS_BUN_VERSION" \
     && bun --version
@@ -39,16 +39,16 @@ WORKDIR /app/ui
 #copy the package.json
 #COPY package*.json .
 #COPY bunfig.toml   .
-#RUN --mount=type=cache,target=/app/ui/cache,rw             \
+#RUN --mount=type=cache,target=/cache/bun,rw             \
 #    bun install --verbose
 
 #copy the rest of the UI files
 COPY ./ .
-RUN --mount=type=cache,target=/app/ui/cache,rw          \
+RUN --mount=type=cache,target=/cache/bun,rw          \
     export https_proxy=http://10.232.233.70:8080        \
     && bun install --verbose
 
-RUN --mount=type=cache,target=/app/ui/cache,rw          \
+RUN --mount=type=cache,target=/cache/bun,rw          \
     export https_proxy=http://10.232.233.70:8080        \
     && mkdir -p /app/ui/public                          \
     && bun run build --no-lint  --debug  &2>1           \
@@ -72,7 +72,7 @@ RUN export https_proxy=http://10.232.233.70:8080 \
     && rm -rf /var/cache/apk/*
 
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV BUN_INSTALL_CACHE_DIR=/app/ui/cache
+ENV BUN_INSTALL_CACHE_DIR=/cache/bun
 ENV BUN_INSTALL=/usr/local/bun
 ENV NVM_DIR=/usr/local/nvm
 ENV NODE_ENV=production
@@ -82,7 +82,7 @@ ENV PATH=$BUN_INSTALL/bin:$PATH
 
 # Install Bun (uses official install script)
 # brew install oven-sh/bun/bun
-RUN --mount=type=cache,target=/app/ui/cache,rw \
+RUN --mount=type=cache,target=/cache/bun,rw \
     mkdir -p $BUN_INSTALL  /app/ui \
     && curl -fsSL https://bun.sh/install | bash -s "bun-v$TOOLS_BUN_VERSION" \
     && bun --version
