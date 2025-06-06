@@ -35,15 +35,14 @@ WORKDIR /app/ui
 
 #copy the package.json
 #COPY package*.json .
-#RUN --mount=type=cache,target=/cache/bun,rw             \
-#    bun install
 
 #copy the rest of the files
 COPY . .
-RUN --mount=type=cache,target=/cache/bun,rw             \
-    echo "Installing dependencies..."                   \
-    && bun install                                      \
-    && bun run build  --no-lint --debug                 \
+RUN --mount=type=cache,target=/cache/bun,rw                     \
+    echo "Installing dependencies..."                           \
+    && bun install                                              \
+    && bun install -D tailwindcss @tailwindcss/postcss postcss  \
+    && bun run build  --no-lint --debug                         \
     && mkdir -p /app/ui/public
 
 ### STAGE 3: final
