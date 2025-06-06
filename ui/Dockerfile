@@ -51,7 +51,8 @@ RUN --mount=type=cache,target=/app/ui/cache,rw          \
 RUN --mount=type=cache,target=/app/ui/cache,rw          \
     export https_proxy=http://10.232.233.70:8080        \
     && mkdir -p /app/ui/public                          \
-    && bun run build --no-lint  --debug  &2>1 || find .
+    && bun run build --no-lint  --debug  &2>1           \
+    && find .
 
 ### STAGE 3: final
 FROM $BASE_IMAGE_REGISTRY/chainguard/wolfi-base:latest AS final
