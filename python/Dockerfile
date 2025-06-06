@@ -86,8 +86,7 @@ ENV UV_PROJECT_ENVIRONMENT="/app/python/.venv"
 ENV UV_CACHE_DIR=/app/python/.cache/uv
 
 RUN export https_proxy=http://10.232.233.70:8080 \
-    && apk update && apk add nodejs npm \
-    && mkdir -p /app/python/.cache/uv
+    && apk update && apk add nodejs npm
 
 COPY --from=python-builder /usr/local/bin/kubectl /usr/local/bin/kubectl
 COPY --from=python-builder /usr/local/bin/istioctl /usr/local/bin/istioctl
@@ -97,6 +96,9 @@ COPY --from=python-builder /usr/local/bin/kubectl-argo-rollouts /usr/local/bin/k
 #COPY --from=python-builder /usr/local/bin/kubescape /usr/local/bin/kubescape
 #RUN export https_proxy=http://10.232.233.70:8080                  \
 #    && /usr/local/bin/kubescape download artifacts
+USER python
+RUN mkdir -p /app/python/.cache/uv
+WORKDIR  /app/python/
 
 COPY pyproject.toml .
 COPY .python-version .
@@ -124,7 +126,8 @@ RUN --mount=type=cache,target=/app/python/.cache                  \
 RUN --mount=type=cache,target=/app/python/.cache                  \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     export https_proxy=http://10.232.233.70:8080                  \
-    && uv run kagent-engine --help
+    && uv run kagent-engine --help \
+    && uv run kagent-engine serve --help
 
 RUN chown -R python:pythongroup /app/python && \
     chmod -vR 755 /app/python/.venv/bin
@@ -142,4 +145,5 @@ EXPOSE 8081
 LABEL org.opencontainers.image.source=https://github.com/kagent-dev/kagent
 LABEL org.opencontainers.image.description="Kagent app is the apiserver for running agents."
 LABEL org.opencontainers.image.authors="Kagent Creators 🤖"
+
 CMD ["uv", "run", "kagent-engine", "serve", "--host", "0.0.0.0", "--port", "8081"]
