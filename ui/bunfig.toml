@@ -17,12 +17,8 @@ saveTextLockfile = true
 
 # equivalent to `--frozen-lockfile` flag frozenLockfile = false
 
-registry = "http://docker-registry-proxy.corp.amdocs.com:8081/repository/npm-external/"
+#registry = "http://docker-registry-proxy.corp.amdocs.com:8081/repository/npm-external/"
 
-proxy = "http://10.232.233.70:8080"
+registry = "http://docker-registry-proxy.corp.amdocs.com/repository/npm-amdocs/"
 
-HTTP_PROXY = "http://10.232.233.70:8080"
-
-HTTPS_PROXY = "http://10.232.233.70:8080"
-
-no_proxy = "localhost,127.0.0.1,docker-registry-proxy.corp.amdocs.com"
+noproxy = "localhost,127.0.0.1,docker-registry-proxy.corp.amdocs.com"
