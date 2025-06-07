@@ -60,8 +60,7 @@ TOOLS_ARGO_CD_VERSION ?= 3.0.0
 TOOLS_KUBECTL_VERSION ?= 1.33.4
 
 # build args
-TOOLS_IMAGE_BUILD_ARGS =  --build-arg PROXY=$(PROXY)
-TOOLS_IMAGE_BUILD_ARGS += --build-arg LOCALARCH=$(LOCALARCH)
+TOOLS_IMAGE_BUILD_ARGS = --build-arg LOCALARCH=$(LOCALARCH)
 TOOLS_IMAGE_BUILD_ARGS += --build-arg BASE_IMAGE_REGISTRY=$(BASE_IMAGE_REGISTRY)
 TOOLS_IMAGE_BUILD_ARGS += --build-arg TOOLS_GO_VERSION=$(TOOLS_GO_VERSION)
 TOOLS_IMAGE_BUILD_ARGS += --build-arg TOOLS_UV_VERSION=$(TOOLS_UV_VERSION)
@@ -122,7 +121,7 @@ clean:
 	
 .PHONY: buildx-create
 buildx-create:
-	docker buildx inspect $(BUILDER_NAME)  || docker buildx create --driver-opt "network=host,image=docker-registry-proxy.corp.amdocs.com/moby/buildkit:$(BUILDKIT_VERSION)" --config .devcontainer/buildkitd.toml --name $(BUILDER_NAME) --use
+	docker buildx inspect $(BUILDER_NAME)  || docker buildx create --driver-opt "network=host,image=docker-registry-proxy.corp.amdocs.com/moby/buildkit:$(BUILDKIT_VERSION)" --config tools/buildx/buildkitd.toml --name $(BUILDER_NAME) --use
 	docker buildx use $(BUILDER_NAME) || true
 
 .PHONY: create-kind-cluster
@@ -343,3 +342,10 @@ otel-local:
 	docker rm -f jaeger-desktop || true
 	docker run -d --name jaeger-desktop --restart=always -p 16686:16686 -p 4317:4317 -p 4318:4318 $(BASE_IMAGE_REGISTRY)/jaegertracing/jaeger:2.6.0
 	open http://localhost:16686
+
+.PHONY: proxy
+proxy:
+	@echo "Setting up proxy..."
+	cd tools/docker-proxy 	\
+	&& docker compose down 	\
+	&& docker compose up 

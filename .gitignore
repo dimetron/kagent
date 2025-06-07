@@ -199,3 +199,6 @@ go/bin/
 ## Helm
 *.tgz
 /tmp/
+/tools/docker-proxy/storage/
+/tools/docker-proxy/squid/cache/
+/tools/docker-proxy/verdaccio/storage/

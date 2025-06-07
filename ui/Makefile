@@ -25,7 +25,8 @@ update: outdated
 
 .PHONY: build
 build:
-	npm install -D @tailwindcss/postcss gensync autoprefixer geist
+	#@tailwindcss/postcss
+	npm install -D gensync autoprefixer geist
 	rm -rf bun.lock
 	bun install
 	bun run build --no-lint || bun run build -d 2>&1
@@ -38,6 +39,10 @@ clean:
 	rm -rf dist
 	rm -rf .bun
 	rm -rf .cache
+
+.PHONY: lint
+lint:
+	bun next lint
 
 .PHONY: install-bun
 install-bun:

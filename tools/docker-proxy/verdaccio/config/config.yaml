@@ -64,9 +64,11 @@ auth:
 # a list of other known repositories we can talk to
 uplinks:
   npmjs:
-    #url: http://docker-registry-proxy.corp.amdocs.com:8081/repository/npm-external/
-    url: https://registry.npmjs.org/
-    http_proxy: http://10.232.233.70:8080
+    url: http://docker-registry-proxy.corp.amdocs.com:8081/repository/npm-external/
+    http_proxy: http://127.0.0.1:3128
+    no_proxy: localhost,127.0.0.1
+    #url: https://registry.npmjs.org/
+    #http_proxy: http://127.0.0.1:3128
 
 # Learn how to protect your packages
 # https://verdaccio.org/docs/protect-your-dependencies/
@@ -169,9 +171,9 @@ listen:
 
 # https://verdaccio.org/docs/configuration#proxy
 
-http_proxy: http://10.232.233.70:8080
-https_proxy: http://10.232.233.70:8080
-no_proxy: localhost,127.0.0.1
+http_proxy: http://127.0.0.1:3128
+https_proxy: http://127.0.0.1:3128
+no_proxy: localhost,127.0.0.1,docker-registry-proxy.corp.amdocs.com
 
 # https://verdaccio.org/docs/configuration#notifications
 # notify:
@@ -186,7 +188,9 @@ middlewares:
 
 # https://verdaccio.org/docs/logger
 # log settings
-log: { type: stdout, format: pretty, level: http }
+log: { type: stdout, format: pretty, level: info }
+#log: { type: file, path: /verdaccio/logs/verdaccio.log, level: info }
+
 #experiments:
 #  # support for npm token command
 #  token: false

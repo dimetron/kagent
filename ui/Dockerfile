@@ -5,14 +5,15 @@ FROM --platform=linux/$BUILDARCH $BASE_IMAGE_REGISTRY/chainguard/wolfi-base:late
 ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
 
-RUN export https_proxy=http://10.232.233.70:8080 \
+RUN export https_proxy=http://127.0.0.1:3128 \
     && apk update \
-    && apk add curl openssl unzip bash git ca-certificates nginx supervisor \
+    && apk add curl openssl unzip bash git ca-certificates-bundle nginx supervisor \
     && rm -rf /var/cache/apk/*
 
 ARG TOOLS_BUN_VERSION
 ARG TARGETARCH
 
+ENV DO_NOT_TRACK=1
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV BUN_INSTALL_CACHE_DIR=/cache/bun
 ENV BUN_INSTALL=/usr/local/bun
@@ -27,7 +28,7 @@ ENV PATH=$BUN_INSTALL/bin:$PATH
 # brew install oven-sh/bun/bun
 RUN --mount=type=cache,target=/cache/bun,rw \
     mkdir -p $BUN_INSTALL  /app/ui \
-    && export https_proxy=http://10.232.233.70:8080 \
+    && export https_proxy=http://127.0.0.1:3128 \
     && curl -fsSL https://bun.sh/install | bash -s "bun-v$TOOLS_BUN_VERSION" \
     && bun --version
 
@@ -38,15 +39,17 @@ WORKDIR /app/ui
 
 #copy the rest of the files
 COPY . .
-RUN --mount=type=cache,target=/cache/bun,rw                               \
-    echo "Installing dependencies..."                                     \
-    && export https_proxy=http://10.232.233.70:8080                       \
-    && bun install -D @tailwindcss/postcss gensync autoprefixer geist
 
-RUN --mount=type=cache,target=/cache/bun,rw                     \
-    echo "Running build..."                                     \
-    && mkdir -p /app/ui/public                                  \
-    && bun run build  --no-lint
+RUN --mount=type=cache,target=/cache/bun,rw                                 \
+    echo "Installing dependencies..."                                       \
+    && bun install  --verbose --registry http://127.0.0.1:4873                        \
+    && bun install  --verbose --registry http://127.0.0.1:4873                        \
+    -D gensync autoprefixer geist
+
+RUN --mount=type=cache,target=/cache/bun,rw                                 \
+    echo "Running build..."                                                 \
+    && export https_proxy=http://127.0.0.1:3128                             \
+    && bun run build --no-lint -d 2>&1
 
 ### STAGE 3: final
 FROM $BASE_IMAGE_REGISTRY/chainguard/wolfi-base:latest AS final
@@ -54,7 +57,7 @@ FROM $BASE_IMAGE_REGISTRY/chainguard/wolfi-base:latest AS final
 ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
 
-RUN export https_proxy=http://10.232.233.70:8080 \
+RUN export https_proxy=http://127.0.0.1:3128 \
     && apk update \
     && apk add curl openssl unzip bash git ca-certificates nginx supervisor \
     && rm -rf /var/cache/apk/*
@@ -66,15 +69,17 @@ ENV PATH=$BUN_INSTALL/bin:$PATH
 # brew install oven-sh/bun/bun
 RUN --mount=type=cache,target=/cache/bun,rw \
     mkdir -p $BUN_INSTALL  \
-    && export https_proxy=http://10.232.233.70:8080 \
+    && export https_proxy=http://127.0.0.1:3128 \
     && curl -fsSL https://bun.sh/install | bash -s "bun-v$TOOLS_BUN_VERSION" \
     && bun --version
 
-RUN mkdir -p /app/ui /run/nginx /var/lib/nginx/tmp/     \
-    && addgroup -g 1001    nginx                        \
-    && adduser  -u 1001 -G nginx -s /bin/bash -D nextjs \
-    && adduser  -u 1002 -G nginx -s /bin/bash -D nginx  \
-    && chown    -vR nextjs:nginx /app/ui
+RUN mkdir -p /app/ui/public /run/nginx/ /var/lib/nginx/tmp/ /var/lib/nginx/logs/  \
+    && addgroup -g 1001    nginx                            \
+    && adduser  -u 1001 -G nginx -s /bin/bash -D nextjs     \
+    && adduser  -u 1002 -G nginx -s /bin/bash -D nginx      \
+    && chown    -vR nextjs:nginx /app/ui                    \
+    && chown    -vR nextjs:nginx /run/nginx                 \
+    && chown    -vR nextjs:nginx /var/lib/nginx/
 
 WORKDIR /app
 COPY conf/nginx.conf /etc/nginx/nginx.conf
