@@ -83,7 +83,7 @@ ENV GIT_LFS_SKIP_SMUDGE=1
 ENV UV_LINK_MODE=copy
 ENV UV_PROJECT_ENVIRONMENT="/app/python/.venv"
 ENV UV_CACHE_DIR=/app/python/.cache/uv
-ENV PATH=$UV_PROJECT_ENVIRONMENT/bin:$PATH
+ENV PATH=/app/python/.venv/bin:$PATH
 
 RUN export https_proxy=http://127.0.0.1:3128 \
     && apk update && apk add nodejs npm
@@ -93,12 +93,6 @@ COPY --from=python-builder /usr/local/bin/istioctl  /usr/local/bin/istioctl
 COPY --from=python-builder /usr/local/bin/helm      /usr/local/bin/helm
 COPY --from=python-builder /usr/local/bin/kubectl-argo-rollouts /usr/local/bin/kubectl-argo-rollouts
 
-#COPY --from=python-builder /usr/local/bin/kubescape /usr/local/bin/kubescape
-#RUN export https_proxy=http://127.0.0.1:3128                  \
-#    && /usr/local/bin/kubescape download artifacts
-RUN mkdir -p /app/python/.cache/uv
-WORKDIR  /app/python/
-
 COPY pyproject.toml .
 COPY .python-version .
 COPY uv.lock .
@@ -107,26 +101,21 @@ COPY src src
 
 # Install dependencies
 RUN --mount=type=cache,target=/app/python/.cache                      \
-    --mount=type=bind,source=pyproject.toml,target=pyproject.toml     \
     echo "Installing Python $TOOLS_PYTHON_VERSION..."                 \
     && export https_proxy=http://127.0.0.1:3128                       \
     && uv venv .venv                                                  \
     && uv python install $TOOLS_PYTHON_VERSION                        \
     && uv cache dir                                                   \
     && uv version                                                     \
-    && uv pip install -v hatchling setuptools hatch                   \
-    && chown -R python:pythongroup /app/python || :
+    && uv pip install -v hatchling setuptools hatch
 
-# Generate configs
 RUN --mount=type=cache,target=/app/python/.cache                  \
-    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     mkdir -p /app/python/.autogenstudio/configs                   \
-    && export https_proxy=http://127.0.0.1:3128                   \
+    && chown -R python:pythongroup /app/python/ || :               \
     && uv run tool_gen -o /app/python/.autogenstudio/configs
 
 # Test if the tool is working and fetch all dependencies
 RUN --mount=type=cache,target=/app/python/.cache                  \
-    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     export https_proxy=http://127.0.0.1:3128                      \
     && uv run kagent-engine --help                                \
     && uv run kagent-engine serve --help
