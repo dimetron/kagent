@@ -154,16 +154,14 @@ pipeline {
 
     stage('Start Proxy') {
         steps {
-                script {
-                env.GIT_COMMIT_HASH = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
-                echo "Latest Git Commit Hash: ${env.GIT_COMMIT_HASH}"
+            script {
                 sh """
                 cd $HOME_PATH;
                 source $HOME/.bash_profile
                 export GOPATH=$HOME/workspace/${jobName}
                 make SEMVER=${SEMVER} GO_VERSION=${env.BASE_GO_VERSION} proxy-start
                 """
-                }
+            }
         }
     }
 
@@ -205,16 +203,14 @@ pipeline {
 
     stage('Stop Proxy') {
         steps {
-                script {
-                env.GIT_COMMIT_HASH = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
-                echo "Latest Git Commit Hash: ${env.GIT_COMMIT_HASH}"
+            script {
                 sh """
                 cd $HOME_PATH;
                 source $HOME/.bash_profile
                 export GOPATH=$HOME/workspace/${jobName}
                 make SEMVER=${SEMVER} GO_VERSION=${env.BASE_GO_VERSION} proxy-stop
                 """
-                }
+            }
         }
     }
 
