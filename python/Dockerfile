@@ -108,8 +108,7 @@ COPY src src
 # Install dependencies
 RUN --mount=type=cache,target=/app/python/.cache                  \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    export https_proxy=http://127.0.0.1:3128                  \
-    && uv venv .venv                                              \
+    export https_proxy=http://127.0.0.1:3128                      \
     && uv sync --locked                                           \
     && uv pip install hatchling setuptools hatch                  \
     && chown -vR python:pythongroup /app/python
@@ -119,7 +118,7 @@ RUN --mount=type=cache,target=/app/python/.cache                  \
 RUN --mount=type=cache,target=/app/python/.cache                  \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     mkdir -p /app/python/.autogenstudio/configs                   \
-    && export https_proxy=http://127.0.0.1:3128               \
+    && export https_proxy=http://127.0.0.1:3128                   \
     && uv run tool_gen -o /app/python/.autogenstudio/configs
 
 # Test if the tool is working and fetch all dependencies
@@ -135,7 +134,7 @@ RUN chown -R python:pythongroup /app/python && \
 ENV UV_OFFLINE=1
 
 #set custom certificates
-ENV CERT_PATH = '/app/python/amdcerts.pem'
+ENV CERT_PATH='/app/python/amdcerts.pem'
 COPY amdcerts.pem $CERT_PATH
 ENV REQUESTS_CA_BUNDLE=$CERT_PATH
 ENV SSL_CERT_FILE=$CERT_PATH
