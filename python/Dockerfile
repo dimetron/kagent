@@ -103,10 +103,6 @@ COPY uv.lock .
 COPY README.md .
 COPY src src
 
-RUN addgroup -g 1001 pythongroup && \
-    adduser -u 1001 -G pythongroup -s /bin/bash -D python && \
-    chown -R python:pythongroup /app/python
-
 USER 1001
 
 # Install dependencies
