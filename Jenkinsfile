@@ -161,7 +161,7 @@ pipeline {
                 cd $HOME_PATH;
                 source $HOME/.bash_profile
                 export GOPATH=$HOME/workspace/${jobName}
-                make SEMVER=${SEMVER} GO_VERSION=${env.BASE_GO_VERSION} proxy
+                make SEMVER=${SEMVER} GO_VERSION=${env.BASE_GO_VERSION} proxy-start
                 """
             }
         }
@@ -200,6 +200,15 @@ pipeline {
                     """
                 }
            )
+           script {
+            //clean go cache
+            sh """
+            cd $HOME_PATH;
+            source $HOME/.bash_profile
+            export GOPATH=$HOME/workspace/${jobName}
+            make TAG=${env.BRANCH_SIMPLE_NAME} GO_VERSION=${env.BASE_GO_VERSION} proxy-stop
+            """
+            }
         }
     }
 

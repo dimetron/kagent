@@ -120,7 +120,7 @@ report/cve:
 	grype docker:$(UI_IMG)         -o template -t reports/report.tmpl.html --file reports/$(SEMVER)/ui-cve.html
 
 .PHONY: clean
-clean: clean/proxy
+clean: proxy-clean
 	docker buildx rm $(BUILDER_NAME) || :
 	@tools/buildx/buildx-create.sh
 	docker system prune -f --volumes || :
@@ -169,9 +169,6 @@ build-img-versions:
 	@echo controller=$(CONTROLLER_IMG)
 	@echo ui=$(UI_IMG)
 	@echo app=$(APP_IMG)
-
-.PHONY: push
-push: push-controller push-ui push-app
 
 .PHONY: controller-manifests
 controller-manifests:
@@ -348,13 +345,18 @@ otel-local:
 	docker run -d --name jaeger-desktop --restart=always -p 16686:16686 -p 4317:4317 -p 4318:4318 $(BASE_IMAGE_REGISTRY)/jaegertracing/jaeger:2.6.0
 	open http://localhost:16686
 
-.PHONY: proxy
-proxy:
+.PHONY: proxy-start
+proxy-start:
 	@echo "Setting up proxy..."
 	cd tools/docker-proxy 	\
 	&& docker compose pull	\
 	&& docker compose down 	\
 	&& docker compose up -d
+
+proxy-stop:
+	@echo "Stoping up proxy..."
+	cd tools/docker-proxy 	\
+	&& docker compose down
 
 .PHONY: proxy-log
 proxy-log:
@@ -367,8 +369,8 @@ check-proxy:
 	export export https_proxy=http://127.0.0.1:3128 \
 	&& curl -L https://dl-cdn.alpinelinux.org/MIRRORS.txt
 
-.PHONY: clean/proxy
-clean/proxy:
+.PHONY: proxy-clean
+proxy-clean:
 	@echo "Cleaning up proxy..."
 	cd tools/docker-proxy 		\
 	&& docker compose pull		\
