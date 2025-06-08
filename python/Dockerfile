@@ -129,7 +129,8 @@ RUN --mount=type=cache,target=/app/python/.cache                  \
     && uv run kagent-engine serve --help
 
 RUN chown -R 1001 /app/python && \
-    chmod -vR 755 /app/python/.venv/bin \
+    chmod -vR 755 /app/python/.venv/bin && \
+    chmod  -v 777 /app/python/.venv/bin/python3
 
 ENV UV_OFFLINE=1
 
