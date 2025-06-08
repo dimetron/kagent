@@ -95,11 +95,19 @@ COPY --from=python-builder /usr/local/bin/istioctl  /usr/local/bin/istioctl
 COPY --from=python-builder /usr/local/bin/helm      /usr/local/bin/helm
 COPY --from=python-builder /usr/local/bin/kubectl-argo-rollouts /usr/local/bin/kubectl-argo-rollouts
 
+WORKDIR /app/python
+
 COPY pyproject.toml .
 COPY .python-version .
 COPY uv.lock .
 COPY README.md .
 COPY src src
+
+RUN addgroup -g 1001 pythongroup && \
+    adduser -u 1001 -G pythongroup -s /bin/bash -D python && \
+    chown -R python:pythongroup /app/python
+
+USER 1001
 
 # Install dependencies
 RUN --mount=type=cache,target=/app/python/.cache                  \
@@ -131,8 +139,6 @@ ENV CERT_PATH='/app/python/amdcerts.pem'
 COPY amdcerts.pem $CERT_PATH
 ENV REQUESTS_CA_BUNDLE=$CERT_PATH
 ENV SSL_CERT_FILE=$CERT_PATH
-
-USER python
 
 LABEL org.opencontainers.image.source=https://github.com/kagent-dev/kagent
 LABEL org.opencontainers.image.description="Kagent app is the apiserver for running agents."
