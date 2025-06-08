@@ -13,3 +13,4 @@ bun.lock
 .npmrc
 cypress/
 cypress.*
+jest.*
