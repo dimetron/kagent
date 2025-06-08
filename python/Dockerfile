@@ -5,7 +5,7 @@ FROM $BASE_IMAGE_REGISTRY/chainguard/wolfi-base:latest AS base-os
 ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
 RUN export https_proxy=http://127.0.0.1:3128  \
-    && apk update && apk add  \
+    && apk update && apk add \
     curl openssl unzip bash git ca-certificates jq
 
 ### STAGE 2: python
@@ -26,12 +26,12 @@ RUN addgroup -g 1001 pythongroup && \
     adduser -u 1001 -G pythongroup -s /bin/bash -D python && \
     chown -R python:pythongroup /app/python
 
-RUN --mount=type=cache,target=/app/python/.cache,rw                   \
+RUN --mount=type=cache,target=/app/python/.cache,rw  \
     echo "Installing Python $TOOLS_PYTHON_VERSION..."                 \
-    && export https_proxy=http://127.0.0.1:3128                       \
-    && uv venv .venv                                                  \
+    && export https_proxy=http://127.0.0.1:3128   \
+    && uv venv .venv                                 \
     && uv python install $TOOLS_PYTHON_VERSION                        \
-    && uv cache dir                                                   \
+    && uv cache dir                                  \
     && uv version
 
 ### STAGE 3: tools
@@ -47,15 +47,6 @@ ARG TOOLS_ARGO_CD_VERSION
 
 RUN mkdir -p /app/downloads /usr/local/bin/
 WORKDIR /app/downloads
-
-
-# Install Bun (uses official install script)
-# brew install oven-sh/bun/bun
-RUN --mount=type=cache,target=/cache/bun,rw \
-    mkdir -p $BUN_INSTALL  \
-    && export https_proxy=http://127.0.0.1:3128                               \
-    && curl -fsSL https://bun.sh/install | bash -s "bun-v$TOOLS_BUN_VERSION"  \
-    && bun --version
 
 RUN export https_proxy=http://127.0.0.1:3128   \
     && curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/$TARGETARCH/kubectl" \
@@ -78,24 +69,27 @@ RUN export https_proxy=http://127.0.0.1:3128   \
     && ./get_helm.sh \
     && rm get_helm.sh
 
+# Install Kubescape
+RUN export https_proxy=http://127.0.0.1:3128   \
+    && curl -Ls https://raw.githubusercontent.com/kubescape/kubescape/master/install.sh | bash \
+    && ls /usr/local/bin/
+
+
 ### STAGE 4: final
 FROM python-os AS final
-#
-ENV GIT_LFS_SKIP_SMUDGE=1
-ENV UV_LINK_MODE=copy
-ENV UV_PROJECT_ENVIRONMENT="/app/python/.venv"
-ENV UV_CACHE_DIR=/app/python/.cache/uv
+ARG TARGETARCH
 
 RUN export https_proxy=http://127.0.0.1:3128 \
-    && apk update \
-    && apk add nodejs npm
+    && apk update && apk add nodejs npm
 
-COPY --from=python-builder /usr/local/bin/kubectl   /usr/local/bin/kubectl
-COPY --from=python-builder /usr/local/bin/istioctl  /usr/local/bin/istioctl
-COPY --from=python-builder /usr/local/bin/helm      /usr/local/bin/helm
-COPY --from=python-builder /usr/local/bin/kubectl-argo-rollouts /usr/local/bin/kubectl-argo-rollouts
+COPY --from=python-builder --chown=python:pythongroup /usr/local/bin/kubectl /usr/local/bin/kubectl
+COPY --from=python-builder --chown=python:pythongroup /usr/local/bin/istioctl /usr/local/bin/istioctl
+COPY --from=python-builder --chown=python:pythongroup /usr/local/bin/helm /usr/local/bin/helm
+COPY --from=python-builder --chown=python:pythongroup /usr/local/bin/kubectl-argo-rollouts /usr/local/bin/kubectl-argo-rollouts
+COPY --from=python-builder --chown=python:pythongroup /usr/local/bin/kubescape /usr/local/bin/kubescape
 
-WORKDIR /app/python
+RUN export https_proxy=http://127.0.0.1:3128       \
+    && /usr/local/bin/kubescape download artifacts    || :
 
 COPY pyproject.toml .
 COPY .python-version .
@@ -103,41 +97,39 @@ COPY uv.lock .
 COPY README.md .
 COPY src src
 
-USER 1001
-
 # Install dependencies
 RUN --mount=type=cache,target=/app/python/.cache                  \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    export https_proxy=http://127.0.0.1:3128                      \
+    export https_proxy=http://127.0.0.1:3128                  \
     && uv venv .venv && uv sync --locked
 
 # Generate configs
 RUN --mount=type=cache,target=/app/python/.cache                  \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    export https_proxy=http://127.0.0.1:3128                      \
-    && mkdir -p /root/.autogenstudio/configs                      \
-    && uv run tool_gen -o /root/.autogenstudio/configs
+    mkdir -p /app/python/.autogenstudio/configs                   \
+    && export https_proxy=http://127.0.0.1:3128               \
+    && uv run tool_gen -o /app/python/.autogenstudio/configs
 
 # Test if the tool is working and fetch all dependencies
 RUN --mount=type=cache,target=/app/python/.cache                  \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    export https_proxy=http://127.0.0.1:3128                      \
+    export https_proxy=http://127.0.0.1:3128                  \
     && uv run kagent-engine --help
 
-RUN chown -R python:pythongroup /app/ \
-    && chmod +x /app/python/.venv/bin/*
+RUN chown -R python:pythongroup /app/python && \
+    chmod -vR 755 /app/python/.venv/bin
 
 ENV UV_OFFLINE=1
-EXPOSE 8081
 
 #set custom certificates
-ENV CERT_PATH='/app/python/amdcerts.pem'
+ENV CERT_PATH = '/app/python/amdcerts.pem'
 COPY amdcerts.pem $CERT_PATH
 ENV REQUESTS_CA_BUNDLE=$CERT_PATH
 ENV SSL_CERT_FILE=$CERT_PATH
 
+EXPOSE 8081
+
 LABEL org.opencontainers.image.source=https://github.com/kagent-dev/kagent
 LABEL org.opencontainers.image.description="Kagent app is the apiserver for running agents."
 LABEL org.opencontainers.image.authors="Kagent Creators 🤖"
-
 CMD ["uv", "run", "kagent-engine", "serve", "--host", "0.0.0.0", "--port", "8081"]
