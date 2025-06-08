@@ -85,10 +85,10 @@ ENV GIT_LFS_SKIP_SMUDGE=1
 ENV UV_LINK_MODE=copy
 ENV UV_PROJECT_ENVIRONMENT="/app/python/.venv"
 ENV UV_CACHE_DIR=/app/python/.cache/uv
-ENV PATH=/app/python/.venv/bin:$PATH
 
 RUN export https_proxy=http://127.0.0.1:3128 \
-    && apk update && apk add nodejs npm
+    && apk update \
+    && apk add nodejs npm
 
 COPY --from=python-builder /usr/local/bin/kubectl   /usr/local/bin/kubectl
 COPY --from=python-builder /usr/local/bin/istioctl  /usr/local/bin/istioctl
@@ -120,8 +120,8 @@ RUN --mount=type=cache,target=/app/python/.cache                  \
     export https_proxy=http://127.0.0.1:3128                      \
     && uv run kagent-engine --help
 
-RUN chown -R python:pythongroup /app/python && \
-    chmod -vR 755 /app/python/.venv/bin
+RUN chown -R python:pythongroup /app/ \
+    && chmod +x /app/python/.venv/bin/*
 
 ENV UV_OFFLINE=1
 EXPOSE 8081
@@ -132,7 +132,7 @@ COPY amdcerts.pem $CERT_PATH
 ENV REQUESTS_CA_BUNDLE=$CERT_PATH
 ENV SSL_CERT_FILE=$CERT_PATH
 
-USER 1001
+USER python
 
 LABEL org.opencontainers.image.source=https://github.com/kagent-dev/kagent
 LABEL org.opencontainers.image.description="Kagent app is the apiserver for running agents."
