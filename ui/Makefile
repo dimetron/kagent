@@ -25,7 +25,7 @@ update: outdated
 
 .PHONY: build
 build:
-	#npm install -D npm node
+	#npm install -D npm node eslint
 	npm install geist
 	rm -rf bun.lock
 	bun run build --no-lint

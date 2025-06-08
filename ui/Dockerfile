@@ -49,6 +49,7 @@ RUN --mount=type=cache,target=/cache/bun,rw                                   \
     && export https_proxy=http://127.0.0.1:3128                               \
     && echo "registry=http://127.0.0.1:4873" > .npmrc                         \
     && bun install geist                                                      \
+    && bun install -D eslint                                                  \
     && bun pm ls --all | tee | gzip | base64 -w0                              \
     && bun install --registry=http://127.0.0.1:4873                           \
     && echo "Bun dependencies hash:"                                          \
