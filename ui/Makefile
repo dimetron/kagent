@@ -25,10 +25,9 @@ update: outdated
 
 .PHONY: build
 build:
-	npm install -D npm node geist
-	npm install
+	#npm install -D npm node
+	npm install geist
 	rm -rf bun.lock
-	bun install
 	bun run build --no-lint
 	bun pm ls | tee | gzip | base64 -w0
 	@echo "Bun dependencies hash:"
