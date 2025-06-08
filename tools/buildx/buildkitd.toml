@@ -27,9 +27,11 @@ insecure = true
 http = true
 insecure = true
 [registry."docker-registry-proxy.corp.amdocs.com"]
+mirrors = ["https://localhost:6000"]
 http = true
 http2 = true
 insecure = true
+
 [worker.oci]
 enabled = true
 platforms = [ "linux/amd64", "linux/arm64" ]

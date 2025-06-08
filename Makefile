@@ -60,7 +60,10 @@ TOOLS_ARGO_CD_VERSION ?= 3.0.0
 TOOLS_KUBECTL_VERSION ?= 1.33.4
 
 # build args
+NPM_REGISTRY ?= "http://127.0.0.1:4873"
+
 TOOLS_IMAGE_BUILD_ARGS = --build-arg LOCALARCH=$(LOCALARCH)
+TOOLS_IMAGE_BUILD_ARGS += --build-arg NPM_REGISTRY=$(NPM_REGISTRY)
 TOOLS_IMAGE_BUILD_ARGS += --build-arg BASE_IMAGE_REGISTRY=$(BASE_IMAGE_REGISTRY)
 TOOLS_IMAGE_BUILD_ARGS += --build-arg TOOLS_GO_VERSION=$(TOOLS_GO_VERSION)
 TOOLS_IMAGE_BUILD_ARGS += --build-arg TOOLS_UV_VERSION=$(TOOLS_UV_VERSION)
@@ -115,15 +118,15 @@ report/cve:
 	grype docker:$(UI_IMG)         -o template -t reports/report.tmpl.html --file reports/$(SEMVER)/ui-cve.html
 
 .PHONY: clean
-clean:
+clean: clean/proxy
 	docker buildx rm $(BUILDER_NAME) || :
+	@tools/buildx/buildx-create.sh
 	docker system prune -f --volumes || :
-	
+
 .PHONY: buildx-create
 buildx-create:
-	docker buildx inspect $(BUILDER_NAME)  || docker buildx create --driver-opt "network=host,image=docker-registry-proxy.corp.amdocs.com/moby/buildkit:$(BUILDKIT_VERSION)" --config tools/buildx/buildkitd.toml --name $(BUILDER_NAME) --use
-	docker buildx use $(BUILDER_NAME) || true
-
+	@tools/buildx/buildx-create.sh
+	
 .PHONY: create-kind-cluster
 create-kind-cluster:
 	docker pull $(BASE_IMAGE_REGISTRY)/kindest/node:v1.32.5 || true
@@ -347,5 +350,36 @@ otel-local:
 proxy:
 	@echo "Setting up proxy..."
 	cd tools/docker-proxy 	\
+	&& docker compose pull	\
 	&& docker compose down 	\
-	&& docker compose up 
+	&& docker compose up -d \
+	&& docker compose logs -f
+
+.PHONY: proxy-log
+proxy-log:
+	cd tools/docker-proxy 		\
+	&& docker compose logs -f
+
+.PHONY: check-proxy
+check-proxy:
+	@echo "Checking proxy return 200."
+	export export https_proxy=http://127.0.0.1:3128 \
+	&& curl -L https://dl-cdn.alpinelinux.org/MIRRORS.txt
+
+.PHONY: clean/proxy
+clean/proxy:
+	@echo "Cleaning up proxy..."
+	cd tools/docker-proxy 		\
+	&& docker compose pull		\
+	&& docker compose down 		\
+	&& rm -rf verdaccio/storage \
+	&& rm -rf squid/cache		\
+	&& docker compose up -d		\
+	&& sleep 5
+
+.PHONY: tshark
+tshark:
+	@echo "Building tshark image..."
+	docker exec -t buildx_buildkit_$(BUILDER_NAME)0 /bin/sh -c "which tshark   || https_proxy=http://192.168.8.1:3128 apk update"
+	docker exec -t buildx_buildkit_$(BUILDER_NAME)0 /bin/sh -c "which tshark   || https_proxy=http://192.168.8.1:3128 apk add tshark"
+	docker exec -t buildx_buildkit_$(BUILDER_NAME)0 /bin/sh -c "tshark -Y 'dns or http' || echo 'tshark not found, please install it manually'"

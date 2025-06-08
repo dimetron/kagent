@@ -25,17 +25,22 @@ update: outdated
 
 .PHONY: build
 build:
-	#@tailwindcss/postcss
-	npm install -D gensync autoprefixer geist
+	npm install -D npm node geist
+	npm install
 	rm -rf bun.lock
 	bun install
-	bun run build --no-lint || bun run build -d 2>&1
+	bun run build --no-lint
+	bun pm ls | tee | gzip | base64 -w0
+	@echo "Bun dependencies hash:"
+	bun pm hash
 
 .PHONY: clean
 clean:
+	npm cache clean --force || true
+	bun pm cache rm || true
 	rm -rf .next
 	rm -rf node_modules
-	rm -f bun.lock
+	rm -rf bun.lock
 	rm -rf dist
 	rm -rf .bun
 	rm -rf .cache
@@ -47,3 +52,11 @@ lint:
 .PHONY: install-bun
 install-bun:
 	brew install bun
+
+.PHONY: docker-build-strace
+docker-build-strace:
+	docker build -t kagents-ui-strace .
+	docker create --name temp-kagents-ui-strace kagents-ui-strace
+	docker cp temp-kagents-ui-strace:/app/ui/strace-logs ./strace-logs
+	docker rm temp-kagents-ui-strace
+	@echo "Strace logs copied to ./strace-logs directory"

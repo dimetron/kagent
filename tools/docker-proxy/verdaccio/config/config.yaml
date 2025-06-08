@@ -22,18 +22,18 @@ web:
   # by default packages are ordercer ascendant (asc|desc)
   # sort_packages: asc
   # convert your UI to the dark side
-  # darkMode: true
-  # html_cache: true
+  darkMode: true
+  html_cache: true
   # by default all features are displayed
   # login: true
-  # showInfo: true
+  showInfo: true
   # showSettings: true
   # In combination with darkMode you can force specific theme
   # showThemeSwitch: true
   # showFooter: true
   # showSearch: true
   # showRaw: true
-  # showDownloadTarball: true
+  showDownloadTarball: true
   #  HTML tags injected after manifest <scripts/>
   # scriptsBodyAfter:
   #    - '<script type="text/javascript" src="https://my.company.com/customJS.min.js"></script>'
@@ -64,12 +64,13 @@ auth:
 # a list of other known repositories we can talk to
 uplinks:
   npmjs:
-    url: http://docker-registry-proxy.corp.amdocs.com:8081/repository/npm-external/
+    maxage: 1440m
+    timeout: 10s
+    max_fails: 3
+    url: https://registry.npmjs.org/
     http_proxy: http://127.0.0.1:3128
     no_proxy: localhost,127.0.0.1
-    #url: https://registry.npmjs.org/
-    #http_proxy: http://127.0.0.1:3128
-
+    
 # Learn how to protect your packages
 # https://verdaccio.org/docs/protect-your-dependencies/
 # https://verdaccio.org/docs/configuration#packages
@@ -109,7 +110,7 @@ server:
   keepAliveTimeout: 60
   # Allow `req.ip` to resolve properly when Verdaccio is behind a proxy or load-balancer
   # See: https://expressjs.com/en/guide/behind-proxies.html
-  # trustProxy: '127.0.0.1'
+  trustProxy: '127.0.0.1'
 
 # https://verdaccio.org/docs/configuration#offline-publish
 # publish:
@@ -155,7 +156,7 @@ server:
 # https://verdaccio.org/docs/configuration#listen-port
 listen:
   - 0.0.0.0:4873              # listen on all addresses (INADDR_ANY)
-#  - localhost:4873            # default value
+  - localhost:4873            # default value
 # - http://localhost:4873     # same thing
 # - 0.0.0.0:4873              # listen on all addresses (INADDR_ANY)
 # - https://example.org:4873  # if you want to use https
@@ -173,7 +174,7 @@ listen:
 
 http_proxy: http://127.0.0.1:3128
 https_proxy: http://127.0.0.1:3128
-no_proxy: localhost,127.0.0.1,docker-registry-proxy.corp.amdocs.com
+no_proxy: localhost,127.0.0.1
 
 # https://verdaccio.org/docs/configuration#notifications
 # notify:
@@ -188,7 +189,7 @@ middlewares:
 
 # https://verdaccio.org/docs/logger
 # log settings
-log: { type: stdout, format: pretty, level: info }
+log: { type: stdout, format: pretty, level: debug }
 #log: { type: file, path: /verdaccio/logs/verdaccio.log, level: info }
 
 #experiments:

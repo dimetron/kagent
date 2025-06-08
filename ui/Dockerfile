@@ -7,12 +7,13 @@ ENV LC_ALL=C.UTF-8
 
 RUN export https_proxy=http://127.0.0.1:3128 \
     && apk update \
-    && apk add curl openssl unzip bash git ca-certificates-bundle nginx supervisor \
+    && apk add curl openssl unzip bash git ca-certificates-bundle nginx supervisor strace \
     && rm -rf /var/cache/apk/*
 
 ARG TOOLS_BUN_VERSION
 ARG TARGETARCH
 
+# Use host machine's npm registry (can be overridden with --build-arg NPM_REGISTRY)
 ENV DO_NOT_TRACK=1
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV BUN_INSTALL_CACHE_DIR=/cache/bun
@@ -26,9 +27,9 @@ ENV PATH=$BUN_INSTALL/bin:$PATH
 
 # Install Bun (uses official install script)
 # brew install oven-sh/bun/bun
-RUN --mount=type=cache,target=/cache/bun,rw \
-    mkdir -p $BUN_INSTALL  /app/ui \
-    && export https_proxy=http://127.0.0.1:3128 \
+RUN --mount=type=cache,target=/cache/bun,rw         \
+    mkdir -p $BUN_INSTALL  /app/ui /app/ui/public   \
+    && export https_proxy=http://127.0.0.1:3128     \
     && curl -fsSL https://bun.sh/install | bash -s "bun-v$TOOLS_BUN_VERSION" \
     && bun --version
 
@@ -36,20 +37,23 @@ WORKDIR /app/ui
 
 #copy the package.json
 #COPY package*.json .
+#RUN --mount=type=cache,target=/cache/bun,rw             \
+#    bun install
 
 #copy the rest of the files
 COPY . .
 
-RUN --mount=type=cache,target=/cache/bun,rw                                 \
-    echo "Installing dependencies..."                                       \
-    && bun install  --verbose --registry http://127.0.0.1:4873                        \
-    && bun install  --verbose --registry http://127.0.0.1:4873                        \
-    -D gensync autoprefixer geist
-
-RUN --mount=type=cache,target=/cache/bun,rw                                 \
-    echo "Running build..."                                                 \
-    && export https_proxy=http://127.0.0.1:3128                             \
-    && bun run build --no-lint -d 2>&1
+RUN --mount=type=cache,target=/cache/bun,rw                                   \
+    echo "Installing dependencies Using npm registry: http://127.0.0.1:3128"  \
+    && export no_proxy=localhost,127.0.0.1                                    \
+    && export https_proxy=http://127.0.0.1:3128                               \
+    && echo "registry=http://127.0.0.1:4873" > .npmrc                         \
+    && bun pm migrate                                                         \
+    #&& bun pm ls --all | tee | gzip | base64 -w0                             \
+    && bun install --registry=http://127.0.0.1:4873                           \
+    && echo "Bun dependencies hash:"                                          \
+    && bun pm hash                                                            \
+    && bun run build --no-lint 2>&1 || bun run build
 
 ### STAGE 3: final
 FROM $BASE_IMAGE_REGISTRY/chainguard/wolfi-base:latest AS final
