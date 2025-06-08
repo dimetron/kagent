@@ -30,10 +30,10 @@ RUN addgroup -g 1001 pythongroup && \
 RUN --mount=type=cache,target=/app/python/.cache,rw                   \
     echo "Installing Python $TOOLS_PYTHON_VERSION..."                 \
     && export https_proxy=http://127.0.0.1:3128                       \
-    && pwd                                                            \
     && uv venv .venv                                                  \
     && uv python install $TOOLS_PYTHON_VERSION                        \
-    && uv cache dir
+    && uv cache dir                                                   \
+    && uv version
 
 ### STAGE 3: tools
 FROM python-os AS python-builder
@@ -83,13 +83,14 @@ ENV GIT_LFS_SKIP_SMUDGE=1
 ENV UV_LINK_MODE=copy
 ENV UV_PROJECT_ENVIRONMENT="/app/python/.venv"
 ENV UV_CACHE_DIR=/app/python/.cache/uv
+ENV PATH=$UV_PROJECT_ENVIRONMENT/bin:$PATH
 
 RUN export https_proxy=http://127.0.0.1:3128 \
     && apk update && apk add nodejs npm
 
-COPY --from=python-builder /usr/local/bin/kubectl /usr/local/bin/kubectl
-COPY --from=python-builder /usr/local/bin/istioctl /usr/local/bin/istioctl
-COPY --from=python-builder /usr/local/bin/helm /usr/local/bin/helm
+COPY --from=python-builder /usr/local/bin/kubectl   /usr/local/bin/kubectl
+COPY --from=python-builder /usr/local/bin/istioctl  /usr/local/bin/istioctl
+COPY --from=python-builder /usr/local/bin/helm      /usr/local/bin/helm
 COPY --from=python-builder /usr/local/bin/kubectl-argo-rollouts /usr/local/bin/kubectl-argo-rollouts
 
 #COPY --from=python-builder /usr/local/bin/kubescape /usr/local/bin/kubescape
@@ -105,17 +106,16 @@ COPY README.md .
 COPY src src
 
 # Install dependencies
-RUN --mount=type=cache,target=/app/python/.cache                  \
-    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    export https_proxy=http://127.0.0.1:3128                      \
-    && export https_proxy=http://127.0.0.1:3128                   \
-    && pwd                                                        \
-    && uv venv .venv                                              \
-    && uv python install $TOOLS_PYTHON_VERSION                    \
-    && uv cache dir                                               \
-    && uv sync --locked                                           \
-    && uv pip install -v hatchling setuptools hatch               \
-    && chown -R 1001:1001 /app/python || :
+RUN --mount=type=cache,target=/app/python/.cache                      \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml     \
+    echo "Installing Python $TOOLS_PYTHON_VERSION..."                 \
+    && export https_proxy=http://127.0.0.1:3128                       \
+    && uv venv .venv                                                  \
+    && uv python install $TOOLS_PYTHON_VERSION                        \
+    && uv cache dir                                                   \
+    && uv version                                                     \
+    && uv pip install -v hatchling setuptools hatch                   \
+    && chown -R python:pythongroup /app/python || :
 
 # Generate configs
 RUN --mount=type=cache,target=/app/python/.cache                  \
@@ -131,9 +131,9 @@ RUN --mount=type=cache,target=/app/python/.cache                  \
     && uv run kagent-engine --help                                \
     && uv run kagent-engine serve --help
 
-RUN chown -R 1001:1001 /app/python && \
-    chmod -vR 755 /app/python/.venv/bin && \
-    chmod  -v 777 /app/python/.venv/bin/python3
+RUN chown -R python:pythongroup /app/python && \
+    chmod +x /app/python/.venv/bin && \
+    chmod +x /app/python/.venv/bin/python3
 
 ENV UV_OFFLINE=1
 
