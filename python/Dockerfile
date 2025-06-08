@@ -5,8 +5,7 @@ FROM $BASE_IMAGE_REGISTRY/chainguard/wolfi-base:latest AS base-os
 ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
 RUN export https_proxy=http://127.0.0.1:3128  \
-    && apk update  \
-    && apk add     \
+    && apk update && apk add  \
     curl openssl unzip bash git ca-certificates jq
 
 ### STAGE 2: python
@@ -49,6 +48,15 @@ ARG TOOLS_ARGO_CD_VERSION
 RUN mkdir -p /app/downloads /usr/local/bin/
 WORKDIR /app/downloads
 
+
+# Install Bun (uses official install script)
+# brew install oven-sh/bun/bun
+RUN --mount=type=cache,target=/cache/bun,rw \
+    mkdir -p $BUN_INSTALL  \
+    && curl -fsSL https://bun.sh/install | bash -s "bun-v$TOOLS_BUN_VERSION" \
+    && bun --version
+
+
 RUN export https_proxy=http://127.0.0.1:3128   \
     && curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/$TARGETARCH/kubectl" \
     && chmod +x kubectl \
@@ -69,12 +77,6 @@ RUN export https_proxy=http://127.0.0.1:3128   \
     && chmod 700 get_helm.sh \
     && ./get_helm.sh \
     && rm get_helm.sh
-
-## Install Kubescape
-#RUN export https_proxy=http://127.0.0.1:3128   \
-#    && curl -Ls https://raw.githubusercontent.com/kubescape/kubescape/master/install.sh | bash \
-#    && ls /usr/local/bin/
-
 
 ### STAGE 4: final
 FROM python-os AS final
@@ -100,18 +102,8 @@ COPY README.md .
 COPY src src
 
 # Install dependencies
-RUN --mount=type=cache,target=/app/python/.cache                      \
-    echo "Installing Python $TOOLS_PYTHON_VERSION..."                 \
-    && export https_proxy=http://127.0.0.1:3128                       \
-    && uv venv .venv                                                  \
-    && uv python install $TOOLS_PYTHON_VERSION                        \
-    && uv cache dir                                                   \
-    && uv version                                                     \
-    && uv pip install -v hatchling setuptools hatch
-
 RUN --mount=type=cache,target=/app/python/.cache                  \
     mkdir -p /app/python/.autogenstudio/configs                   \
-    && chown -R python:pythongroup /app/python/ || :               \
     && uv run tool_gen -o /app/python/.autogenstudio/configs
 
 # Test if the tool is working and fetch all dependencies
@@ -121,10 +113,10 @@ RUN --mount=type=cache,target=/app/python/.cache                  \
     && uv run kagent-engine serve --help
 
 RUN chown -R python:pythongroup /app/python && \
-    chmod +x /app/python/.venv/bin && \
-    chmod +x /app/python/.venv/bin/python3
+    chmod -vR 755 /app/python/.venv/bin
 
 ENV UV_OFFLINE=1
+EXPOSE 8081
 
 #set custom certificates
 ENV CERT_PATH='/app/python/amdcerts.pem'
@@ -132,7 +124,6 @@ COPY amdcerts.pem $CERT_PATH
 ENV REQUESTS_CA_BUNDLE=$CERT_PATH
 ENV SSL_CERT_FILE=$CERT_PATH
 
-EXPOSE 8081
 USER 1001
 
 LABEL org.opencontainers.image.source=https://github.com/kagent-dev/kagent
