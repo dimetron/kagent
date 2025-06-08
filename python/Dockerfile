@@ -21,20 +21,19 @@ RUN export https_proxy=http://127.0.0.1:3128  \
 ENV GIT_LFS_SKIP_SMUDGE=1
 ENV UV_LINK_MODE=copy
 ENV UV_PROJECT_ENVIRONMENT="/app/python/.venv"
-ENV UV_CACHE_DIR=/app/python/.cache/uv
 
 WORKDIR /app/python
 RUN addgroup -g 1001 pythongroup && \
     adduser -u 1001 -G pythongroup -s /bin/bash -D python && \
     chown -R python:pythongroup /app/python
 
-RUN --mount=type=cache,target=/app/python/.cache,rw  \
+RUN --mount=type=cache,target=/app/python/.cache,rw                   \
     echo "Installing Python $TOOLS_PYTHON_VERSION..."                 \
-    && export https_proxy=http://127.0.0.1:3128   \
-    && uv venv .venv                                 \
+    && export https_proxy=http://127.0.0.1:3128                       \
+    && pwd                                                            \
+    && uv venv .venv                                                  \
     && uv python install $TOOLS_PYTHON_VERSION                        \
-    && uv cache dir                                  \
-    && uv version
+    && uv cache dir
 
 ### STAGE 3: tools
 FROM python-os AS python-builder
@@ -109,10 +108,14 @@ COPY src src
 RUN --mount=type=cache,target=/app/python/.cache                  \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     export https_proxy=http://127.0.0.1:3128                      \
+    && export https_proxy=http://127.0.0.1:3128                   \
+    && pwd                                                        \
+    && uv venv .venv                                              \
+    && uv python install $TOOLS_PYTHON_VERSION                    \
+    && uv cache dir                                               \
     && uv sync --locked                                           \
     && uv pip install -v hatchling setuptools hatch               \
     && chown -R 1001:1001 /app/python || :
-
 
 # Generate configs
 RUN --mount=type=cache,target=/app/python/.cache                  \
@@ -128,7 +131,7 @@ RUN --mount=type=cache,target=/app/python/.cache                  \
     && uv run kagent-engine --help                                \
     && uv run kagent-engine serve --help
 
-RUN chown -R 1001 /app/python && \
+RUN chown -R 1001:1001 /app/python && \
     chmod -vR 755 /app/python/.venv/bin && \
     chmod  -v 777 /app/python/.venv/bin/python3
 
