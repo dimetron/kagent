@@ -128,8 +128,8 @@ RUN --mount=type=cache,target=/app/python/.cache                  \
     && uv run kagent-engine --help                                \
     && uv run kagent-engine serve --help
 
-RUN chown -R python:pythongroup /app/python && \
-    chmod -vR 755 /app/python/.venv/bin
+RUN chown -R 1001 /app/python && \
+    chmod -vR 755 /app/python/.venv/bin \
 
 ENV UV_OFFLINE=1
 
@@ -140,7 +140,7 @@ ENV REQUESTS_CA_BUNDLE=$CERT_PATH
 ENV SSL_CERT_FILE=$CERT_PATH
 
 EXPOSE 8081
-USER python
+USER 1001
 
 LABEL org.opencontainers.image.source=https://github.com/kagent-dev/kagent
 LABEL org.opencontainers.image.description="Kagent app is the apiserver for running agents."
