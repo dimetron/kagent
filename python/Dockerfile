@@ -53,9 +53,9 @@ WORKDIR /app/downloads
 # brew install oven-sh/bun/bun
 RUN --mount=type=cache,target=/cache/bun,rw \
     mkdir -p $BUN_INSTALL  \
-    && curl -fsSL https://bun.sh/install | bash -s "bun-v$TOOLS_BUN_VERSION" \
+    && export https_proxy=http://127.0.0.1:3128                               \
+    && curl -fsSL https://bun.sh/install | bash -s "bun-v$TOOLS_BUN_VERSION"  \
     && bun --version
-
 
 RUN export https_proxy=http://127.0.0.1:3128   \
     && curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/$TARGETARCH/kubectl" \
@@ -103,14 +103,22 @@ COPY src src
 
 # Install dependencies
 RUN --mount=type=cache,target=/app/python/.cache                  \
-    mkdir -p /app/python/.autogenstudio/configs                   \
-    && uv run tool_gen -o /app/python/.autogenstudio/configs
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    export https_proxy=http://127.0.0.1:3128                      \
+    && uv venv .venv && uv sync --locked
+
+# Generate configs
+RUN --mount=type=cache,target=/app/python/.cache                  \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    export https_proxy=http://127.0.0.1:3128                      \
+    && mkdir -p /root/.autogenstudio/configs                      \
+    && uv run tool_gen -o /root/.autogenstudio/configs
 
 # Test if the tool is working and fetch all dependencies
 RUN --mount=type=cache,target=/app/python/.cache                  \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     export https_proxy=http://127.0.0.1:3128                      \
-    && uv run kagent-engine --help                                \
-    && uv run kagent-engine serve --help
+    && uv run kagent-engine --help
 
 RUN chown -R python:pythongroup /app/python && \
     chmod -vR 755 /app/python/.venv/bin
