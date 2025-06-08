@@ -9,13 +9,14 @@ BUILDKIT_VERSION = v0.22.0
 LOCALARCH ?= $(shell uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/')
 
 # Proxy settings
-PROXY ?= http://10.232.233.70:8080
+PROXY ?= http://127.0.0.1:3128
 export https_proxy=$(PROXY)
-export no_proxy="docker.io,localhost,192.168.64.11,192.168.5.15,192.168.8,1,192.168.100.1,192.168.5.15,127.0.0.1,192.168.5.0/24,10.96.0.0/12,192.168.100.1,192.168.8.1,192.168.8.0/24,185.162.148.55,185.139.140.136,*.svc,*.default,*.local,*.internal,*.testing,ga.sock,*.qmp.sock,serial.sock,ssh.sock,docker.sock,localaddress,*.localdomain,*.localdomain.com,illinlic01,indlinsls,linvc04,bitbucket,gitlab,ldap,10.232.233.70,10.19.50.20,10.19.50.20,genproxy,genproxy.corp.amdocs.com,10.17.88.18,10.17.88.22,10.232.217.1,10.232.217.2,10.20.40.100,10.19.214.200,*.socket,127.254.254.254,teleproxy,traffic-manager.ambassador,169.254/16,10.0.0.0/8,localhost4,*.localdomain4,localhost,10.0.0.0/8,172.16.0.0/12,192.168.100.0/16,wpad,jira,awsnvportal.corp.amdocs.com,illin5646,wpad.corp.amdocs.com,185.162.148.55,185.139.140.136,dmitriyr01-mac,*.eaas.amdocs.com,*.corp.amdocs.com,*.corp.amdocs.aws,*.corp.amdocs.azr,uk-fullvpn.amdocs.com,isr-fullvpn.amdocs.com,fullvpn.amdocs.com,aus-fullvpn.amdocs.com,docker-registry-proxy.corp.amdocs.com,*.azmk8s.io"
+export no_proxy="proxy.golang.org,docker.io,localhost,192.168.64.11,192.168.5.15,192.168.8,1,192.168.100.1,192.168.5.15,127.0.0.1,192.168.5.0/24,10.96.0.0/12,192.168.100.1,192.168.8.1,192.168.8.0/24,185.162.148.55,185.139.140.136,*.svc,*.default,*.local,*.internal,*.testing,ga.sock,*.qmp.sock,serial.sock,ssh.sock,docker.sock,localaddress,*.localdomain,*.localdomain.com,illinlic01,indlinsls,linvc04,bitbucket,gitlab,ldap,10.232.233.70,10.19.50.20,10.19.50.20,genproxy,genproxy.corp.amdocs.com,10.17.88.18,10.17.88.22,10.232.217.1,10.232.217.2,10.20.40.100,10.19.214.200,*.socket,127.254.254.254,teleproxy,traffic-manager.ambassador,169.254/16,10.0.0.0/8,localhost4,*.localdomain4,localhost,10.0.0.0/8,172.16.0.0/12,192.168.100.0/16,wpad,jira,awsnvportal.corp.amdocs.com,illin5646,wpad.corp.amdocs.com,185.162.148.55,185.139.140.136,dmitriyr01-mac,*.eaas.amdocs.com,*.corp.amdocs.com,*.corp.amdocs.aws,*.corp.amdocs.azr,uk-fullvpn.amdocs.com,isr-fullvpn.amdocs.com,fullvpn.amdocs.com,aus-fullvpn.amdocs.com,docker-registry-proxy.corp.amdocs.com,*.azmk8s.io"
 
 export CGO_ENABLED=0
 export GO111MODULE=on
 export GOTOOLCHAIN=local
+export GOPROXY="http://docker-registry-proxy.corp.amdocs.com:8081/repository/goproxy"
 export BUILDX_NO_DEFAULT_ATTESTATIONS=1
 
 BUILD_DATE := $(shell date -u '+%Y-%m-%d')

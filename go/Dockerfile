@@ -11,7 +11,7 @@ ARG TARGETOS
 
 ENV GO111MODULE=on
 ENV GOTOOLCHAIN=local
-ENV GOPROXY="http://docker-registry-proxy.corp.amdocs.com:8081/repository/goproxy/,http://proxy.golang.org"
+ENV GOPROXY="http://docker-registry-proxy.corp.amdocs.com:8081/repository/goproxy"
 ENV PATH=$PATH:/usr/local/go/bin
 
 WORKDIR /workspace
