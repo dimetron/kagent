@@ -354,8 +354,7 @@ proxy:
 	cd tools/docker-proxy 	\
 	&& docker compose pull	\
 	&& docker compose down 	\
-	&& docker compose up -d \
-	&& docker compose logs -f
+	&& docker compose up -d
 
 .PHONY: proxy-log
 proxy-log:

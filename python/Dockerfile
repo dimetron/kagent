@@ -89,7 +89,7 @@ COPY --from=python-builder --chown=python:pythongroup /usr/local/bin/kubectl-arg
 COPY --from=python-builder --chown=python:pythongroup /usr/local/bin/kubescape /usr/local/bin/kubescape
 
 RUN export https_proxy=http://127.0.0.1:3128       \
-    && /usr/local/bin/kubescape download artifacts    || :
+    && /usr/local/bin/kubescape download artifacts -l debug    || :
 
 COPY pyproject.toml .
 COPY .python-version .
