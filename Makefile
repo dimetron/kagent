@@ -16,7 +16,8 @@ export no_proxy="proxy.golang.org,docker.io,localhost,192.168.64.11,192.168.5.15
 export CGO_ENABLED=0
 export GO111MODULE=on
 export GOTOOLCHAIN=local
-export GOPROY="http://docker-registry-proxy.corp.amdocs.com:8081/repository/goproxy"
+export GOPROXY=http://docker-registry-proxy.corp.amdocs.com:8081/repository/goproxy
+
 export BUILDX_NO_DEFAULT_ATTESTATIONS=1
 
 BUILD_DATE := $(shell date -u '+%Y-%m-%d')

@@ -9,7 +9,7 @@ LDFLAGS := -X github.com/kagent-dev/kagent/go/cli/internal/cli.Version=$(VERSION
 export CGO_ENABLED=0
 export GO111MODULE=on
 export GOTOOLCHAIN=local
-export GOPROY="http://docker-registry-proxy.corp.amdocs.com:8081/repository/goproxy"
+export GOPROXY=http://docker-registry-proxy.corp.amdocs.com:8081/repository/goproxy
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
