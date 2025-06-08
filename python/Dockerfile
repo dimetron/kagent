@@ -110,8 +110,8 @@ RUN --mount=type=cache,target=/app/python/.cache                  \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     export https_proxy=http://127.0.0.1:3128                      \
     && uv sync --locked                                           \
-    && uv pip install hatchling setuptools hatch                  \
-    && chown -vR python:pythongroup /app/python
+    && uv pip install -v hatchling setuptools hatch               \
+    && chown -R 1001:1001 /app/python || :
 
 
 # Generate configs
@@ -124,8 +124,8 @@ RUN --mount=type=cache,target=/app/python/.cache                  \
 # Test if the tool is working and fetch all dependencies
 RUN --mount=type=cache,target=/app/python/.cache                  \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    export https_proxy=http://127.0.0.1:3128                  \
-    && uv run kagent-engine --help \
+    export https_proxy=http://127.0.0.1:3128                      \
+    && uv run kagent-engine --help                                \
     && uv run kagent-engine serve --help
 
 RUN chown -R python:pythongroup /app/python && \
