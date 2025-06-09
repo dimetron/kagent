@@ -2,11 +2,13 @@
 ARG BASE_IMAGE_REGISTRY=cgr.dev
 FROM --platform=linux/$BUILDARCH $BASE_IMAGE_REGISTRY/chainguard/wolfi-base:latest AS base-os
 
+ADD FullAmdocsCA.crt /etc/ssl/certs/FullAmdocsCA.crt
+RUN cat /etc/ssl/certs/FullAmdocsCA.crt >> /etc/ssl/certs/ca-certificates.crt
+
 ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
-
-RUN export https_proxy=http://127.0.0.1:3128 \
-    && apk update \
+RUN export https_proxy=http://127.0.0.1:3128  \
+    && apk update || apk update               \
     && apk add curl openssl unzip bash git ca-certificates-bundle nginx supervisor strace \
     && rm -rf /var/cache/apk/*
 
@@ -59,11 +61,14 @@ RUN --mount=type=cache,target=/cache/bun,rw                                   \
 ### STAGE 3: final
 FROM $BASE_IMAGE_REGISTRY/chainguard/wolfi-base:latest AS final
 
+# add CA certificates before installing other packages
+ADD FullAmdocsCA.crt /etc/ssl/certs/FullAmdocsCA.crt
+RUN cat /etc/ssl/certs/FullAmdocsCA.crt >> /etc/ssl/certs/ca-certificates.crt
+
 ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
-
-RUN export https_proxy=http://127.0.0.1:3128 \
-    && apk update \
+RUN export https_proxy=http://127.0.0.1:3128  \
+    && apk update || apk update               \
     && apk add curl openssl unzip bash git ca-certificates nginx supervisor \
     && rm -rf /var/cache/apk/*
 

@@ -283,6 +283,7 @@ def helm():
 def serve(
     host: str = "127.0.0.1",
     port: int = 8081,
+    appdir: str | None = None,
 ):
     import logging
     import os
@@ -308,7 +309,7 @@ def serve(
         HTTPXClientInstrumentor().instrument()
         OpenAIInstrumentor().instrument()
 
-    ui(host=host, port=port)
+    ui(host=host, port=port, appdir=appdir)
 
 
 def run():
