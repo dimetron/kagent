@@ -6,7 +6,7 @@ global:
 
 # https://kagent.dev/docs/getting-started/configuring-providers
 providers:
-  default: openAI
+  default: azureOpenAI
   openAI:
     provider: OpenAI
     model: "gpt-4.1-mini"
@@ -17,7 +17,7 @@ providers:
     provider: Ollama
     model: "llama3.2"
     config:
-      host: host.docker.internal:11434
+      host: host.lima.internal:11434
   anthropic:
     provider: Anthropic
     model: "claude-3-sonnet-20240229"
@@ -30,14 +30,17 @@ providers:
     apiKeySecretRef: kagent-azure-openai
     apiKeySecretKey: AZUREOPENAI_API_KEY
     apiKey: ""
+    defaultHeaders:
+      username: "dmitriyr"
+      application: "kagent"
     config:
-      apiVersion: "2023-05-15"
+      apiVersion: "2024-10-21"
       azureAdToken: ""
-      azureDeployment: ""
-      azureEndpoint: ""
+      azureDeployment: "gpt-4.1-mini"
+      azureEndpoint: "https://chat.autox.corp.amdocs.azr/api/v1/proxy"
 
 controller:
-  loglevel: "info"
+  loglevel: "debug"
 
   # -- Namespaces the controller should watch.
   # If empty, the controller will watch ONLY release namespace.
@@ -47,8 +50,8 @@ controller:
   #  - watch-ns-2
 
   image:
-    registry: cr.kagent.dev
-    repository: kagent-dev/kagent/controller
+    registry: illin4261.corp.amdocs.com:28090/platform
+    repository: kagent/controller
     tag: "" # Will default to global, then Chart version
     pullPolicy: IfNotPresent
   resources:
@@ -62,23 +65,30 @@ controller:
 
 app:
   image:
-    registry: cr.kagent.dev
-    repository: kagent-dev/kagent/app
+    registry: illin4261.corp.amdocs.com:28090/platform
+    repository: kagent/app
     tag: "" # Will default to global, then Chart version
     pullPolicy: IfNotPresent
   resources:
     requests:
       cpu: 100m
-      memory: 256Mi
+      memory: 512Mi
     limits:
-      cpu: 1000m
-      memory: 1Gi
-  env: [] # Additional environment variables for the app can be added here
-
+      cpu: 2000m
+      memory: 2Gi
+  env: []
+#    - name: https_proxy
+#      value: https://192.168.8.1:3128
+#    - name: no_proxy
+#      value: 0.42.0.0/16,0.42.0.0/16,127.0.0.1,*.corp.amdocs.com,localhost
+#    - name: REQUESTS_CA_BUNDLE
+#      value: /app/python/amdcerts.pem
+#    - name: SSL_CERT_FILE
+#      value: /app/python/amdcerts.pem
 ui:
   image:
-    registry: cr.kagent.dev
-    repository: kagent-dev/kagent/ui
+    registry: illin4261.corp.amdocs.com:28090/platform
+    repository: kagent/ui
     tag: "" # Will default to global, then Chart version
     pullPolicy: IfNotPresent
   resources:
@@ -103,7 +113,9 @@ service:
       port: 8083
       targetPort: 8083
 
-imagePullSecrets: []
+imagePullSecrets:
+  - name: amdocs-nexus-pull-secret
+
 nameOverride: ""
 fullnameOverride: ""
 
@@ -111,7 +123,11 @@ fullnameOverride: ""
 # @default -- `.Release.Namespace`
 namespaceOverride: ""
 
-podAnnotations: {}
+podAnnotations:
+  sidecar.istio.io/inject: "true"
+  #ignore otel outbound traffic
+  traffic.sidecar.istio.io/excludeOutboundPorts: "4317,4318,4319,8080,8081,8082,8083"
+  sidecar.istio.io/componentLogLevel: "http:debug,client:info,connection:info,conn_handler:info,pool:info"
 
 podSecurityContext: {}
   # fsGroup: 2000
@@ -126,10 +142,10 @@ securityContext: {}
 
 otel:
   tracing:
-    enabled: false
+    enabled: true
     exporter:
       otlp:
-        endpoint: http://host.docker.internal:4317
+        endpoint: http://host.lima.internal:4317
         timeout: 10
         insecure: true
 

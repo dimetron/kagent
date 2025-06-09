@@ -134,12 +134,14 @@ ENV SSL_CERT_FILE=$CERT_PATH
 # update permissions and ownership
 RUN --mount=type=cache,target=/app/python/.cache                  \
     echo "Update permissions and ownership.."                     \
-    && chmod -vR 750 /app/python/bin/*                            \
-    && chmod -vR 750 /app/python/.venv/bin/*                      \
-    && chown -vR python:pythongroup /app/python || :
+    && chmod -v 660 /app/*                                       \
+    && chmod -R 750 /app/python/bin/*                             \
+    && chmod -R 750 /app/python/.venv/bin/*                       \
+    && chown -R python:pythongroup /app/ || :
 
 EXPOSE 8081
-USER python
+#USER python
+
 
 LABEL org.opencontainers.image.source=https://github.com/kagent-dev/kagent
 LABEL org.opencontainers.image.description="Kagent app is the apiserver for running agents."
