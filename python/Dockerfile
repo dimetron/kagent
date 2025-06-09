@@ -134,7 +134,7 @@ ENV SSL_CERT_FILE=$CERT_PATH
 # update permissions and ownership
 RUN --mount=type=cache,target=/app/python/.cache                  \
     echo "Update permissions and ownership.."                     \
-    && chmod -v 660 /app/*                                       \
+    && chmod -v 660 /app/*                                        \
     && chmod -R 750 /app/python/bin/*                             \
     && chmod -R 750 /app/python/.venv/bin/*                       \
     && chown -R python:pythongroup /app/ || :
