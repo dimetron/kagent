@@ -9,7 +9,7 @@ ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
 RUN export https_proxy=http://127.0.0.1:3128  \
     && apk update || apk update               \
-    && apk add curl openssl unzip bash git ca-certificates-bundle nginx supervisor strace \
+    && apk add curl openssl unzip bash git ca-certificates-bundle nginx supervisor \
     && rm -rf /var/cache/apk/*
 
 ARG TOOLS_BUN_VERSION
@@ -69,7 +69,7 @@ ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
 RUN export https_proxy=http://127.0.0.1:3128  \
     && apk update || apk update               \
-    && apk add curl openssl unzip bash git ca-certificates nginx supervisor \
+    && apk add curl openssl unzip bash ca-certificates nginx supervisor \
     && rm -rf /var/cache/apk/*
 
 ARG TOOLS_BUN_VERSION
