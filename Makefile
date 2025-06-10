@@ -19,7 +19,6 @@ export GOTOOLCHAIN=local
 export GOPROXY=http://docker-registry-proxy.corp.amdocs.com:8081/repository/goproxy
 
 export BUILDX_NO_DEFAULT_ATTESTATIONS=1
-
 BUILD_DATE := $(shell date -u '+%Y-%m-%d')
 GIT_COMMIT := $(shell git rev-parse --short HEAD || echo "unknown")
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null | sed 's/-dirty//' | grep v || echo "v0.0.0-$(GIT_COMMIT)")
@@ -129,7 +128,7 @@ clean: proxy-clean
 
 .PHONY: buildx-create
 buildx-create:
-	@tools/buildx/buildx-create.sh $BUILDER_NAME
+	@tools/buildx/buildx-create.sh $(BUILDER_NAME)
 	
 .PHONY: create-kind-cluster
 create-kind-cluster:
