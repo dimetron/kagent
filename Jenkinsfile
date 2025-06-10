@@ -85,7 +85,6 @@ pipeline {
                 echo ("Using Semver: ${SEMVER}")
                 manager.addShortText("SEMVER: ${SEMVER}", "black", "white", "1px", "green");
                 manager.addShortText("GO: ${BASE_GO_VERSION}", "black", "white", "1px", "green");
-                sh """sleep 5""" //allow stop the pipeline to see the semver
             }
         }
     }
@@ -159,7 +158,7 @@ pipeline {
                 cd $HOME_PATH;
                 source $HOME/.bash_profile
                 export GOPATH=$HOME/workspace/${jobName}
-                make SEMVER=${SEMVER} GO_VERSION=${env.BASE_GO_VERSION} proxy-start
+                make SEMVER=${SEMVER} GO_VERSION=${env.BASE_GO_VERSION} clean buildx-create proxy-start
                 """
             }
         }

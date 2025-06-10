@@ -4,7 +4,7 @@ BASE_IMAGE_REGISTRY ?= docker-registry-proxy.corp.amdocs.com
 DOCKER_REPO ?= platform/kagent
 
 #buildx configuration
-BUILDER_NAME ?= container-builder
+BUILDER_NAME ?= kagent-builder
 BUILDKIT_VERSION = v0.22.0
 LOCALARCH ?= $(shell uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/')
 
@@ -129,7 +129,7 @@ clean: proxy-clean
 
 .PHONY: buildx-create
 buildx-create:
-	@tools/buildx/buildx-create.sh
+	@tools/buildx/buildx-create.sh $BUILDER_NAME
 	
 .PHONY: create-kind-cluster
 create-kind-cluster:

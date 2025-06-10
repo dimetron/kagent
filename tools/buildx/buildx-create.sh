@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 
 export BUILDKIT_VERSION=v0.22.0
+export BUILDX_NAME=$1
+
+echo "Activate BuildX -> $BUILDX_NAME with buildkit version: $BUILDKIT_VERSION"
+
 export OS=$(uname -o)
 export script_dir=$(dirname "$0")
 
@@ -88,8 +92,6 @@ if [[ "$(uname -m)"  == "x86_64" ]]; then
   docker run --rm --privileged multiarch/qemu-user-static --reset -p yes || true
 fi
 
-export BUILDX_NAME=container-builder
-echo "Activate BuildX -> $BUILDX_NAME with buildkit version: $BUILDKIT_VERSION"
 #docker buildx rm $BUILDX_NAME || true
 docker buildx inspect $BUILDX_NAME > /dev/null 2>&1  || docker buildx create --driver-opt "network=host,image=docker-registry-proxy.corp.amdocs.com/moby/buildkit:$BUILDKIT_VERSION" --config $script_dir/buildkitd.toml --name $BUILDX_NAME --use
 docker buildx use $BUILDX_NAME || true
