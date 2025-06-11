@@ -385,6 +385,7 @@ proxy-clean:
 	&& docker compose down 		\
 	&& rm -rf verdaccio/storage \
 	&& rm -rf squid/cache		\
+	&& rm -rf zeek				\
 	&& docker compose up -d		\
 	&& sleep 5
 
