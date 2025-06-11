@@ -118,7 +118,7 @@ RUN --mount=type=cache,target=/app/python/.cache                  \
 RUN --mount=type=cache,target=/app/python/.cache                  \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     export https_proxy=http://127.0.0.1:3128                      \
-    && uv pip install -g  hatchling hatch setuptools              \
+    && uv pip install hatchling hatch setuptools                  \
     && uv run kagent-engine --help
 
 # Install Kubescape
