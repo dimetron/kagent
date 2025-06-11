@@ -105,8 +105,7 @@ RUN --mount=type=cache,target=/app/python/.cache                  \
 RUN --mount=type=cache,target=/app/python/.cache                  \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     export https_proxy=http://127.0.0.1:3128                      \
-    && uv venv .venv && uv sync --locked                          \
-    && uv pip install hatchling hatch setuptools
+    && uv venv .venv && uv sync --locked
 
 # Generate configs
 RUN --mount=type=cache,target=/app/python/.cache                  \
@@ -119,17 +118,18 @@ RUN --mount=type=cache,target=/app/python/.cache                  \
 RUN --mount=type=cache,target=/app/python/.cache                  \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     export https_proxy=http://127.0.0.1:3128                      \
+    && uv pip install -g  hatchling hatch setuptools              \
     && uv run kagent-engine --help
 
 # Install Kubescape
-RUN export https_proxy=http://127.0.0.1:3128                                                            \
-    && curl -Lo install.sh https://raw.githubusercontent.com/kubescape/kubescape/master/install.sh      \
-    && chmod +x install.sh                        \
-    && /bin/bash install.sh  2>&1
-
-RUN mv /app/python/.kubescape/bin/kubescape bin/kubescape  \
-    && kubescape download artifacts || :                   \
-    && echo -e "\033[0m"
+#RUN export https_proxy=http://127.0.0.1:3128                                                            \
+#    && curl -Lo install.sh https://raw.githubusercontent.com/kubescape/kubescape/master/install.sh      \
+#    && chmod +x install.sh                        \
+#    && /bin/bash install.sh  2>&1
+#
+#RUN mv /app/python/.kubescape/bin/kubescape bin/kubescape  \
+#    && kubescape download artifacts || :                   \
+#    && echo -e "\033[0m"
 
 ENV UV_OFFLINE=1
 
