@@ -1,6 +1,25 @@
 version: '3.1'
 
 services:
+  jaeger-desktop:
+    image: "docker-registry-proxy.corp.amdocs.com/jaegertracing/jaeger:2.6.0"
+    container_name: 'jaeger-desktop'
+    hostname: 'jaeger-desktop'
+    restart: always
+    network_mode: host
+  security-zeek:
+    image: "docker-registry-proxy.corp.amdocs.com/zeek/zeek"
+    container_name: 'security-zeek'
+    hostname: 'security-zeek'
+    privileged: true
+    restart: always
+    network_mode: host
+    environment:
+      - ZEEK_LOG_LEVEL=info
+    working_dir: /usr/local/zeek/logs
+    command: zeek -i eth0
+    volumes:
+      - ./zeek:/usr/local/zeek/logs
   proxy-http:
     image: "docker-registry-proxy.corp.amdocs.com/ubuntu/squid"
     container_name: 'proxy-http'
@@ -78,5 +97,8 @@ services:
       - DOCKER_PROXY_PORT=6000
       - DOCKER_LOG_LEVEL=info
       - HTTP_PROXY=http://127.0.0.1:3128
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+      - OTEL_LOGS_EXPORTER=otlp
+      - OTEL_TRACES_EXPORTER=otlp
     volumes:
       - ./docker-proxy/config.yml:/etc/docker/registry/config.yml

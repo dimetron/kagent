@@ -16,8 +16,8 @@ outdated:
 .PHONY: update
 update: outdated
 	rm -rf bun.lock .next node_modules
-	npm audit fix --force || true
-	npm update    --force || true
+	npm audit  || true
+	npm update || true
 	npm install
 	bun install
 	npm outdated || true
