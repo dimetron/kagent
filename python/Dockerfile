@@ -105,7 +105,8 @@ RUN --mount=type=cache,target=/app/python/.cache                  \
 RUN --mount=type=cache,target=/app/python/.cache                  \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     export https_proxy=http://127.0.0.1:3128                      \
-    && uv venv .venv && uv sync --locked
+    && uv venv .venv && uv sync --locked                          \
+    && uv pip install hatchling hatch setuptools
 
 # Generate configs
 RUN --mount=type=cache,target=/app/python/.cache                  \
