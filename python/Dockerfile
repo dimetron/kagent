@@ -15,10 +15,11 @@ RUN export https_proxy=http://127.0.0.1:3128  \
 
 ### STAGE 2: python
 FROM base-os AS python-os
-ARG TOOLS_PYTHON_VERSION=3.12
 
+ARG TOOLS_PYTHON_VERSION=3.12
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+
 RUN export https_proxy=http://127.0.0.1:3128  \
     && apk update || apk update               \
     && apk add python3 uv nodejs npm
@@ -31,11 +32,9 @@ ENV BUN_INSTALL=/usr/local/bun
 ENV BUN_INSTALL_CACHE_DIR=/app/python/.cache
 ENV PATH=$BUN_INSTALL/bin:/app/python/bin/:$PATH
 
-RUN addgroup -g 1001 pythongroup && \
+RUN addgroup -g 1001 pythongroup      && \
     adduser  -u 1001 -G pythongroup -s /bin/bash -D python -h /app/python/ && \
-    mkdir -p /tmp /app/python/.autogenstudio/configs                       && \
     chown -vR python:pythongroup /app
-
 
 ### STAGE 3: tools
 FROM python-os AS python-builder
@@ -46,8 +45,10 @@ ARG TOOLS_HELM_VERSION
 ARG TOOLS_ISTIO_VERSION
 ARG TOOLS_ARGO_CD_VERSION
 
-RUN mkdir -p /app/python/downloads /app/python/bin/
+USER python
 WORKDIR /app/python/downloads
+
+RUN mkdir -p /app/python/downloads /app/python/bin/
 
 RUN export https_proxy=http://127.0.0.1:3128   \
     && curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/$TARGETARCH/kubectl" \
@@ -72,6 +73,7 @@ RUN export https_proxy=http://127.0.0.1:3128                                    
 ### STAGE 4: final
 FROM python-os AS final
 ARG TARGETARCH
+ARG TOOLS_PYTHON_VERSION=3.12
 
 USER python
 WORKDIR /app/python
@@ -95,28 +97,19 @@ COPY --chown=python:pythongroup uv.lock .
 COPY --chown=python:pythongroup src src
 COPY --chown=python:pythongroup README.md .
 
-# update permissions and ownership
-RUN --mount=type=cache,target=/app/python/.cache                  \
-    echo "Update permissions and ownership with readonly"         \
-    && chmod -R 777 /app/python/bin/*                             \
-    && chown -R python:pythongroup /app/ || :
-
 # Install dependencies
 RUN --mount=type=cache,target=/app/python/.cache                  \
-    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     export https_proxy=http://127.0.0.1:3128                      \
-    && uv venv .venv && uv sync --locked
+    && uv sync --locked
 
 # Generate configs
 RUN --mount=type=cache,target=/app/python/.cache                  \
-    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     export https_proxy=http://127.0.0.1:3128                      \
     && mkdir -p /app/python/.autogenstudio/configs                \
     && uv run tool_gen -o /app/python/.autogenstudio/configs
 
 # Test if the tool is working and fetch all dependencies
 RUN --mount=type=cache,target=/app/python/.cache                  \
-    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     export https_proxy=http://127.0.0.1:3128                      \
     && uv pip install hatchling hatch setuptools                  \
     && uv run kagent-engine serve       --help
