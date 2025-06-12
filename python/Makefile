@@ -14,7 +14,7 @@ update:
 	uv venv .venv
 	uv python install 3.12
 	uv sync --all-extras --all-groups
-	uv pip install hatchling
+	uv pip install hatchling hatch setuptools
 	uv lock
 
 .PHONY: format

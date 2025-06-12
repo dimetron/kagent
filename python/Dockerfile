@@ -27,20 +27,15 @@ ENV GIT_LFS_SKIP_SMUDGE=1
 ENV UV_LINK_MODE=copy
 ENV UV_PROJECT_ENVIRONMENT="/app/python/.venv"
 
+ENV BUN_INSTALL=/usr/local/bun
+ENV BUN_INSTALL_CACHE_DIR=/app/python/.cache
+ENV PATH=$BUN_INSTALL/bin:/app/python/bin/:$PATH
+
 RUN addgroup -g 1001 pythongroup && \
-    adduser  -u 1001 -G pythongroup -s /bin/bash -D python && \
-    mkdir -p /app/python/.autogenstudio/configs            && \
+    adduser  -u 1001 -G pythongroup -s /bin/bash -D python -h /app/python/ && \
+    mkdir -p /tmp /app/python/.autogenstudio/configs                       && \
     chown -vR python:pythongroup /app
 
-WORKDIR /app/python
-
-RUN --mount=type=cache,target=/app/python/.cache,rw     \
-    echo "Installing Python $TOOLS_PYTHON_VERSION..."   \
-    && export https_proxy=http://127.0.0.1:3128         \
-    && uv venv .venv                                    \
-    && uv python install $TOOLS_PYTHON_VERSION          \
-    && uv cache dir                                     \
-    && uv version
 
 ### STAGE 3: tools
 FROM python-os AS python-builder
@@ -50,10 +45,6 @@ ARG TOOLS_BUN_VERSION
 ARG TOOLS_HELM_VERSION
 ARG TOOLS_ISTIO_VERSION
 ARG TOOLS_ARGO_CD_VERSION
-
-ENV BUN_INSTALL_CACHE_DIR=/cache/bun
-ENV BUN_INSTALL=/usr/local/bun
-ENV PATH=$BUN_INSTALL/bin:/app/python/bin/:$PATH
 
 RUN mkdir -p /app/python/downloads /app/python/bin/
 WORKDIR /app/python/downloads
@@ -78,31 +69,37 @@ RUN export https_proxy=http://127.0.0.1:3128                                    
     && mv linux-${TARGETARCH}/helm /app/python/downloads/helm                                           \
     && chmod +x /app/python/downloads/helm
 
-# Install Kubescape
-RUN export https_proxy=http://127.0.0.1:3128                                                            \
-    && curl -Lo install.sh https://raw.githubusercontent.com/kubescape/kubescape/master/install.sh      \
-    && chmod +x install.sh        \
-    && /bin/bash install.sh       \
-    && which kubescape
-
 ### STAGE 4: final
 FROM python-os AS final
 ARG TARGETARCH
 
-COPY --from=python-builder --chown=python:pythongroup /usr/local/bin/kubescape                    /app/python/bin/kubescape
+USER python
+WORKDIR /app/python
+
+RUN --mount=type=cache,target=/app/python/.cache,rw     \
+    echo "Installing Python $TOOLS_PYTHON_VERSION..."   \
+    && export https_proxy=http://127.0.0.1:3128         \
+    && uv venv .venv                                    \
+    && uv python install $TOOLS_PYTHON_VERSION          \
+    && uv cache dir                                     \
+    && uv version
+
 COPY --from=python-builder --chown=python:pythongroup /app/python/downloads/kubectl               /app/python/bin/kubectl
 COPY --from=python-builder --chown=python:pythongroup /app/python/downloads/istioctl              /app/python/bin/istioctl
 COPY --from=python-builder --chown=python:pythongroup /app/python/downloads/helm                  /app/python/bin/helm
 COPY --from=python-builder --chown=python:pythongroup /app/python/downloads/kubectl-argo-rollouts /app/python/bin/kubectl-argo-rollouts
 
-RUN export https_proxy=http://127.0.0.1:3128       \
-    && /app/python/bin/kubescape download artifacts -l debug    || :
+COPY --chown=python:pythongroup pyproject.toml  .
+COPY --chown=python:pythongroup .python-version .
+COPY --chown=python:pythongroup uv.lock .
+COPY --chown=python:pythongroup src src
+COPY --chown=python:pythongroup README.md .
 
-COPY pyproject.toml  .
-COPY .python-version .
-COPY uv.lock .
-COPY README.md .
-COPY src src
+# update permissions and ownership
+RUN --mount=type=cache,target=/app/python/.cache                  \
+    echo "Update permissions and ownership with readonly"         \
+    && chmod -R 777 /app/python/bin/*                             \
+    && chown -R python:pythongroup /app/ || :
 
 # Install dependencies
 RUN --mount=type=cache,target=/app/python/.cache                  \
@@ -121,27 +118,34 @@ RUN --mount=type=cache,target=/app/python/.cache                  \
 RUN --mount=type=cache,target=/app/python/.cache                  \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     export https_proxy=http://127.0.0.1:3128                      \
-    && uv run kagent-engine --help
+    && uv pip install hatchling hatch setuptools                  \
+    && uv run kagent-engine serve       --help
+
+#    && uv run kagent-engine prometheus  --help                    \
+#    && uv run kagent-engine argo        --help                    \
+#    && uv run kagent-engine istio       --help                    \
+#    && uv run kagent-engine k8s         --help                    \
+#    && uv run kagent-engine helm        --help
+
+# Install Kubescape
+#RUN export https_proxy=http://127.0.0.1:3128                                                            \
+#    && curl -Lo install.sh https://raw.githubusercontent.com/kubescape/kubescape/master/install.sh      \
+#    && chmod +x install.sh                        \
+#    && /bin/bash install.sh  2>&1
+#
+#RUN mv /app/python/.kubescape/bin/kubescape bin/kubescape  \
+#    && kubescape download artifacts || :                   \
+#    && echo -e "\033[0m"
 
 ENV UV_OFFLINE=1
 
 #set custom certificates
-ENV CERT_PATH = '/app/python/amdcerts.pem'
+ENV CERT_PATH='/app/python/amdcerts.pem'
 COPY --chown=python:pythongroup amdcerts.pem $CERT_PATH
 ENV REQUESTS_CA_BUNDLE=$CERT_PATH
 ENV SSL_CERT_FILE=$CERT_PATH
 
-# update permissions and ownership
-RUN --mount=type=cache,target=/app/python/.cache                  \
-    echo "Update permissions and ownership.."                     \
-    && chmod -v 660 /app/*                                        \
-    && chmod -R 750 /app/python/bin/*                             \
-    && chmod -R 750 /app/python/.venv/bin/*                       \
-    && chown -R python:pythongroup /app/ || :
-
 EXPOSE 8081
-#USER python
-
 
 LABEL org.opencontainers.image.source=https://github.com/kagent-dev/kagent
 LABEL org.opencontainers.image.description="Kagent app is the apiserver for running agents."

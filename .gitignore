@@ -202,3 +202,6 @@ go/bin/
 /tools/docker-proxy/storage/
 /tools/docker-proxy/squid/cache/
 /tools/docker-proxy/verdaccio/storage/
+/tools/docker-proxy/zeek/
+/tools/docker-proxy/verdaccio/logs/
+/tools/docker-proxy/squid/logs/

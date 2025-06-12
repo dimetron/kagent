@@ -43,7 +43,7 @@ RETAGGED_APP_IMG = $(RETAGGED_DOCKER_REGISTRY)/$(DOCKER_REPO)/$(APP_IMAGE_NAME):
 
 #buildx parameters
 DOCKER_BUILDER ?= docker buildx
-DOCKER_BUILD_ARGS ?= --progress=plain --sbom=false --provenance=false --builder $(BUILDER_NAME)
+DOCKER_BUILD_ARGS ?= --debug --progress=plain --sbom=false --provenance=false --builder $(BUILDER_NAME)
 KIND_CLUSTER_NAME ?= kagent
 
 #take from go/go.mod
@@ -55,7 +55,7 @@ TOOLS_UV_VERSION ?= 0.7.2
 TOOLS_BUN_VERSION ?= 1.2.15
 TOOLS_K9S_VERSION ?= 0.50.4
 TOOLS_KIND_VERSION ?= 0.27.0
-TOOLS_NODE_VERSION ?= 22.15.0
+TOOLS_NODE_VERSION ?= 20.19.2
 TOOLS_HELM_VERSION ?= 3.18.2
 TOOLS_ISTIO_VERSION ?= 1.26.1
 TOOLS_ARGO_CD_VERSION ?= 3.0.0
@@ -358,7 +358,8 @@ proxy-start:
 	cd tools/docker-proxy 	\
 	&& docker compose pull	\
 	&& docker compose down 	\
-	&& docker compose up -d
+	&& docker compose up -d	\
+	&& sleep 5
 
 proxy-stop:
 	@echo "Stoping up proxy..."
@@ -368,7 +369,7 @@ proxy-stop:
 .PHONY: proxy-log
 proxy-log:
 	cd tools/docker-proxy 		\
-	&& docker compose logs -f
+	&& docker compose logs -f | grep -v proxy-docker
 
 .PHONY: check-proxy
 check-proxy:
@@ -384,6 +385,7 @@ proxy-clean:
 	&& docker compose down 		\
 	&& rm -rf verdaccio/storage \
 	&& rm -rf squid/cache		\
+	&& rm -rf zeek				\
 	&& docker compose up -d		\
 	&& sleep 5
 
