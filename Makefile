@@ -43,7 +43,7 @@ RETAGGED_APP_IMG = $(RETAGGED_DOCKER_REGISTRY)/$(DOCKER_REPO)/$(APP_IMAGE_NAME):
 
 #buildx parameters
 DOCKER_BUILDER ?= docker buildx
-DOCKER_BUILD_ARGS ?= --debug --progress=plain --sbom=false --provenance=false --builder $(BUILDER_NAME)
+DOCKER_BUILD_ARGS ?= --progress=plain --sbom=false --provenance=false --builder $(BUILDER_NAME)
 KIND_CLUSTER_NAME ?= kagent
 
 #take from go/go.mod
