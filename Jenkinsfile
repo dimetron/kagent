@@ -158,7 +158,9 @@ pipeline {
                 cd $HOME_PATH;
                 source $HOME/.bash_profile
                 export GOPATH=$HOME/workspace/${jobName}
-                make SEMVER=${SEMVER} GO_VERSION=${env.BASE_GO_VERSION} clean buildx-create proxy-start
+                make SEMVER=${SEMVER} clean
+                make SEMVER=${SEMVER} buildx-create proxy-start
+                sleep 5
                 """
             }
         }
@@ -173,27 +175,25 @@ pipeline {
                     cd $HOME_PATH;
                     source $HOME/.bash_profile
                     export GOPATH=$HOME/workspace/${jobName}
-                    make SEMVER=${SEMVER} GO_VERSION=${env.BASE_GO_VERSION} HUBS=${env.PLATFORM_DOCKER_REPO}/platform/kagent build-controller
+                    make SEMVER=${SEMVER}  HUBS=${env.PLATFORM_DOCKER_REPO}/platform/kagent build-controller
                     """
                 },
                 app: {
                     echo 'Docker Building..'
                     sh """
-                    sleep 5
                     cd $HOME_PATH;
                     source $HOME/.bash_profile
                     export GOPATH=$HOME/workspace/${jobName}
-                    make SEMVER=${SEMVER} GO_VERSION=${env.BASE_GO_VERSION} HUBS=${env.PLATFORM_DOCKER_REPO}/platform/kagent build-app
+                    make SEMVER=${SEMVER}  HUBS=${env.PLATFORM_DOCKER_REPO}/platform/kagent build-app
                     """
                 },
                 ui: {
                     echo 'Docker Building..'
                     sh """
-                    sleep 10
                     cd $HOME_PATH;
                     source $HOME/.bash_profile
                     export GOPATH=$HOME/workspace/${jobName}
-                    make SEMVER=${SEMVER} GO_VERSION=${env.BASE_GO_VERSION} HUBS=${env.PLATFORM_DOCKER_REPO}/platform/kagent build-ui
+                    make SEMVER=${SEMVER}  HUBS=${env.PLATFORM_DOCKER_REPO}/platform/kagent build-ui
                     """
                 }
            )
@@ -207,7 +207,7 @@ pipeline {
                 cd $HOME_PATH;
                 source $HOME/.bash_profile
                 export GOPATH=$HOME/workspace/${jobName}
-                make SEMVER=${SEMVER} GO_VERSION=${env.BASE_GO_VERSION} proxy-stop
+                make SEMVER=${SEMVER}  proxy-stop
                 """
             }
         }
@@ -229,7 +229,7 @@ pipeline {
             cd $HOME_PATH;
             source $HOME/.bash_profile
             export GOPATH=$HOME/workspace/${jobName}
-            make TAG=${env.BRANCH_SIMPLE_NAME} GO_VERSION=${env.BASE_GO_VERSION} clean/go clean/yarn
+            make TAG=${env.BRANCH_SIMPLE_NAME}  clean/go clean/yarn
             """
 
             def remoteCommand = "set +x; curl --noproxy '*' -vv -k -X POST '${env.FOSS_JENKINS}/${env.JENKINS_JOB_NAME}/buildWithParameters?token=fossscan' --user '$KUBEX_FOSS_USER:$KUBEX_FOSS_PASS' "
@@ -307,7 +307,7 @@ pipeline {
             cd $HOME_PATH;
             source $HOME/.bash_profile
             export GOPATH=$HOME/workspace/${jobName}
-            make GO_VERSION=${env.BASE_GO_VERSION} \
+            make  \
                  VERSION=${SEMVER} TAG=${env.BRANCH_SIMPLE_NAME} \
                  MAVEN_DD_URL=${env.MAVEN_DD_URL}  \
                  ARTIF_CRED_USER=${ARTIF_CRED_USER} ARTIF_CRED_PASS=${ARTIF_CRED_PASS} \
@@ -325,7 +325,7 @@ pipeline {
                 cd $HOME_PATH;
                 source $HOME/.bash_profile
                 export GOPATH=$HOME/workspace/${jobName}
-                make TAG=${env.BRANCH_SIMPLE_NAME} SEMVER=${SEMVER} GO_VERSION=${env.BASE_GO_VERSION} HUBS=${env.PLATFORM_DOCKER_REPO}/platform/kagent cve/scan
+                make TAG=${env.BRANCH_SIMPLE_NAME} SEMVER=${SEMVER}  HUBS=${env.PLATFORM_DOCKER_REPO}/platform/kagent cve/scan
                 """
             }
         }
@@ -334,7 +334,7 @@ pipeline {
         steps {
             sh """
             ## not ready yet
-            ## make TAG=${env.BRANCH_SIMPLE_NAME} SEMVER=${SEMVER} GO_VERSION=${env.BASE_GO_VERSION} HUBS=${env.PLATFORM_DOCKER_REPO}/platform/kagent test/e2e
+            ## make TAG=${env.BRANCH_SIMPLE_NAME} SEMVER=${SEMVER}  HUBS=${env.PLATFORM_DOCKER_REPO}/platform/kagent test/e2e
             """
         }
     }
@@ -358,7 +358,7 @@ pipeline {
             source $HOME/.bash_profile
             export GOPATH=$HOME/workspace/${jobName}
 
-            make GO_VERSION=${env.BASE_GO_VERSION} \
+            make  \
                  MAVEN_DD_URL=${env.MAVEN_DD_URL}  \
                  SEMVER=${SEMVER} TAG=${env.BRANCH_SIMPLE_NAME} \
                  HUBS=${env.PLATFORM_DOCKER_REPO}/platform/kagent \

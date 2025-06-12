@@ -160,7 +160,7 @@ prune-kind-cluster:
 
 .PHONY: build
 build: DOCKER_BUILD_ARGS += --load
-build:  build-controller build-ui build-app
+build: build-controller build-ui build-app
 
 .PHONY: build-cli
 build-cli:
@@ -337,7 +337,7 @@ test/e2e:
 	@echo "Running E2E tests..."
 
 .PHONY: kagent-cli-install
-kagent-cli-install: build-cli-local kind-load-docker-images helm-version
+kagent-cli-install: build build-cli-local kind-load-docker-images helm-version
 kagent-cli-install:
 	KAGENT_HELM_REPO=./helm/ ./go/bin/kagent-local install
 	KAGENT_HELM_REPO=./helm/ ./go/bin/kagent-local dashboard
