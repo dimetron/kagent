@@ -1075,9 +1075,9 @@ test = [
 requires-dist = [
     { name = "alembic", specifier = ">=1.11.0" },
     { name = "anthropic", extras = ["vertex"], specifier = ">=0.49.0" },
-    { name = "autogen-agentchat", specifier = ">=0.6.1" },
-    { name = "autogen-core", specifier = ">=0.6.1" },
-    { name = "autogen-ext", extras = ["anthropic", "azure", "mcp", "ollama", "openai"], specifier = ">=0.6.1" },
+    { name = "autogen-agentchat", specifier = ">=0.5.7" },
+    { name = "autogen-core", specifier = ">=0.5.7" },
+    { name = "autogen-ext", extras = ["anthropic", "azure", "mcp", "ollama", "openai"], specifier = ">=0.5.7" },
     { name = "bs4", specifier = ">=0.0.2" },
     { name = "fastapi", specifier = ">=0.103.1" },
     { name = "google-auth", specifier = ">=2.40.2" },

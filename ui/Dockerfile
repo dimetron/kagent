@@ -15,10 +15,8 @@ ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
 RUN export PKS="curl openssl unzip bash git ca-certificates-bundle nginx supervisor" \
     && export https_proxy=$HTTPS_PROXY  \
-    && apk update   || apk update                \
+    && apk update   || apk update       \
     && apk add $PKS || apk add $PKS
-
-
 
 # Use host machine's npm registry (can be overridden with --build-arg NPM_REGISTRY)
 ENV DO_NOT_TRACK=1
@@ -42,10 +40,13 @@ RUN --mount=type=cache,target=/cache/bun,rw         \
 
 WORKDIR /app/ui
 
-#copy the package.json
-#COPY package*.json .
-#RUN --mount=type=cache,target=/cache/bun,rw             \
-#    bun install
+COPY package*.json .
+RUN --mount=type=cache,target=/cache/bun,rw                                   \
+    echo "Installing dependencies Using npm registry: $HTTPS_PROXY"           \
+    && export no_proxy=localhost,127.0.0.1                                    \
+    && export https_proxy=$HTTPS_PROXY                                        \
+    && echo "registry=$NPM_REGISTRY" > .npmrc                                 \
+    bun install --registry=$NPM_REGISTRY
 
 #copy the rest of the files
 COPY . .
