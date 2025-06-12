@@ -7,13 +7,18 @@ export GIT_LFS_SKIP_SMUDGE=1
 
 ### Build and Test
 
+.PHONY: clean
+clean:
+	rm -rf .venv
+
 .PHONY: update
 update:
-	rm -rf .venv
 	uv venv .venv
 	uv sync --all-extras --all-groups
 	uv pip install hatchling hatch setuptools
 	uv lock
+	uv pip tree
+	uv pip list
 
 .PHONY: format
 format:

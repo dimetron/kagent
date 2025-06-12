@@ -2,7 +2,7 @@
 requires = [
   "hatchling >= 1.27.0",
   "hatch >=1.14.1",
-  "setuptools>=67.0.0"
+  "setuptools>=80.9.0"
 ]
 build-backend = "hatchling.build"
 
@@ -43,7 +43,7 @@ dependencies = [
   "markitdown[all]>=v0.1.1",
   "websockets>=11.0",
   "google-genai>=1.18.0",
-  "google-auth>=2.40.2"
+  "google-auth>=2.40.2",
 ]
 
 [project.optional-dependencies]
