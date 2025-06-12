@@ -92,8 +92,7 @@ ARG HTTPS_PROXY=$HTTPS_PROXY
 
 WORKDIR /app/python
 
-RUN --mount=type=cache,target=/app/python/.build,rw     \
-    echo "Installing Python $TOOLS_PYTHON_VERSION..."   \
+RUN echo "Installing Python $TOOLS_PYTHON_VERSION..."   \
     && export https_proxy=${HTTPS_PROXY}                \
     && uv venv                                          \
     && cat .venv/pyvenv.cfg                             \
@@ -112,26 +111,20 @@ COPY --chown=python:pythongroup src src
 COPY --chown=python:pythongroup README.md .
 
 # Install dependencies
-RUN --mount=type=cache,target=/app/python/.build,rw                 \
-    export https_proxy=${HTTPS_PROXY}                               \
-    && uv sync --locked --refresh --all-extras --all-groups         \
-    && uv pip install hatchling hatch setuptools                    \
-    && uv pip tree                                                  \
-    && uv pip list                                                  \
-    && cp -r /app/python/.build /app/python/.cache
+RUN export https_proxy=${HTTPS_PROXY}                               \
+    && uv cache clean                                               \
+    && uv sync --locked --refresh                                   \
+    && uv pip install hatchling hatch setuptools
 
 ENV UV_OFFLINE=1
-ENV UV_CACHE_DIR=/app/python/.cache/uv
 
 # Generate configs
-RUN --mount=type=cache,target=/app/python/.build,rw                 \
-    export https_proxy=${HTTPS_PROXY}                               \
+RUN export https_proxy=${HTTPS_PROXY}                               \
     && mkdir -p /app/python/.autogenstudio/configs                  \
     && uv run tool_gen -o /app/python/.autogenstudio/configs
 
 # Test if the tool is working and fetch all dependencies
-RUN --mount=type=cache,target=/app/python/.build,rw                 \
-    export https_proxy=$HTTPS_PROXY                                 \
+RUN export https_proxy=$HTTPS_PROXY                                 \
     && uv run kagent-engine --help
 
 #    && uv run kagent-engine prometheus  --help                    \
