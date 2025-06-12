@@ -200,7 +200,6 @@ release-controller: build-controller
 
 .PHONY: build-ui
 build-ui: buildx-create
-	make -C ui build
 	$(DOCKER_BUILDER) build $(DOCKER_BUILD_ARGS) $(TOOLS_IMAGE_BUILD_ARGS) -t $(UI_IMG) -f ui/Dockerfile ./ui
 
 .PHONY: release-ui
@@ -210,7 +209,6 @@ release-ui: build-ui
 
 .PHONY: build-app
 build-app: buildx-create
-	make -C python build
 	$(DOCKER_BUILDER) build $(DOCKER_BUILD_ARGS) $(TOOLS_IMAGE_BUILD_ARGS) -t $(APP_IMG) -f python/Dockerfile ./python
 
 .PHONY: release-app
