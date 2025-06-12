@@ -27,22 +27,24 @@ RUN export https_proxy=$HTTPS_PROXY  \
     && apk add python3 uv nodejs npm
 
 ENV GIT_LFS_SKIP_SMUDGE=1
+
 ENV UV_LINK_MODE=copy
-ENV UV_CACHE_DIR=/app/python/.cache/uv
+ENV UV_CACHE_DIR=/app/python/.build/uv
 ENV UV_PROJECT_ENVIRONMENT="/app/python/.venv"
 
 ENV BUN_INSTALL=/usr/local/bun
-ENV BUN_INSTALL_CACHE_DIR=/app/python/.cache/bun
+ENV BUN_INSTALL_CACHE_DIR=/app/python/.build/bun
 
 ENV PATH=$BUN_INSTALL/bin:/app/python/bin/:$PATH
 
-RUN --mount=type=cache,target=/app/python/.cache,rw       \
+RUN --mount=type=cache,target=/app/python/.build,rw       \
     addgroup -g 1001 pythongroup                       && \
     adduser  -u 1001 -G pythongroup -s /bin/bash -D python -h /app/python/  && \
     mkdir    -p /app/python/bin                        && \
-    mkdir    -p /app/python/.venv                      && \
-    mkdir    -p /app/python/.cache/uv                  && \
     mkdir    -p /app/python/downloads                  && \
+    mkdir    -p /app/python/.venv                      && \
+    mkdir    -p /app/python/.build/uv                  && \
+    mkdir    -p /app/python/.build/bun                 && \
     mkdir    -p /app/python/.autogenstudio/configs     && \
     chown    -vR 1001:1001 /app
 
@@ -90,7 +92,7 @@ ARG HTTPS_PROXY=$HTTPS_PROXY
 
 WORKDIR /app/python
 
-RUN --mount=type=cache,target=/app/python/.cache,rw     \
+RUN --mount=type=cache,target=/app/python/.build,rw     \
     echo "Installing Python $TOOLS_PYTHON_VERSION..."   \
     && export https_proxy=${HTTPS_PROXY}                \
     && uv venv                                          \
@@ -110,23 +112,25 @@ COPY --chown=python:pythongroup src src
 COPY --chown=python:pythongroup README.md .
 
 # Install dependencies
-RUN --mount=type=cache,target=/app/python/.cache                    \
+RUN --mount=type=cache,target=/app/python/.build,rw                 \
     export https_proxy=${HTTPS_PROXY}                               \
     && uv sync --locked --refresh --all-extras --all-groups         \
     && uv pip install hatchling hatch setuptools                    \
     && uv pip tree                                                  \
-    && uv pip list
+    && uv pip list                                                  \
+    && cp -r /app/python/.build /app/python/.cache
 
 ENV UV_OFFLINE=1
+ENV UV_CACHE_DIR=/app/python/.cache/uv
 
 # Generate configs
-RUN --mount=type=cache,target=/app/python/.cache                    \
+RUN --mount=type=cache,target=/app/python/.build,rw                 \
     export https_proxy=${HTTPS_PROXY}                               \
     && mkdir -p /app/python/.autogenstudio/configs                  \
     && uv run tool_gen -o /app/python/.autogenstudio/configs
 
 # Test if the tool is working and fetch all dependencies
-RUN --mount=type=cache,target=/app/python/.cache                    \
+RUN --mount=type=cache,target=/app/python/.build,rw                 \
     export https_proxy=$HTTPS_PROXY                                 \
     && uv run kagent-engine --help
 

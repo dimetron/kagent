@@ -62,6 +62,7 @@ TOOLS_ARGO_CD_VERSION ?= 3.0.0
 TOOLS_KUBECTL_VERSION ?= 1.33.4
 
 # build args
+#NPM_REGISTRY ?= "https://registry.npmjs.org/"
 NPM_REGISTRY ?= "http://127.0.0.1:4873"
 
 TOOLS_IMAGE_BUILD_ARGS = --build-arg HTTPS_PROXY=$(PROXY)
@@ -397,3 +398,7 @@ tshark:
 	docker exec -t buildx_buildkit_$(BUILDER_NAME)0 /bin/sh -c "which tshark   || https_proxy=http://192.168.8.1:3128 apk update"
 	docker exec -t buildx_buildkit_$(BUILDER_NAME)0 /bin/sh -c "which tshark   || https_proxy=http://192.168.8.1:3128 apk add tshark"
 	docker exec -t buildx_buildkit_$(BUILDER_NAME)0 /bin/sh -c "tshark -Y 'dns or http' || echo 'tshark not found, please install it manually'"
+
+.PHONY: docker-shell-python
+docker-shell-python:
+	docker run --rm -it --entrypoint busybox $(APP_IMG) sh
