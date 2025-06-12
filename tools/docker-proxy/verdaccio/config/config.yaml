@@ -67,12 +67,13 @@ uplinks:
     maxage: 1440m
     timeout: 10s
     max_fails: 3
-#    url: https://registry.npmjs.org/
-#    http_proxy: http://127.0.0.1:3128
-#    no_proxy: localhost,127.0.0.1
-    url: http://docker-registry-proxy.corp.amdocs.com:8081/repository/npm-external/
+    url: https://registry.npmjs.org/
     http_proxy: http://127.0.0.1:3128
     no_proxy: localhost,127.0.0.1
+    ### internal nexus proxy
+    #url: http://docker-registry-proxy.corp.amdocs.com:8081/repository/npm-external/
+    #http_proxy: http://127.0.0.1:3128
+    #no_proxy: localhost,127.0.0.1
 
 # Learn how to protect your packages
 # https://verdaccio.org/docs/protect-your-dependencies/
