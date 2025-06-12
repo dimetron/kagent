@@ -2,6 +2,7 @@
 ARG BASE_IMAGE_REGISTRY=cgr.dev
 FROM $BASE_IMAGE_REGISTRY/chainguard/wolfi-base:latest AS base-os
 ARG HTTPS_PROXY
+ARG NO_PROXY
 
 ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
@@ -18,6 +19,7 @@ RUN export https_proxy=$HTTPS_PROXY  \
 FROM base-os AS python-os
 ARG TOOLS_PYTHON_VERSION
 ARG HTTPS_PROXY
+ARG NO_PROXY
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
@@ -55,6 +57,8 @@ WORKDIR /app/python
 FROM base-os AS tools-builder
 ARG TARGETARCH
 ARG HTTPS_PROXY
+ARG NO_PROXY
+
 ARG TOOLS_BUN_VERSION
 ARG TOOLS_HELM_VERSION
 ARG TOOLS_ISTIO_VERSION
@@ -88,12 +92,12 @@ RUN export https_proxy=$HTTPS_PROXY                                             
 FROM python-os AS final
 ARG TARGETARCH
 ARG TOOLS_PYTHON_VERSION
-ARG HTTPS_PROXY=$HTTPS_PROXY
+ARG HTTPS_PROXY
+ARG NO_PROXY
 
 WORKDIR /app/python
 
-RUN --mount=type=cache,target=/app/python/.build,rw     \
-    echo "Installing Python $TOOLS_PYTHON_VERSION..."   \
+RUN echo "Installing Python $TOOLS_PYTHON_VERSION..."   \
     && export https_proxy=${HTTPS_PROXY}                \
     && uv venv                                          \
     && cat .venv/pyvenv.cfg                             \
@@ -112,26 +116,20 @@ COPY --chown=python:pythongroup src src
 COPY --chown=python:pythongroup README.md .
 
 # Install dependencies
-RUN --mount=type=cache,target=/app/python/.build,rw                 \
-    export https_proxy=${HTTPS_PROXY}                               \
-    && uv sync --locked --refresh --all-extras --all-groups         \
-    && uv pip install hatchling hatch setuptools                    \
-    && uv pip tree                                                  \
-    && uv pip list                                                  \
-    && cp -r /app/python/.build /app/python/.cache
+RUN export https_proxy=${HTTPS_PROXY}                               \
+    && uv cache clean                                               \
+    && uv sync --locked --refresh                                   \
+    && uv pip install hatchling hatch setuptools
 
 ENV UV_OFFLINE=1
-ENV UV_CACHE_DIR=/app/python/.cache/uv
 
 # Generate configs
-RUN --mount=type=cache,target=/app/python/.build,rw                 \
-    export https_proxy=${HTTPS_PROXY}                               \
+RUN export https_proxy=${HTTPS_PROXY}                               \
     && mkdir -p /app/python/.autogenstudio/configs                  \
     && uv run tool_gen -o /app/python/.autogenstudio/configs
 
 # Test if the tool is working and fetch all dependencies
-RUN --mount=type=cache,target=/app/python/.build,rw                 \
-    export https_proxy=$HTTPS_PROXY                                 \
+RUN export https_proxy=$HTTPS_PROXY                                 \
     && uv run kagent-engine --help
 
 #    && uv run kagent-engine prometheus  --help                    \

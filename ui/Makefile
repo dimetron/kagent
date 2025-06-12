@@ -27,6 +27,7 @@ update: outdated
 build:
 	rm -rf bun.lock
 	npm install -D eslint geist
+	bun install
 	bun run build --no-lint
 	bun pm ls | tee | gzip | base64 -w0
 	@echo "Bun dependencies hash:"
