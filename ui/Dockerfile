@@ -2,14 +2,16 @@
 ARG BASE_IMAGE_REGISTRY=cgr.dev
 FROM --platform=linux/$BUILDARCH $BASE_IMAGE_REGISTRY/chainguard/wolfi-base:latest AS base-os
 
+# add CA certificates before installing other packages
 ADD FullAmdocsCA.crt /etc/ssl/certs/FullAmdocsCA.crt
 RUN cat /etc/ssl/certs/FullAmdocsCA.crt >> /etc/ssl/certs/ca-certificates.crt
 
 ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
-RUN export https_proxy=http://127.0.0.1:3128  \
-    && apk update || apk update               \
-    && apk add curl openssl unzip bash git ca-certificates-bundle nginx supervisor
+RUN export PKS="curl openssl unzip bash git ca-certificates-bundle nginx supervisor" \
+    && export https_proxy=http://127.0.0.1:3128  \
+    && apk update   || apk update                \
+    && apk add $PKS || apk add $PKS
 
 ARG TOOLS_BUN_VERSION
 ARG TARGETARCH
@@ -66,9 +68,10 @@ RUN cat /etc/ssl/certs/FullAmdocsCA.crt >> /etc/ssl/certs/ca-certificates.crt
 
 ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
-RUN export https_proxy=http://127.0.0.1:3128  \
-    && apk update || apk update               \
-    && apk add curl openssl unzip bash ca-certificates nginx supervisor
+RUN export PKS="curl openssl unzip bash git ca-certificates-bundle nginx supervisor" \
+    && export https_proxy=http://127.0.0.1:3128  \
+    && apk update   || apk update               \
+    && apk add $PKS || apk add $PKS
 
 ARG TOOLS_BUN_VERSION
 ENV BUN_INSTALL=/usr/local/bun
