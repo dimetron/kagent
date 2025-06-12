@@ -31,22 +31,21 @@ RUN export https_proxy=$HTTPS_PROXY  \
 ENV GIT_LFS_SKIP_SMUDGE=1
 
 ENV UV_LINK_MODE=copy
-ENV UV_CACHE_DIR=/app/python/.build/uv
+ENV UV_CACHE_DIR=/app/python/.cache/uv
 ENV UV_PROJECT_ENVIRONMENT="/app/python/.venv"
 
 ENV BUN_INSTALL=/usr/local/bun
-ENV BUN_INSTALL_CACHE_DIR=/app/python/.build/bun
+ENV BUN_INSTALL_CACHE_DIR=/app/python/.cache/bun
 
 ENV PATH=$BUN_INSTALL/bin:/app/python/bin/:$PATH
 
-RUN --mount=type=cache,target=/app/python/.build,rw       \
+RUN --mount=type=cache,target=/app/python/.cache,rw       \
     addgroup -g 1001 pythongroup                       && \
     adduser  -u 1001 -G pythongroup -s /bin/bash -D python -h /app/python/  && \
     mkdir    -p /app/python/bin                        && \
     mkdir    -p /app/python/downloads                  && \
-    mkdir    -p /app/python/.venv                      && \
-    mkdir    -p /app/python/.build/uv                  && \
-    mkdir    -p /app/python/.build/bun                 && \
+    mkdir    -p /app/python/.cache/uv                  && \
+    mkdir    -p /app/python/.cache/bun                 && \
     mkdir    -p /app/python/.autogenstudio/configs     && \
     chown    -vR 1001:1001 /app
 
