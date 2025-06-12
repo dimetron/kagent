@@ -397,3 +397,7 @@ tshark:
 	docker exec -t buildx_buildkit_$(BUILDER_NAME)0 /bin/sh -c "which tshark   || https_proxy=http://192.168.8.1:3128 apk update"
 	docker exec -t buildx_buildkit_$(BUILDER_NAME)0 /bin/sh -c "which tshark   || https_proxy=http://192.168.8.1:3128 apk add tshark"
 	docker exec -t buildx_buildkit_$(BUILDER_NAME)0 /bin/sh -c "tshark -Y 'dns or http' || echo 'tshark not found, please install it manually'"
+
+.PHONY: docker-shell-python
+docker-shell-python:
+	docker run --rm -it --entrypoint busybox $(APP_IMG) sh

@@ -110,7 +110,7 @@ COPY --chown=python:pythongroup src src
 COPY --chown=python:pythongroup README.md .
 
 # Install dependencies
-RUN --mount=type=cache,target=/app/python/.cache                    \
+RUN --mount=type=cache,target=/app/python/.cache,rw                 \
     export https_proxy=${HTTPS_PROXY}                               \
     && uv sync --locked --refresh --all-extras --all-groups         \
     && uv pip install hatchling hatch setuptools                    \
@@ -120,13 +120,13 @@ RUN --mount=type=cache,target=/app/python/.cache                    \
 ENV UV_OFFLINE=1
 
 # Generate configs
-RUN --mount=type=cache,target=/app/python/.cache                    \
+RUN --mount=type=cache,target=/app/python/.cache,rw                 \
     export https_proxy=${HTTPS_PROXY}                               \
     && mkdir -p /app/python/.autogenstudio/configs                  \
     && uv run tool_gen -o /app/python/.autogenstudio/configs
 
 # Test if the tool is working and fetch all dependencies
-RUN --mount=type=cache,target=/app/python/.cache                    \
+RUN --mount=type=cache,target=/app/python/.cache,rw                 \
     export https_proxy=$HTTPS_PROXY                                 \
     && uv run kagent-engine --help
 
