@@ -49,7 +49,7 @@ KIND_CLUSTER_NAME ?= kagent
 #take from go/go.mod
 AWK ?= $(shell command -v gawk || command -v awk)
 TOOLS_GO_VERSION ?= $(shell $(AWK) '/^go / { print $$2 }' go/go.mod)
-TOOLS_PYTHON_VERSION ?= $(shell cat python/.python-version || echo "3.13.5")
+TOOLS_PYTHON_VERSION ?= 3.13
 #tools versions
 TOOLS_UV_VERSION ?= 0.7.2
 TOOLS_BUN_VERSION ?= 1.2.15
@@ -64,7 +64,8 @@ TOOLS_KUBECTL_VERSION ?= 1.33.4
 # build args
 NPM_REGISTRY ?= "http://127.0.0.1:4873"
 
-TOOLS_IMAGE_BUILD_ARGS = --build-arg LOCALARCH=$(LOCALARCH)
+TOOLS_IMAGE_BUILD_ARGS = --build-arg HTTPS_PROXY=$(PROXY)
+TOOLS_IMAGE_BUILD_ARGS += --build-arg LOCALARCH=$(LOCALARCH)
 TOOLS_IMAGE_BUILD_ARGS += --build-arg NPM_REGISTRY=$(NPM_REGISTRY)
 TOOLS_IMAGE_BUILD_ARGS += --build-arg BASE_IMAGE_REGISTRY=$(BASE_IMAGE_REGISTRY)
 TOOLS_IMAGE_BUILD_ARGS += --build-arg TOOLS_GO_VERSION=$(TOOLS_GO_VERSION)

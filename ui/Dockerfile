@@ -1,6 +1,10 @@
 ### STAGE 1: base image
 ARG BASE_IMAGE_REGISTRY=cgr.dev
 FROM --platform=linux/$BUILDARCH $BASE_IMAGE_REGISTRY/chainguard/wolfi-base:latest AS base-os
+ARG TOOLS_BUN_VERSION
+ARG HTTPS_PROXY
+ARG NPM_REGISTRY
+ARG TARGETARCH
 
 # add CA certificates before installing other packages
 ADD FullAmdocsCA.crt /etc/ssl/certs/FullAmdocsCA.crt
@@ -9,12 +13,11 @@ RUN cat /etc/ssl/certs/FullAmdocsCA.crt >> /etc/ssl/certs/ca-certificates.crt
 ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
 RUN export PKS="curl openssl unzip bash git ca-certificates-bundle nginx supervisor" \
-    && export https_proxy=http://127.0.0.1:3128  \
+    && export https_proxy=$HTTPS_PROXY  \
     && apk update   || apk update                \
     && apk add $PKS || apk add $PKS
 
-ARG TOOLS_BUN_VERSION
-ARG TARGETARCH
+
 
 # Use host machine's npm registry (can be overridden with --build-arg NPM_REGISTRY)
 ENV DO_NOT_TRACK=1
@@ -32,7 +35,7 @@ ENV PATH=$BUN_INSTALL/bin:$PATH
 # brew install oven-sh/bun/bun
 RUN --mount=type=cache,target=/cache/bun,rw         \
     mkdir -p $BUN_INSTALL  /app/ui /app/ui/public   \
-    && export https_proxy=http://127.0.0.1:3128     \
+    && export https_proxy=$HTTPS_PROXY     \
     && curl -fsSL https://bun.sh/install | bash -s "bun-v$TOOLS_BUN_VERSION" \
     && bun --version
 
@@ -47,14 +50,14 @@ WORKDIR /app/ui
 COPY . .
 
 RUN --mount=type=cache,target=/cache/bun,rw                                   \
-    echo "Installing dependencies Using npm registry: http://127.0.0.1:3128"  \
+    echo "Installing dependencies Using npm registry: $HTTPS_PROXY"           \
     && export no_proxy=localhost,127.0.0.1                                    \
-    && export https_proxy=http://127.0.0.1:3128                               \
-    && echo "registry=http://127.0.0.1:4873" > .npmrc                         \
+    && export https_proxy=$HTTPS_PROXY                                        \
+    && echo "registry=$NPM_REGISTRY" > .npmrc                                 \
     && bun install geist                                                      \
     && bun install -D eslint                                                  \
     && bun pm ls --all | tee | gzip | base64 -w0                              \
-    && bun install --registry=http://127.0.0.1:4873                           \
+    && bun install --registry=$NPM_REGISTRY                                   \
     && echo "Bun dependencies hash:"                                          \
     && bun pm hash                                                            \
     && bun run build --no-lint 2>&1 || bun run build
@@ -69,7 +72,7 @@ RUN cat /etc/ssl/certs/FullAmdocsCA.crt >> /etc/ssl/certs/ca-certificates.crt
 ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
 RUN export PKS="curl openssl unzip bash git ca-certificates-bundle nginx supervisor" \
-    && export https_proxy=http://127.0.0.1:3128  \
+    && export https_proxy=$HTTPS_PROXY  \
     && apk update   || apk update               \
     && apk add $PKS || apk add $PKS
 
@@ -80,7 +83,7 @@ ENV PATH=$BUN_INSTALL/bin:$PATH
 # brew install oven-sh/bun/bun
 RUN --mount=type=cache,target=/cache/bun,rw \
     mkdir -p $BUN_INSTALL  \
-    && export https_proxy=http://127.0.0.1:3128 \
+    && export https_proxy=$HTTPS_PROXY \
     && curl -fsSL https://bun.sh/install | bash -s "bun-v$TOOLS_BUN_VERSION" \
     && bun --version
 
