@@ -10,7 +10,7 @@ LOCALARCH ?= $(shell uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/')
 
 # Proxy settings
 PROXY ?= http://127.0.0.1:3128
-NOPROXY ?= "127.0.0.1,localhost,.svc.cluster.local svc.cluster.local cluster.local,genproxy,*.corp.amdocs.com,*.corp.amdocs.aws,*.corp.amdocs.azr"
+NOPROXY ?= "127.0.0.1,localhost,.svc.cluster.local svc.cluster.local cluster.local,genproxy,chat.autox.corp.amdocs.azr,*.corp.amdocs.com,*.corp.amdocs.aws,*.corp.amdocs.azr,100.72.198.10"
 
 export https_proxy=$(PROXY)
 export no_proxy=$(NOPROXY)
