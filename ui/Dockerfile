@@ -50,14 +50,14 @@ WORKDIR /app/ui
 COPY . .
 
 RUN --mount=type=cache,target=/cache/bun,rw                                   \
-    echo "Installing dependencies Using npm registry: $HTTPS_PROXY"  \
+    echo "Installing dependencies Using npm registry: $HTTPS_PROXY"           \
     && export no_proxy=localhost,127.0.0.1                                    \
-    && export https_proxy=$HTTPS_PROXY                               \
-    && echo "registry=$NPM_REGISTRY" > .npmrc                         \
+    && export https_proxy=$HTTPS_PROXY                                        \
+    && echo "registry=$NPM_REGISTRY" > .npmrc                                 \
     && bun install geist                                                      \
     && bun install -D eslint                                                  \
     && bun pm ls --all | tee | gzip | base64 -w0                              \
-    && bun install --registry=$NPM_REGISTRY                           \
+    && bun install --registry=$NPM_REGISTRY                                   \
     && echo "Bun dependencies hash:"                                          \
     && bun pm hash                                                            \
     && bun run build --no-lint 2>&1 || bun run build
