@@ -25,9 +25,8 @@ update: outdated
 
 .PHONY: build
 build:
-	#npm install -D npm node eslint
-	npm install geist
 	rm -rf bun.lock
+	npm install -D eslint geist
 	bun run build --no-lint
 	bun pm ls | tee | gzip | base64 -w0
 	@echo "Bun dependencies hash:"

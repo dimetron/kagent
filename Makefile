@@ -62,7 +62,8 @@ TOOLS_ARGO_CD_VERSION ?= 3.0.0
 TOOLS_KUBECTL_VERSION ?= 1.33.4
 
 # build args
-NPM_REGISTRY ?= "https://registry.npmjs.org/"
+#NPM_REGISTRY ?= "https://registry.npmjs.org/"
+NPM_REGISTRY ?= "http://127.0.0.1:4873"
 
 TOOLS_IMAGE_BUILD_ARGS = --build-arg HTTPS_PROXY=$(PROXY)
 TOOLS_IMAGE_BUILD_ARGS += --build-arg LOCALARCH=$(LOCALARCH)
