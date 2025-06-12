@@ -32,12 +32,20 @@ ENV BUN_INSTALL=/usr/local/bun
 ENV BUN_INSTALL_CACHE_DIR=/app/python/.cache
 ENV PATH=$BUN_INSTALL/bin:/app/python/bin/:$PATH
 
-RUN addgroup -g 1001 pythongroup      && \
-    adduser  -u 1001 -G pythongroup -s /bin/bash -D python -h /app/python/ && \
-    chown -vR python:pythongroup /app
+RUN --mount=type=cache,target=/app/python/.cache,rw       \
+    addgroup -g 1001 pythongroup                       && \
+    adduser  -u 1001 -G pythongroup -s /bin/bash -D python -h /app/python/  && \
+    mkdir    -p /app/python/bin                        && \
+    mkdir    -p /app/python/.cache/uv                  && \
+    mkdir    -p /app/python/downloads                  && \
+    mkdir    -p /app/python/.autogenstudio/configs     && \
+    chown    -vR 1001:1001 /app
+
+USER python
+WORKDIR /app/python
 
 ### STAGE 3: tools
-FROM python-os AS python-builder
+FROM base-os AS tools-builder
 ARG TARGETARCH
 
 ARG TOOLS_BUN_VERSION
@@ -45,7 +53,6 @@ ARG TOOLS_HELM_VERSION
 ARG TOOLS_ISTIO_VERSION
 ARG TOOLS_ARGO_CD_VERSION
 
-USER python
 WORKDIR /app/python/downloads
 
 RUN mkdir -p /app/python/downloads /app/python/bin/
@@ -75,7 +82,6 @@ FROM python-os AS final
 ARG TARGETARCH
 ARG TOOLS_PYTHON_VERSION=3.12
 
-USER python
 WORKDIR /app/python
 
 RUN --mount=type=cache,target=/app/python/.cache,rw     \
@@ -86,10 +92,10 @@ RUN --mount=type=cache,target=/app/python/.cache,rw     \
     && uv cache dir                                     \
     && uv version
 
-COPY --from=python-builder --chown=python:pythongroup /app/python/downloads/kubectl               /app/python/bin/kubectl
-COPY --from=python-builder --chown=python:pythongroup /app/python/downloads/istioctl              /app/python/bin/istioctl
-COPY --from=python-builder --chown=python:pythongroup /app/python/downloads/helm                  /app/python/bin/helm
-COPY --from=python-builder --chown=python:pythongroup /app/python/downloads/kubectl-argo-rollouts /app/python/bin/kubectl-argo-rollouts
+COPY --from=tools-builder --chown=python:pythongroup /app/python/downloads/kubectl               /app/python/bin/kubectl
+COPY --from=tools-builder --chown=python:pythongroup /app/python/downloads/istioctl              /app/python/bin/istioctl
+COPY --from=tools-builder --chown=python:pythongroup /app/python/downloads/helm                  /app/python/bin/helm
+COPY --from=tools-builder --chown=python:pythongroup /app/python/downloads/kubectl-argo-rollouts /app/python/bin/kubectl-argo-rollouts
 
 COPY --chown=python:pythongroup pyproject.toml  .
 COPY --chown=python:pythongroup .python-version .
