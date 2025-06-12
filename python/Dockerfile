@@ -15,8 +15,8 @@ RUN export https_proxy=http://127.0.0.1:3128  \
 
 ### STAGE 2: python
 FROM base-os AS python-os
+ARG TOOLS_PYTHON_VERSION
 
-ARG TOOLS_PYTHON_VERSION=3.12
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
@@ -36,6 +36,7 @@ RUN --mount=type=cache,target=/app/python/.cache,rw       \
     addgroup -g 1001 pythongroup                       && \
     adduser  -u 1001 -G pythongroup -s /bin/bash -D python -h /app/python/  && \
     mkdir    -p /app/python/bin                        && \
+    mkdir    -p /app/python/.venv                      && \
     mkdir    -p /app/python/.cache/uv                  && \
     mkdir    -p /app/python/downloads                  && \
     mkdir    -p /app/python/.autogenstudio/configs     && \
@@ -80,7 +81,7 @@ RUN export https_proxy=http://127.0.0.1:3128                                    
 ### STAGE 4: final
 FROM python-os AS final
 ARG TARGETARCH
-ARG TOOLS_PYTHON_VERSION=3.12
+ARG TOOLS_PYTHON_VERSION
 
 WORKDIR /app/python
 
@@ -88,7 +89,9 @@ RUN --mount=type=cache,target=/app/python/.cache,rw     \
     echo "Installing Python $TOOLS_PYTHON_VERSION..."   \
     && export https_proxy=http://127.0.0.1:3128         \
     && uv venv .venv                                    \
+    && cat .venv/pyvenv.cfg                             \
     && uv python install $TOOLS_PYTHON_VERSION          \
+    && uv pip install hatchling hatch setuptools        \
     && uv cache dir                                     \
     && uv version
 
@@ -117,7 +120,6 @@ RUN --mount=type=cache,target=/app/python/.cache                  \
 # Test if the tool is working and fetch all dependencies
 RUN --mount=type=cache,target=/app/python/.cache                  \
     export https_proxy=http://127.0.0.1:3128                      \
-    && uv pip install hatchling hatch setuptools                  \
     && uv run kagent-engine serve       --help
 
 #    && uv run kagent-engine prometheus  --help                    \
@@ -150,4 +152,4 @@ LABEL org.opencontainers.image.source=https://github.com/kagent-dev/kagent
 LABEL org.opencontainers.image.description="Kagent app is the apiserver for running agents."
 LABEL org.opencontainers.image.authors="Kagent Creators 🤖"
 
-CMD ["uv", "run", "kagent-engine", "serve", "--host", "0.0.0.0", "--port", "8081", "--appdir" , "/app/python/.autogenstudio"]
+CMD ["uv", "run", "kagent-engine", "serve", "--host", "0.0.0.0", "--port", "8081"]
