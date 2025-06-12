@@ -28,10 +28,12 @@ RUN export https_proxy=$HTTPS_PROXY  \
 
 ENV GIT_LFS_SKIP_SMUDGE=1
 ENV UV_LINK_MODE=copy
+ENV UV_CACHE_DIR=/app/python/.cache/uv
 ENV UV_PROJECT_ENVIRONMENT="/app/python/.venv"
 
 ENV BUN_INSTALL=/usr/local/bun
-ENV BUN_INSTALL_CACHE_DIR=/app/python/.cache
+ENV BUN_INSTALL_CACHE_DIR=/app/python/.cache/bun
+
 ENV PATH=$BUN_INSTALL/bin:/app/python/bin/:$PATH
 
 RUN --mount=type=cache,target=/app/python/.cache,rw       \
@@ -91,7 +93,7 @@ WORKDIR /app/python
 RUN --mount=type=cache,target=/app/python/.cache,rw     \
     echo "Installing Python $TOOLS_PYTHON_VERSION..."   \
     && export https_proxy=${HTTPS_PROXY}                \
-    && uv venv .venv                                    \
+    && uv venv                                          \
     && cat .venv/pyvenv.cfg                             \
     && uv cache dir                                     \
     && uv version
@@ -108,20 +110,24 @@ COPY --chown=python:pythongroup src src
 COPY --chown=python:pythongroup README.md .
 
 # Install dependencies
-RUN --mount=type=cache,target=/app/python/.cache                      \
-    export https_proxy=${HTTPS_PROXY}                                 \
-    && uv sync --locked --refresh                                     \
-    && uv pip install   --refresh-package  hatchling hatch setuptools
+RUN --mount=type=cache,target=/app/python/.cache                    \
+    export https_proxy=${HTTPS_PROXY}                               \
+    && uv sync --locked --refresh --all-extras --all-groups         \
+    && uv pip install hatchling hatch setuptools                    \
+    && uv pip tree                                                  \
+    && uv pip list
+
+ENV UV_OFFLINE=1
 
 # Generate configs
-RUN --mount=type=cache,target=/app/python/.cache                  \
-    export https_proxy=${HTTPS_PROXY}                             \
-    && mkdir -p /app/python/.autogenstudio/configs                \
+RUN --mount=type=cache,target=/app/python/.cache                    \
+    export https_proxy=${HTTPS_PROXY}                               \
+    && mkdir -p /app/python/.autogenstudio/configs                  \
     && uv run tool_gen -o /app/python/.autogenstudio/configs
 
 # Test if the tool is working and fetch all dependencies
-RUN --mount=type=cache,target=/app/python/.cache                  \
-    export https_proxy=$HTTPS_PROXY                      \
+RUN --mount=type=cache,target=/app/python/.cache                    \
+    export https_proxy=$HTTPS_PROXY                                 \
     && uv run kagent-engine --help
 
 #    && uv run kagent-engine prometheus  --help                    \
@@ -139,8 +145,6 @@ RUN --mount=type=cache,target=/app/python/.cache                  \
 #RUN mv /app/python/.kubescape/bin/kubescape bin/kubescape  \
 #    && kubescape download artifacts || :                   \
 #    && echo -e "\033[0m"
-
-ENV UV_OFFLINE=1
 
 #set custom certificates
 ENV CERT_PATH='/app/python/amdcerts.pem'
