@@ -140,7 +140,7 @@ buildx-create:
 .PHONY: create-kind-cluster
 create-kind-cluster:
 	docker pull $(BASE_IMAGE_REGISTRY)/kindest/node:v1.32.5 || true
-	kind create cluster --name $(KIND_CLUSTER_NAME) --image $(BASE_IMAGE_REGISTRY)/kindest/node:v1.32.5
+	kind get nodes --name $(KIND_CLUSTER_NAME)  || kind create cluster --name $(KIND_CLUSTER_NAME) --image $(BASE_IMAGE_REGISTRY)/kindest/node:v1.32.5
 
 .PHONY: use-kind-cluster
 use-kind-cluster:
