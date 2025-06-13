@@ -73,10 +73,10 @@ RUN --mount=type=cache,target=/cache/bun,rw                                   \
 RUN --mount=type=cache,target=/cache/bun,rw                                   \
     --mount=type=cache,target=/app/ui/.next/cache                             \
     --mount=type=cache,target=/app/ui/.node_modules                           \
-    echo -e "Building: $LOCALARCH -> $TARGETARCH : started"                   \
+    echo -e "Building: $LOCALARCH -> $TARGETARCH : started $PROXY_HTTP"        \
     && export no_proxy=$NO_PROXY                                              \
-    && export http_proxy=$PROXY_HTTP                                          \
     && export https_proxy=$PROXY_HTTP                                         \
+    && export GLOBAL_AGENT_HTTPS_PROXY=$PROXY_HTTP                            \
     && export NEXT_TELEMETRY_DEBUG=1                                          \
     && bun run build --no-lint                                                \
     && echo "Building: $LOCALARCH -> $TARGETARCH : completed"
