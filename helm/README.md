@@ -66,6 +66,7 @@ make kagent-cli-install
 #faster build using local proxy
 export KAGENT_DEFAULT_MODEL_PROVIDER=azureOpenAI
 export KAGENT_HELM_REPO=./helm/
+make PROXY=http://127.0.0.1:3128 NPM_REGISTRY="http://127.0.0.1:4873" clean build
 make PROXY=http://127.0.0.1:3128 NPM_REGISTRY="http://127.0.0.1:4873" kagent-cli-install
 ```
 

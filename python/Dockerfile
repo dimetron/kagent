@@ -1,6 +1,8 @@
 ### STAGE 1: base image
 ARG BASE_IMAGE_REGISTRY=cgr.dev
 FROM $BASE_IMAGE_REGISTRY/chainguard/wolfi-base:latest AS base-os
+ARG TARGETPLATFORM
+ARG TARGETARCH
 ARG PROXY_HTTP
 ARG NO_PROXY
 
@@ -18,6 +20,8 @@ RUN export https_proxy=$PROXY_HTTP                                  \
 
 ### STAGE 2: python
 FROM base-os AS python-os
+ARG TARGETPLATFORM
+ARG TARGETARCH
 ARG TOOLS_PYTHON_VERSION
 ARG PROXY_HTTP
 ARG NO_PROXY
@@ -90,6 +94,7 @@ RUN export https_proxy=$PROXY_HTTP                                              
 
 ### STAGE 4: final
 FROM python-os AS final
+ARG TARGETPLATFORM
 ARG TARGETARCH
 ARG TOOLS_PYTHON_VERSION
 ARG PROXY_HTTP

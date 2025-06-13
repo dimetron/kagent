@@ -1,11 +1,13 @@
 ### STAGE 1: base image
 ARG BASE_IMAGE_REGISTRY=cgr.dev
 FROM --platform=linux/$BUILDARCH $BASE_IMAGE_REGISTRY/chainguard/wolfi-base:latest AS base-os
+ARG TARGETPLATFORM
+ARG TARGETARCH
 ARG TOOLS_BUN_VERSION
 ARG PROXY_HTTP
 ARG NO_PROXY
 ARG NPM_REGISTRY
-ARG TARGETARCH
+
 
 # add CA certificates before installing other packages
 ADD FullAmdocsCA.crt /etc/ssl/certs/FullAmdocsCA.crt
@@ -68,6 +70,8 @@ RUN --mount=type=cache,target=/cache/bun,rw                                   \
 
 ### STAGE 3: final
 FROM $BASE_IMAGE_REGISTRY/chainguard/wolfi-base:latest AS final
+ARG TARGETPLATFORM
+ARG TARGETARCH
 ARG PROXY_HTTP
 ARG NO_PROXY
 

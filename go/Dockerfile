@@ -7,7 +7,6 @@ ARG TARGETPLATFORM
 ARG TARGETARCH
 ARG LOCALARCH
 ARG BUILDARCH
-ARG TARGETOS
 
 ENV GO111MODULE=on
 ENV GOTOOLCHAIN=local
@@ -35,12 +34,15 @@ COPY controller controller
 # by leaving it empty we can ensure that the container and binary shipped on it will have the same platform.
 RUN --mount=type=cache,target=/root/go/pkg/mod,rw         \
     --mount=type=cache,target=/root/.cache/go-build,rw    \
-    echo "Building for GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} on ${LOCALARCH}..." && \
-    CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o manager controller/cmd/main.go
+    echo "Building for GOOS=linux GOARCH=${TARGETARCH} on ${LOCALARCH}..." && \
+    CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build -a -o manager controller/cmd/main.go
 
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
 FROM $BASE_IMAGE_REGISTRY/distroless/static:nonroot
+ARG TARGETPLATFORM
+ARG TARGETARCH
+
 WORKDIR /
 COPY --from=builder /workspace/manager .
 USER 65532:65532

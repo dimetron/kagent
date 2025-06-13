@@ -384,7 +384,7 @@ proxy-start:
 	&& docker compose pull	\
 	&& docker compose down 	\
 	&& docker compose up -d	\
-	&& sleep 5
+	&& sleep 7
 
 proxy-stop:
 	@echo "Stoping up proxy..."
