@@ -165,7 +165,7 @@ update-lock-files:
 	make -C python build
 
 .PHONY: build
-build: DOCKER_BUILD_ARGS += --load
+build: DOCKER_BUILD_ARGS += --load --platform linux/$(LOCALARCH)
 build: build-controller build-ui build-app
 
 #use make proxy-log to see proxy logs
