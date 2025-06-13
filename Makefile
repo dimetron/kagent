@@ -10,7 +10,7 @@ LOCALARCH ?= $(shell uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/')
 
 # Proxy settings
 PROXY ?= http://127.0.0.1:3128
-NOPROXY ?= "127.0.0.1,localhost,.svc.cluster.local svc.cluster.local cluster.local,genproxy,chat.autox.corp.amdocs.azr,*.corp.amdocs.com,*.corp.amdocs.aws,*.corp.amdocs.azr,100.72.198.10"
+NOPROXY ?= "127.0.0.1,localhost,.sock,.internal,.local,.svc.cluster.local,svc.cluster.local,cluster.local,genproxy,chat.autox.corp.amdocs.azr,*.corp.amdocs.com,*.corp.amdocs.aws,*.corp.amdocs.azr,100.72.198.10,10.234.177.68,10.232.233.70,10.42.0.0/16,172.17.0.0/16"
 
 export https_proxy=$(PROXY)
 export no_proxy=$(NOPROXY)
@@ -337,6 +337,7 @@ test/e2e:
 .PHONY: kagent-cli-install
 kagent-cli-install: build build-cli-local kind-load-docker-images helm-version
 kagent-cli-install:
+	ps -ef | grep port-forward | grep -v grep | awk '{print $2}' | xargs kill -9 || true
 	KAGENT_HELM_REPO=./helm/ ./go/bin/kagent-local install
 	KAGENT_HELM_REPO=./helm/ ./go/bin/kagent-local dashboard
 
