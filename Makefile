@@ -165,7 +165,7 @@ update-lock-files:
 
 .PHONY: build
 build: DOCKER_BUILD_ARGS += --load
-build: update-lock-files build-controller build-ui build-app
+build: build-controller build-ui build-app
 
 .PHONY: build-cli
 build-cli:

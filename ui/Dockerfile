@@ -14,7 +14,7 @@ RUN cat /etc/ssl/certs/FullAmdocsCA.crt >> /etc/ssl/certs/ca-certificates.crt
 ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
 RUN export PKS="curl openssl unzip bash git ca-certificates-bundle nginx supervisor" \
-    && export HTTPS_PROXY=$PROXY_HTTP  \
+    && export https_proxy=$PROXY_HTTP   \
     && apk update   || apk update       \
     && apk add $PKS || apk add $PKS
 
@@ -34,7 +34,7 @@ ENV PATH=$BUN_INSTALL/bin:$PATH
 # brew install oven-sh/bun/bun
 RUN --mount=type=cache,target=/cache/bun,rw         \
     mkdir -p $BUN_INSTALL  /app/ui /app/ui/public   \
-    && export HTTPS_PROXY=$PROXY_HTTP     \
+    && export https_proxy=$PROXY_HTTP     \
     && curl -fsSL https://bun.sh/install | bash -s "bun-v$TOOLS_BUN_VERSION" \
     && bun --version
 
@@ -43,7 +43,7 @@ WORKDIR /app/ui
 COPY package*.json .
 RUN --mount=type=cache,target=/cache/bun,rw                                   \
     echo "Installing dependencies Using npm registry: $NPM_REGISTRY"           \
-    && export HTTPS_PROXY=$PROXY_HTTP                                        \
+    && export https_proxy=$PROXY_HTTP                                        \
     && export no_proxy=localhost,127.0.0.1                                    \
     && echo "registry=$NPM_REGISTRY" > .npmrc                                 \
     bun install --registry=$NPM_REGISTRY
@@ -54,7 +54,7 @@ COPY . .
 RUN --mount=type=cache,target=/cache/bun,rw                                   \
     echo "Installing dependencies Using npm registry: $PROXY_HTTP"           \
     && export no_proxy=localhost,127.0.0.1                                    \
-    && export HTTPS_PROXY=$PROXY_HTTP                                        \
+    && export https_proxy=$PROXY_HTTP                                        \
     && echo "registry=$NPM_REGISTRY" > .npmrc                                 \
     && bun install geist                                                      \
     && bun install -D eslint                                                  \
@@ -66,6 +66,8 @@ RUN --mount=type=cache,target=/cache/bun,rw                                   \
 
 ### STAGE 3: final
 FROM $BASE_IMAGE_REGISTRY/chainguard/wolfi-base:latest AS final
+ARG PROXY_HTTP
+ARG NO_PROXY
 
 # add CA certificates before installing other packages
 ADD FullAmdocsCA.crt /etc/ssl/certs/FullAmdocsCA.crt
@@ -74,7 +76,7 @@ RUN cat /etc/ssl/certs/FullAmdocsCA.crt >> /etc/ssl/certs/ca-certificates.crt
 ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
 RUN export PKS="curl openssl unzip bash git ca-certificates-bundle nginx supervisor" \
-    && export HTTPS_PROXY=$PROXY_HTTP  \
+    && export https_proxy=$PROXY_HTTP  \
     && apk update   || apk update               \
     && apk add $PKS || apk add $PKS
 
@@ -85,7 +87,7 @@ ENV PATH=$BUN_INSTALL/bin:$PATH
 # brew install oven-sh/bun/bun
 RUN --mount=type=cache,target=/cache/bun,rw \
     mkdir -p $BUN_INSTALL  \
-    && export HTTPS_PROXY=$PROXY_HTTP \
+    && export https_proxy=$PROXY_HTTP \
     && curl -fsSL https://bun.sh/install | bash -s "bun-v$TOOLS_BUN_VERSION" \
     && bun --version
 
