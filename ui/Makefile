@@ -25,11 +25,9 @@ update: outdated
 
 .PHONY: build
 build:
-	rm -rf bun.lock
-	npm install -D eslint geist
 	bun install
 	bun run build --no-lint
-	bun pm ls | tee | gzip | base64 -w0
+	bun pm ls --all
 	@echo "Bun dependencies hash:"
 	bun pm hash
 

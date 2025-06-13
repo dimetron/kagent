@@ -52,17 +52,19 @@ RUN --mount=type=cache,target=/cache/bun,rw                                   \
 COPY . .
 
 RUN --mount=type=cache,target=/cache/bun,rw                                   \
+    --mount=type=cache,target=/app/ui/.next/cache                             \
+    --mount=type=cache,target=/app/ui/.node_modules                           \
     echo "Installing dependencies Using npm registry: $PROXY_HTTP"            \
     && export no_proxy=localhost,127.0.0.1                                    \
+    && export http_proxy=$PROXY_HTTP                                          \
     && export https_proxy=$PROXY_HTTP                                         \
     && echo "registry=$NPM_REGISTRY" > .npmrc                                 \
-    && bun install geist                                                      \
-    && bun install -D eslint                                                  \
-    && bun pm ls --all | tee | gzip | base64 -w0                              \
+    && bun pm ls --all                                                        \
     && bun install --registry=$NPM_REGISTRY                                   \
     && echo "Bun dependencies hash:"                                          \
     && bun pm hash                                                            \
-    && bun run build --no-lint 2>&1 || bun run build
+    && bun run build --no-lint 2>&1 || bun run build                          \
+    && echo "Bun build completed"
 
 ### STAGE 3: final
 FROM $BASE_IMAGE_REGISTRY/chainguard/wolfi-base:latest AS final
