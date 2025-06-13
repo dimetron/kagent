@@ -1,7 +1,7 @@
 ### STAGE 1: base image
 ARG BASE_IMAGE_REGISTRY=cgr.dev
 FROM $BASE_IMAGE_REGISTRY/chainguard/wolfi-base:latest AS base-os
-ARG HTTPS_PROXY
+ARG PROXY_HTTP
 ARG NO_PROXY
 
 ENV LANG=C.UTF-8
@@ -11,20 +11,20 @@ ENV LC_ALL=C.UTF-8
 ADD FullAmdocsCA.crt /etc/ssl/certs/FullAmdocsCA.crt
 RUN cat /etc/ssl/certs/FullAmdocsCA.crt >> /etc/ssl/certs/ca-certificates.crt
 
-RUN export https_proxy=$HTTPS_PROXY  \
+RUN export https_proxy=$PROXY_HTTP  \
     && apk update || apk update               \
     && apk add curl openssl unzip bash git ca-certificates jq
 
 ### STAGE 2: python
 FROM base-os AS python-os
 ARG TOOLS_PYTHON_VERSION
-ARG HTTPS_PROXY
+ARG PROXY_HTTP
 ARG NO_PROXY
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-RUN export https_proxy=$HTTPS_PROXY  \
+RUN export https_proxy=$PROXY_HTTP  \
     && apk update || apk update               \
     && apk add python3 uv nodejs npm
 
@@ -55,7 +55,7 @@ WORKDIR /app/python
 ### STAGE 3: tools
 FROM base-os AS tools-builder
 ARG TARGETARCH
-ARG HTTPS_PROXY
+ARG PROXY_HTTP
 ARG NO_PROXY
 
 ARG TOOLS_BUN_VERSION
@@ -67,21 +67,21 @@ WORKDIR /app/python/downloads
 
 RUN mkdir -p /app/python/downloads /app/python/bin/
 
-RUN export https_proxy=$HTTPS_PROXY   \
+RUN export https_proxy=$PROXY_HTTP   \
     && curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/$TARGETARCH/kubectl" \
     && chmod +x kubectl
 
-RUN export https_proxy=$HTTPS_PROXY   \
+RUN export https_proxy=$PROXY_HTTP   \
     && curl -Lo /app/python/downloads/kubectl-argo-rollouts -L https://github.com/argoproj/argo-rollouts/releases/$TOOLS_ARGO_CD_VERSION/download/kubectl-argo-rollouts-linux-$TARGETARCH \
     && chmod +x /app/python/downloads/kubectl-argo-rollouts
 
-RUN export https_proxy=$HTTPS_PROXY                                                                    \
+RUN export https_proxy=$PROXY_HTTP                                                                    \
     && curl -L https://istio.io/downloadIstio | ISTIO_VERSION=$TOOLS_ISTIO_VERSION TARGET_ARCH=$TARGETARCH sh - \
     && mv istio-*/bin/istioctl /app/python/downloads/                                                           \
     && rm -rf istio-*
 
 # Install Helm
-RUN export https_proxy=$HTTPS_PROXY                                                            \
+RUN export https_proxy=$PROXY_HTTP                                                            \
     && curl -Lo helm.tar.gz https://get.helm.sh/helm-v${TOOLS_HELM_VERSION}-linux-${TARGETARCH}.tar.gz  \
     && tar -xvf helm.tar.gz                                                                             \
     && mv linux-${TARGETARCH}/helm /app/python/downloads/helm                                           \
@@ -91,13 +91,13 @@ RUN export https_proxy=$HTTPS_PROXY                                             
 FROM python-os AS final
 ARG TARGETARCH
 ARG TOOLS_PYTHON_VERSION
-ARG HTTPS_PROXY
+ARG PROXY_HTTP
 ARG NO_PROXY
 
 WORKDIR /app/python
 
 RUN echo "Installing Python $TOOLS_PYTHON_VERSION..."   \
-    && export https_proxy=${HTTPS_PROXY}                \
+    && export https_proxy=${PROXY_HTTP}                \
     && uv venv                                          \
     && cat .venv/pyvenv.cfg                             \
     && uv cache dir                                     \
@@ -115,7 +115,7 @@ COPY --chown=python:pythongroup src src
 COPY --chown=python:pythongroup README.md .
 
 # Install dependencies
-RUN export https_proxy=${HTTPS_PROXY}                               \
+RUN export https_proxy=${PROXY_HTTP}                               \
     && uv cache clean                                               \
     && uv sync --locked --refresh                                   \
     && uv pip install hatchling hatch setuptools
@@ -123,12 +123,12 @@ RUN export https_proxy=${HTTPS_PROXY}                               \
 ENV UV_OFFLINE=1
 
 # Generate configs
-RUN export https_proxy=${HTTPS_PROXY}                               \
+RUN export https_proxy=${PROXY_HTTP}                               \
     && mkdir -p /app/python/.autogenstudio/configs                  \
     && uv run tool_gen -o /app/python/.autogenstudio/configs
 
 # Test if the tool is working and fetch all dependencies
-RUN export https_proxy=$HTTPS_PROXY                                 \
+RUN export https_proxy=$PROXY_HTTP                                 \
     && uv run kagent-engine --help
 
 #    && uv run kagent-engine prometheus  --help                    \
@@ -138,7 +138,7 @@ RUN export https_proxy=$HTTPS_PROXY                                 \
 #    && uv run kagent-engine helm        --help
 
 # Install Kubescape
-#RUN export https_proxy=$HTTPS_PROXY                                                            \
+#RUN export https_proxy=$PROXY_HTTP                                                            \
 #    && curl -Lo install.sh https://raw.githubusercontent.com/kubescape/kubescape/master/install.sh      \
 #    && chmod +x install.sh                        \
 #    && /bin/bash install.sh  2>&1

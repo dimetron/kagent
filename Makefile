@@ -67,7 +67,7 @@ TOOLS_KUBECTL_VERSION ?= 1.33.4
 #NPM_REGISTRY ?= "https://registry.npmjs.org/"
 NPM_REGISTRY ?= "http://127.0.0.1:4873"
 
-TOOLS_IMAGE_BUILD_ARGS = --build-arg HTTPS_PROXY=$(PROXY)
+TOOLS_IMAGE_BUILD_ARGS = --build-arg PROXY_HTTP=$(PROXY)
 TOOLS_IMAGE_BUILD_ARGS += --build-arg NO_PROXY=$(NOPROXY)
 TOOLS_IMAGE_BUILD_ARGS += --build-arg LOCALARCH=$(LOCALARCH)
 TOOLS_IMAGE_BUILD_ARGS += --build-arg NPM_REGISTRY=$(NPM_REGISTRY)
@@ -158,9 +158,14 @@ prune-kind-cluster:
 	docker exec $(KIND_CLUSTER_NAME)-control-plane crictl images --filter dangling=true --no-trunc --quiet | \
 	awk '{print $3}' | xargs -r docker exec $(KIND_CLUSTER_NAME)-control-plane crictl rmi || :
 
+.PHONY: update-lock-files
+update-lock-files:
+	make -C ui build
+	make -C python build
+
 .PHONY: build
 build: DOCKER_BUILD_ARGS += --load
-build: build-controller build-ui build-app
+build: update-lock-files build-controller build-ui build-app
 
 .PHONY: build-cli
 build-cli:
@@ -237,6 +242,7 @@ retag-docker-images: build
 .PHONY: helm-cleanup
 helm-cleanup:
 	rm -f *.tgz
+	mkdir -p dist
 
 .PHONY: helm-test
 helm-test: helm-version
@@ -249,33 +255,33 @@ helm-test: helm-version
 .PHONY: helm-agents
 helm-agents:
 	VERSION=$(VERSION) envsubst < helm/agents/k8s/Chart-template.yaml > helm/agents/k8s/Chart.yaml
-	helm package helm/agents/k8s
+	helm package helm/agents/k8s            -d dist
 	VERSION=$(VERSION) envsubst < helm/agents/kgateway/Chart-template.yaml > helm/agents/kgateway/Chart.yaml
-	helm package helm/agents/kgateway
+	helm package helm/agents/kgateway       -d dist
 	VERSION=$(VERSION) envsubst < helm/agents/istio/Chart-template.yaml > helm/agents/istio/Chart.yaml
-	helm package helm/agents/istio
+	helm package helm/agents/istio          -d dist
 	VERSION=$(VERSION) envsubst < helm/agents/promql/Chart-template.yaml > helm/agents/promql/Chart.yaml
-	helm package helm/agents/promql
+	helm package helm/agents/promql         -d dist
 	VERSION=$(VERSION) envsubst < helm/agents/observability/Chart-template.yaml > helm/agents/observability/Chart.yaml
-	helm package helm/agents/observability
+	helm package helm/agents/observability  -d dist
 	VERSION=$(VERSION) envsubst < helm/agents/helm/Chart-template.yaml > helm/agents/helm/Chart.yaml
-	helm package helm/agents/helm
+	helm package helm/agents/helm           -d dist
 	VERSION=$(VERSION) envsubst < helm/agents/argo-rollouts/Chart-template.yaml > helm/agents/argo-rollouts/Chart.yaml
-	helm package helm/agents/argo-rollouts
+	helm package helm/agents/argo-rollouts  -d dist
 	VERSION=$(VERSION) envsubst < helm/agents/cilium-policy/Chart-template.yaml > helm/agents/cilium-policy/Chart.yaml
-	helm package helm/agents/cilium-policy
+	helm package helm/agents/cilium-policy  -d dist
 	VERSION=$(VERSION) envsubst < helm/agents/cilium-debug/Chart-template.yaml > helm/agents/cilium-debug/Chart.yaml
-	helm package helm/agents/cilium-debug
+	helm package helm/agents/cilium-debug   -d dist
 	VERSION=$(VERSION) envsubst < helm/agents/cilium-manager/Chart-template.yaml > helm/agents/cilium-manager/Chart.yaml
-	helm package helm/agents/cilium-manager
+	helm package helm/agents/cilium-manager -d dist
 
 .PHONY: helm-version
 helm-version: helm-cleanup helm-agents
 	VERSION=$(VERSION) envsubst < helm/kagent-crds/Chart-template.yaml > helm/kagent-crds/Chart.yaml
 	VERSION=$(VERSION) envsubst < helm/kagent/Chart-template.yaml > helm/kagent/Chart.yaml
 	helm dependency update helm/kagent || :
-	helm package helm/kagent-crds
-	helm package helm/kagent
+	helm package helm/kagent-crds -d dist
+	helm package helm/kagent      -d dist
 
 .PHONY: helm-install-provider
 helm-install-provider: helm-version check-openai-key
