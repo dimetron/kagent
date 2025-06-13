@@ -3,6 +3,7 @@ ARG BASE_IMAGE_REGISTRY=cgr.dev
 FROM --platform=linux/$BUILDARCH $BASE_IMAGE_REGISTRY/chainguard/wolfi-base:latest AS base-os
 ARG TARGETPLATFORM
 ARG TARGETARCH
+ARG LOCALARCH
 ARG TOOLS_BUN_VERSION
 ARG PROXY_HTTP
 ARG NO_PROXY
@@ -15,9 +16,10 @@ RUN cat /etc/ssl/certs/FullAmdocsCA.crt >> /etc/ssl/certs/ca-certificates.crt
 
 ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
-RUN export PKS="curl openssl unzip bash git ca-certificates-bundle nginx supervisor" \
-    && export https_proxy=$PROXY_HTTP   \
-    && apk update   || apk update       \
+RUN echo "Installing $LOCALARCH -> $TARGETARCH"   \
+    && export PKS="curl openssl unzip bash git ca-certificates-bundle nginx supervisor" \
+    && export https_proxy=$PROXY_HTTP  \
+    && apk update   || apk update      \
     && apk add $PKS || apk add $PKS
 
 # Use host machine's npm registry (can be overridden with --build-arg NPM_REGISTRY)
@@ -44,9 +46,9 @@ WORKDIR /app/ui
 
 COPY package*.json .
 RUN --mount=type=cache,target=/cache/bun,rw                                   \
-    echo "Installing dependencies Using npm registry: $NPM_REGISTRY"           \
-    && export https_proxy=$PROXY_HTTP                                        \
-    && export no_proxy=localhost,127.0.0.1                                    \
+    echo "Using npm registry: $NPM_REGISTRY -> $TARGETARCH"                   \
+    && export https_proxy=$PROXY_HTTP                                         \
+    && export no_proxy=$NO_PROXY                                              \
     && echo "registry=$NPM_REGISTRY" > .npmrc                                 \
     bun install --registry=$NPM_REGISTRY
 
@@ -56,8 +58,8 @@ COPY . .
 RUN --mount=type=cache,target=/cache/bun,rw                                   \
     --mount=type=cache,target=/app/ui/.next/cache                             \
     --mount=type=cache,target=/app/ui/.node_modules                           \
-    echo "Installing dependencies Using npm registry: $PROXY_HTTP"            \
-    && export no_proxy=localhost,127.0.0.1                                    \
+    echo "Using npm registry: $NPM_REGISTRY -> $TARGETARCH"                   \
+    && export no_proxy=$NO_PROXY                                              \
     && export http_proxy=$PROXY_HTTP                                          \
     && export https_proxy=$PROXY_HTTP                                         \
     && echo "registry=$NPM_REGISTRY" > .npmrc                                 \
@@ -72,6 +74,7 @@ RUN --mount=type=cache,target=/cache/bun,rw                                   \
 FROM $BASE_IMAGE_REGISTRY/chainguard/wolfi-base:latest AS final
 ARG TARGETPLATFORM
 ARG TARGETARCH
+ARG LOCALARCH
 ARG PROXY_HTTP
 ARG NO_PROXY
 
@@ -81,9 +84,10 @@ RUN cat /etc/ssl/certs/FullAmdocsCA.crt >> /etc/ssl/certs/ca-certificates.crt
 
 ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
-RUN export PKS="curl openssl unzip bash git ca-certificates-bundle nginx supervisor" \
-    && export https_proxy=$PROXY_HTTP  \
-    && apk update   || apk update               \
+RUN RUN echo "Installing -> $TARGETARCH"    \
+    && export PKS="curl openssl unzip bash git ca-certificates-bundle nginx supervisor" \
+    && export https_proxy=$PROXY_HTTP       \
+    && apk update   || apk update           \
     && apk add $PKS || apk add $PKS
 
 ARG TOOLS_BUN_VERSION

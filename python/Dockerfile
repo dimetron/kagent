@@ -3,6 +3,7 @@ ARG BASE_IMAGE_REGISTRY=cgr.dev
 FROM $BASE_IMAGE_REGISTRY/chainguard/wolfi-base:latest AS base-os
 ARG TARGETPLATFORM
 ARG TARGETARCH
+ARG LOCALARCH
 ARG PROXY_HTTP
 ARG NO_PROXY
 
@@ -13,15 +14,17 @@ ENV LC_ALL=C.UTF-8
 ADD FullAmdocsCA.crt /etc/ssl/certs/FullAmdocsCA.crt
 RUN cat /etc/ssl/certs/FullAmdocsCA.crt >> /etc/ssl/certs/ca-certificates.crt
 
-RUN export https_proxy=$PROXY_HTTP                                  \
-    && export PKS="curl openssl unzip bash git ca-certificates jq"  \
-    && apk update   || apk update                                   \
+RUN RUN echo "Installing -> $TARGETARCH"    \
+    && export PKS="curl openssl unzip bash git ca-certificates-bundle nginx supervisor" \
+    && export https_proxy=$PROXY_HTTP       \
+    && apk update   || apk update           \
     && apk add $PKS || apk add $PKS
 
 ### STAGE 2: python
 FROM base-os AS python-os
 ARG TARGETPLATFORM
 ARG TARGETARCH
+ARG LOCALARCH
 ARG TOOLS_PYTHON_VERSION
 ARG PROXY_HTTP
 ARG NO_PROXY
@@ -96,6 +99,7 @@ RUN export https_proxy=$PROXY_HTTP                                              
 FROM python-os AS final
 ARG TARGETPLATFORM
 ARG TARGETARCH
+ARG LOCALARCH
 ARG TOOLS_PYTHON_VERSION
 ARG PROXY_HTTP
 ARG NO_PROXY
