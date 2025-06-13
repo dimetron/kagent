@@ -78,9 +78,8 @@ RUN --mount=type=cache,target=/cache/bun,rw                                   \
     && export http_proxy=$PROXY_HTTP                                          \
     && export https_proxy=$PROXY_HTTP                                         \
     && export NEXT_TELEMETRY_DEBUG=1                                          \
-    && bun next telemetry disable                                             \
     && bun run build --no-lint                                                \
-    echo "Building: $LOCALARCH -> $TARGETARCH : completed"
+    && echo "Building: $LOCALARCH -> $TARGETARCH : completed"
 
 ### STAGE 3: final
 FROM $BASE_IMAGE_REGISTRY/chainguard/wolfi-base:latest AS final
