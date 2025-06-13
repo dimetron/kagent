@@ -26,6 +26,7 @@ update: outdated
 .PHONY: build
 build:
 	bun install
+	bun next telemetry disable
 	bun run build --no-lint
 	bun pm ls --all
 	@echo "Bun dependencies hash:"

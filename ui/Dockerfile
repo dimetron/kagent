@@ -38,7 +38,7 @@ ENV PATH=$BUN_INSTALL/bin:$PATH
 # brew install oven-sh/bun/bun
 RUN --mount=type=cache,target=/cache/bun,rw         \
     mkdir -p $BUN_INSTALL  /app/ui /app/ui/public   \
-    && export https_proxy=$PROXY_HTTP     \
+    && export https_proxy=$PROXY_HTTP               \
     && curl -fsSL https://bun.sh/install | bash -s "bun-v$TOOLS_BUN_VERSION" \
     && bun --version
 
@@ -46,11 +46,14 @@ WORKDIR /app/ui
 
 COPY package*.json .
 RUN --mount=type=cache,target=/cache/bun,rw                                   \
-    echo "Using npm registry: $NPM_REGISTRY -> $TARGETARCH"                   \
+    --mount=type=cache,target=/app/ui/.next/cache                             \
+    --mount=type=cache,target=/app/ui/.node_modules                           \
+    echo "Preinstall $LOCALARCH -> $TARGETARCH : started"                     \
     && export https_proxy=$PROXY_HTTP                                         \
     && export no_proxy=$NO_PROXY                                              \
     && echo "registry=$NPM_REGISTRY" > .npmrc                                 \
-    bun install --registry=$NPM_REGISTRY
+    && bun install --registry=$NPM_REGISTRY                                   \
+    && echo "Preinstall $LOCALARCH -> $TARGETARCH : completed"
 
 #copy the rest of the files
 COPY . .
@@ -58,22 +61,26 @@ COPY . .
 RUN --mount=type=cache,target=/cache/bun,rw                                   \
     --mount=type=cache,target=/app/ui/.next/cache                             \
     --mount=type=cache,target=/app/ui/.node_modules                           \
-    echo "Using npm registry: $NPM_REGISTRY -> $TARGETARCH"                   \
+    echo "Install dependencies $LOCALARCH -> $TARGETARCH : started"           \
     && export no_proxy=$NO_PROXY                                              \
     && export http_proxy=$PROXY_HTTP                                          \
     && export https_proxy=$PROXY_HTTP                                         \
-    && echo "registry=$NPM_REGISTRY" > .npmrc                                 \
     && bun install --registry=$NPM_REGISTRY                                   \
     && bun pm ls --all                                                        \
-    && echo "Bun dependencies $LOCALARCH hash:"                               \
     && bun pm hash                                                            \
+    && echo "Install dependencies $LOCALARCH -> $TARGETARCH : completed"
 
 RUN --mount=type=cache,target=/cache/bun,rw                                   \
     --mount=type=cache,target=/app/ui/.next/cache                             \
     --mount=type=cache,target=/app/ui/.node_modules                           \
-    echo "Building: $LOCALARCH -> $TARGETARCH"                   \
-    && bun run build --no-lint 2>&1 || bun run build                          \
-    && echo "Bun build completed"
+    echo -e "Building: $LOCALARCH -> $TARGETARCH : started"                   \
+    && export no_proxy=$NO_PROXY                                              \
+    && export http_proxy=$PROXY_HTTP                                          \
+    && export https_proxy=$PROXY_HTTP                                         \
+    && export NEXT_TELEMETRY_DEBUG=1                                          \
+    && bun next telemetry disable                                             \
+    && bun run build --no-lint                                                \
+    echo "Building: $LOCALARCH -> $TARGETARCH : completed"
 
 ### STAGE 3: final
 FROM $BASE_IMAGE_REGISTRY/chainguard/wolfi-base:latest AS final
