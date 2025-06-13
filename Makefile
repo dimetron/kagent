@@ -55,7 +55,7 @@ KIND_CLUSTER_NAME ?= kagent
 #take from go/go.mod
 AWK ?= $(shell command -v gawk || command -v awk)
 TOOLS_GO_VERSION ?= $(shell $(AWK) '/^go / { print $$2 }' go/go.mod)
-TOOLS_PYTHON_VERSION ?= 3.13
+TOOLS_PYTHON_VERSION ?= 3.12
 
 #tools versions
 TOOLS_UV_VERSION ?= 0.7.13        # https://github.com/astral-sh/uv/releases
@@ -350,6 +350,11 @@ test/e2e:
 .PHONY: kagent-cli-install
 kagent-cli-install: build build-cli-local kind-load-docker-images helm-version
 kagent-cli-install:
+	ps -ef | grep port-forward | grep -v grep | awk '{print $2}' | xargs kill -9 || true
+	KAGENT_HELM_REPO=./helm/ ./go/bin/kagent-local install
+	KAGENT_HELM_REPO=./helm/ ./go/bin/kagent-local dashboard
+
+kagent-cli-dashboard:
 	ps -ef | grep port-forward | grep -v grep | awk '{print $2}' | xargs kill -9 || true
 	KAGENT_HELM_REPO=./helm/ ./go/bin/kagent-local install
 	KAGENT_HELM_REPO=./helm/ ./go/bin/kagent-local dashboard
