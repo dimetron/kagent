@@ -14,7 +14,7 @@ ENV LC_ALL=C.UTF-8
 ADD FullAmdocsCA.crt /etc/ssl/certs/FullAmdocsCA.crt
 RUN cat /etc/ssl/certs/FullAmdocsCA.crt >> /etc/ssl/certs/ca-certificates.crt
 
-RUN RUN echo "Installing -> $TARGETARCH"    \
+RUN echo "Installing -> $TARGETARCH"    \
     && export PKS="curl openssl unzip bash git ca-certificates-bundle nginx supervisor" \
     && export https_proxy=$PROXY_HTTP       \
     && apk update   || apk update           \

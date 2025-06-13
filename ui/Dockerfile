@@ -4,11 +4,11 @@ FROM --platform=linux/$BUILDARCH $BASE_IMAGE_REGISTRY/chainguard/wolfi-base:late
 ARG TARGETPLATFORM
 ARG TARGETARCH
 ARG LOCALARCH
+
 ARG TOOLS_BUN_VERSION
 ARG PROXY_HTTP
 ARG NO_PROXY
 ARG NPM_REGISTRY
-
 
 # add CA certificates before installing other packages
 ADD FullAmdocsCA.crt /etc/ssl/certs/FullAmdocsCA.crt
@@ -63,10 +63,15 @@ RUN --mount=type=cache,target=/cache/bun,rw                                   \
     && export http_proxy=$PROXY_HTTP                                          \
     && export https_proxy=$PROXY_HTTP                                         \
     && echo "registry=$NPM_REGISTRY" > .npmrc                                 \
-    && bun pm ls --all                                                        \
     && bun install --registry=$NPM_REGISTRY                                   \
-    && echo "Bun dependencies hash:"                                          \
+    && bun pm ls --all                                                        \
+    && echo "Bun dependencies $LOCALARCH hash:"                               \
     && bun pm hash                                                            \
+
+RUN --mount=type=cache,target=/cache/bun,rw                                   \
+    --mount=type=cache,target=/app/ui/.next/cache                             \
+    --mount=type=cache,target=/app/ui/.node_modules                           \
+    echo "Building: $LOCALARCH -> $TARGETARCH"                   \
     && bun run build --no-lint 2>&1 || bun run build                          \
     && echo "Bun build completed"
 
@@ -84,7 +89,7 @@ RUN cat /etc/ssl/certs/FullAmdocsCA.crt >> /etc/ssl/certs/ca-certificates.crt
 
 ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
-RUN RUN echo "Installing -> $TARGETARCH"    \
+RUN echo "Installing -> $TARGETARCH"    \
     && export PKS="curl openssl unzip bash git ca-certificates-bundle nginx supervisor" \
     && export https_proxy=$PROXY_HTTP       \
     && apk update   || apk update           \
