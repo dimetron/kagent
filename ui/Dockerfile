@@ -52,9 +52,9 @@ RUN --mount=type=cache,target=/cache/bun,rw                                   \
 COPY . .
 
 RUN --mount=type=cache,target=/cache/bun,rw                                   \
-    echo "Installing dependencies Using npm registry: $PROXY_HTTP"           \
+    echo "Installing dependencies Using npm registry: $PROXY_HTTP"            \
     && export no_proxy=localhost,127.0.0.1                                    \
-    && export https_proxy=$PROXY_HTTP                                        \
+    && export https_proxy=$PROXY_HTTP                                         \
     && echo "registry=$NPM_REGISTRY" > .npmrc                                 \
     && bun install geist                                                      \
     && bun install -D eslint                                                  \
