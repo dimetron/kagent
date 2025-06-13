@@ -63,6 +63,11 @@ export KAGENT_DEFAULT_MODEL_PROVIDER=azureOpenAI
 export KAGENT_HELM_REPO=./helm/
 make kagent-cli-install
 
+#using local proxy
+export KAGENT_DEFAULT_MODEL_PROVIDER=azureOpenAI
+export KAGENT_HELM_REPO=./helm/
+make PROXY=http://127.0.0.1:3128 NPM_REGISTRY="http://127.0.0.1:4873" kagent-cli-install
+ 
 ```
 
 ## Upgrading
