@@ -9,11 +9,15 @@ BUILDKIT_VERSION = v0.22.0
 LOCALARCH ?= $(shell uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/')
 
 # Proxy settings
-PROXY ?= http://127.0.0.1:3128
+PROXY ?= http://genproxy:8080
 NOPROXY ?= "127.0.0.1,localhost,.sock,.internal,.local,.svc.cluster.local,svc.cluster.local,cluster.local,genproxy,chat.autox.corp.amdocs.azr,*.corp.amdocs.com,*.corp.amdocs.aws,*.corp.amdocs.azr,100.72.198.10,10.234.177.68,10.232.233.70,10.42.0.0/16,172.17.0.0/16"
 
 export https_proxy=$(PROXY)
 export no_proxy=$(NOPROXY)
+
+#NPM_REGISTRY ?= "http://127.0.0.1:4873"
+#NPM_REGISTRY ?= "https://registry.npmjs.org/"
+NPM_REGISTRY ?= "http://docker-registry-proxy.corp.amdocs.com:8081/repository/npm-external/"
 
 export CGO_ENABLED=0
 export GO111MODULE=on
@@ -52,20 +56,17 @@ KIND_CLUSTER_NAME ?= kagent
 AWK ?= $(shell command -v gawk || command -v awk)
 TOOLS_GO_VERSION ?= $(shell $(AWK) '/^go / { print $$2 }' go/go.mod)
 TOOLS_PYTHON_VERSION ?= 3.13
-#tools versions
-TOOLS_UV_VERSION ?= 0.7.2
-TOOLS_BUN_VERSION ?= 1.2.15
-TOOLS_K9S_VERSION ?= 0.50.4
-TOOLS_KIND_VERSION ?= 0.27.0
-TOOLS_NODE_VERSION ?= 20.19.2
-TOOLS_HELM_VERSION ?= 3.18.2
-TOOLS_ISTIO_VERSION ?= 1.26.1
-TOOLS_ARGO_CD_VERSION ?= 3.0.0
-TOOLS_KUBECTL_VERSION ?= 1.33.4
 
-# build args
-#NPM_REGISTRY ?= "https://registry.npmjs.org/"
-NPM_REGISTRY ?= "http://127.0.0.1:4873"
+#tools versions
+TOOLS_UV_VERSION ?= 0.7.13        # https://github.com/astral-sh/uv/releases
+TOOLS_BUN_VERSION ?= 1.2.16       # https://github.com/oven-sh/bun/releases
+TOOLS_K9S_VERSION ?= 0.50.4       # https://github.com/derailed/k9s/releases
+TOOLS_KIND_VERSION ?= 0.27.0      #
+TOOLS_NODE_VERSION ?= 20.19.2     #
+TOOLS_HELM_VERSION ?= 3.18.2      #
+TOOLS_ISTIO_VERSION ?= 1.26.1     #
+TOOLS_ARGO_CD_VERSION ?= 3.0.0    #
+TOOLS_KUBECTL_VERSION ?= 1.33.4   #
 
 TOOLS_IMAGE_BUILD_ARGS = --build-arg PROXY_HTTP=$(PROXY)
 TOOLS_IMAGE_BUILD_ARGS += --build-arg NO_PROXY=$(NOPROXY)
@@ -166,6 +167,12 @@ update-lock-files:
 .PHONY: build
 build: DOCKER_BUILD_ARGS += --load
 build: build-controller build-ui build-app
+
+#use make proxy-log to see proxy logs
+.PHONY: build-offline
+build-offline: PROXY ?= "http://127.0.0.1:3128"
+build-offline: NPM_REGISTRY ?= "http://127.0.0.1:4873"
+build-offline: build
 
 .PHONY: build-cli
 build-cli:
