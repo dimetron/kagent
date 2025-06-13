@@ -384,10 +384,11 @@ proxy-log:
 	&& docker compose logs -f | grep -v proxy-docker
 
 .PHONY: check-proxy
-check-proxy:
+proxy-test:
 	@echo "Checking proxy return 200."
-	export export https_proxy=http://127.0.0.1:3128 \
-	&& curl -L https://dl-cdn.alpinelinux.org/MIRRORS.txt
+	export export https_proxy=http://127.0.0.1:3128 	\
+	&& curl -L https://dl-cdn.alpinelinux.org/MIRRORS.txt -o /dev/null	\
+	&& curl -L https://apk.cgr.dev/chainguard/x86_64/APKINDEX.tar.gz -o /dev/null
 
 .PHONY: proxy-clean
 proxy-clean:
