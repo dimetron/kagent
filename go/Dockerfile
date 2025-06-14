@@ -1,21 +1,16 @@
 ### STAGE 1: base image
+ARG LOCALARCH
 ARG BASE_IMAGE_REGISTRY=cgr.dev
-ARG LOCALARCH=amd64
-
 FROM --platform=linux/$LOCALARCH $BASE_IMAGE_REGISTRY/chainguard/go:latest AS builder
+
+### STAGE 2: build the manager binary
 ARG TARGETPLATFORM
 ARG TARGETARCH
 ARG LOCALARCH
-ARG BUILDARCH
-ARG TARGETOS
-
-ENV http_proxy=${PROXY:-http://10.232.233.70:8080}
-ENV https_proxy=${PROXY:-http://10.232.233.70:8080}
-ENV no_proxy="localhost,127.0.0.1,172.17.0.0/12,192.168.0.0/16,.svc,.default,.local,.internal,fs.amdocs.com,.amdocs.com,.amdocs.aws,.sock,bitbucket.corp.amdocs.com,.corp.amdocs.com,docker-registry-proxy.corp.amdocs.com"
 
 ENV GO111MODULE=on
 ENV GOTOOLCHAIN=local
-ENV GOPROXY="http://docker-registry-proxy.corp.amdocs.com:8081/repository/goproxy/,http://proxy.golang.org"
+ENV GOPROXY="http://docker-registry-proxy.corp.amdocs.com:8081/repository/goproxy"
 ENV PATH=$PATH:/usr/local/go/bin
 
 WORKDIR /workspace
@@ -24,9 +19,10 @@ COPY go.mod go.mod
 COPY go.sum go.sum
 # cache deps before building and copying source so that we don't need to re-download as much
 # and so that source changes don't invalidate our downloaded layer
-RUN --mount=type=cache,target=/root/go/pkg/mod,rw      \
-    --mount=type=cache,target=/root/.cache/go-build,rw \
-     go mod download
+RUN --mount=type=cache,target=/root/go/pkg/mod,rw         \
+    --mount=type=cache,target=/root/.cache/go-build,rw    \
+    echo "Downloading go.mod GOARCH=${TARGETARCH} on ${LOCALARCH}..." && \
+     CGO_ENABLED=0 GOARCH=${TARGETARCH} go mod download
 
 # Copy the go source
 COPY autogen autogen
@@ -39,17 +35,23 @@ COPY controller controller
 # by leaving it empty we can ensure that the container and binary shipped on it will have the same platform.
 RUN --mount=type=cache,target=/root/go/pkg/mod,rw         \
     --mount=type=cache,target=/root/.cache/go-build,rw    \
-    echo "Building for GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} on ${LOCALARCH}..." && \
-    CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o manager controller/cmd/main.go
+    echo "Building for GOARCH=${TARGETARCH} on ${LOCALARCH}..." && \
+    CGO_ENABLED=0 GOARCH=${TARGETARCH} go build -a -o manager controller/cmd/main.go
 
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
 FROM $BASE_IMAGE_REGISTRY/distroless/static:nonroot
+ARG TARGETPLATFORM
+ARG TARGETARCH
+ARG VERSION
+
 WORKDIR /
 COPY --from=builder /workspace/manager .
 USER 65532:65532
 
 LABEL org.opencontainers.image.source=https://github.com/kagent-dev/kagent
 LABEL org.opencontainers.image.description="Kagent controller is the controller for the Kagent app."
+LABEL org.opencontainers.image.authors="Kagent Creators 🤖"
+LABEL org.opencontainers.image.version="$VERSION"
 
 ENTRYPOINT ["/manager"]

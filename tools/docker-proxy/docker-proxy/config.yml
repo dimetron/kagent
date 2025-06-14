@@ -1,0 +1,2 @@
+proxy:
+  remoteurl: http://docker-registry-proxy.corp.amdocs.com

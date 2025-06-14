@@ -2,7 +2,7 @@
 requires = [
   "hatchling >= 1.27.0",
   "hatch >=1.14.1",
-  "setuptools>=67.0.0"
+  "setuptools>=80.9.0"
 ]
 build-backend = "hatchling.build"
 
@@ -13,9 +13,9 @@ description = "kagent is a tool for building and deploying agent-based applicati
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-  "autogen-core>=0.5.7",
-  "autogen-agentchat>=0.5.7",
-  "autogen-ext[anthropic,azure,mcp,ollama,openai]>=0.5.7",
+  "autogen-core>=0.6.1",
+  "autogen-agentchat>=0.6.1",
+  "autogen-ext[anthropic,azure,mcp,ollama,openai]>=0.6.1",
   "openai>=1.72.0",
   "tiktoken==0.8.0",
   "python-dotenv>=1.1.0",
@@ -29,7 +29,7 @@ dependencies = [
   "opentelemetry-exporter-otlp-proto-grpc>=1.32.0",
   "opentelemetry-instrumentation-openai>= 0.39.0",
   "opentelemetry-instrumentation-httpx >= 0.52.0",
-  "anthropic>=0.49.0",
+  "anthropic[vertex]>=0.49.0",
   "pinecone>=6.0.2",
   "loguru>=0.7.3",
   "sqlalchemy>=2.0.40",
@@ -42,6 +42,8 @@ dependencies = [
   "magika>=0.6.2",
   "markitdown[all]>=v0.1.1",
   "websockets>=11.0",
+  "google-genai>=1.18.0",
+  "google-auth>=2.40.2",
 ]
 
 [project.optional-dependencies]

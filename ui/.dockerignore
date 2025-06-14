@@ -7,3 +7,10 @@ htmlcov/
 workspace/
 node_modules/
 .next/
+.DS_Store
+.vscode/
+bun.lock
+.npmrc
+cypress/
+cypress.*
+jest.*

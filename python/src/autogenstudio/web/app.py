@@ -15,7 +15,17 @@ from .auth.middleware import AuthMiddleware
 from .config import settings
 from .deps import cleanup_managers, init_auth_manager, init_managers, register_auth_dependencies
 from .initialization import AppInitializer
-from .routes import gallery, invoke, models, runs, sessions, settingsroute, teams, tool_servers, tools, validation, ws
+from .routes import (
+    feedback,
+    invoke,
+    models,
+    runs,
+    sessions,
+    teams,
+    tool_servers,
+    tools,
+    validation,
+)
 
 # Initialize application
 app_file_path = os.path.dirname(os.path.abspath(__file__))
@@ -25,7 +35,6 @@ initializer = AppInitializer(settings, app_file_path)
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """
-    Lifecycle manager for the FastAPI application.
     Handles initialization and cleanup of application resources.
     """
 
@@ -105,14 +114,6 @@ api.include_router(
     responses={404: {"description": "Not found"}},
 )
 
-
-api.include_router(
-    ws.router,
-    prefix="/ws",
-    tags=["websocket"],
-    responses={404: {"description": "Not found"}},
-)
-
 api.include_router(
     validation.router,
     prefix="/validate",
@@ -124,27 +125,6 @@ api.include_router(
     tools.router,
     prefix="/tools",
     tags=["tools"],
-    responses={404: {"description": "Not found"}},
-)
-
-api.include_router(
-    settingsroute.router,
-    prefix="/settings",
-    tags=["settings"],
-    responses={404: {"description": "Not found"}},
-)
-
-api.include_router(
-    gallery.router,
-    prefix="/gallery",
-    tags=["gallery"],
-    responses={404: {"description": "Not found"}},
-)
-# Include authentication routes
-api.include_router(
-    authroutes.router,
-    prefix="/auth",
-    tags=["auth"],
     responses={404: {"description": "Not found"}},
 )
 
@@ -166,6 +146,13 @@ api.include_router(
     invoke.router,
     prefix="/invoke",
     tags=["invoke"],
+    responses={404: {"description": "Not found"}},
+)
+
+api.include_router(
+    feedback.router,
+    prefix="/feedback",
+    tags=["feedback"],
     responses={404: {"description": "Not found"}},
 )
 

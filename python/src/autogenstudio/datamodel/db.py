@@ -7,15 +7,11 @@ from typing import Any, Dict, List, Optional, Union
 from autogen_core import ComponentModel
 from pydantic import ConfigDict, SecretStr, field_validator
 from sqlalchemy import ForeignKey, Integer
-from sqlmodel import JSON, Column, DateTime, Field, SQLModel, func
+from sqlmodel import JSON, Column, DateTime, Field, Relationship, SQLModel, func
 
 from .eval import EvalJudgeCriteria, EvalRunResult, EvalRunStatus, EvalScore, EvalTask
 from .types import (
-    GalleryComponents,
-    GalleryConfig,
-    GalleryMetadata,
     MessageConfig,
-    MessageMeta,
     SettingsConfig,
     TeamResult,
 )
@@ -56,22 +52,37 @@ class Team(BaseDBModel, table=True):
 class Message(BaseDBModel, table=True):
     __table_args__ = {"sqlite_autoincrement": True}
 
-    config: Union[MessageConfig, dict] = Field(
-        default_factory=lambda: MessageConfig(source="", content=""), sa_column=Column(JSON)
-    )
+    config: dict = Field(sa_column=Column(JSON))
     session_id: Optional[int] = Field(
         default=None, sa_column=Column(Integer, ForeignKey("session.id", ondelete="NO ACTION"))
     )
     run_id: Optional[int] = Field(default=None, sa_column=Column(Integer, ForeignKey("run.id", ondelete="CASCADE")))
 
-    message_meta: Optional[Union[MessageMeta, dict]] = Field(default={}, sa_column=Column(JSON))
+    feedback: List["Feedback"] = Relationship(back_populates="message")
+
+
+class Feedback(BaseDBModel, table=True):
+    """
+    Database model for storing user feedback on agent responses.
+    """
+
+    __table_args__ = {"sqlite_autoincrement": True}
+
+    is_positive: bool = Field(default=False, description="Whether the feedback is positive or negative")
+    feedback_text: str = Field(description="The feedback text provided by the user")
+    issue_type: Optional[str] = Field(default=None, description="Category of issue for negative feedback")
+
+    message_id: Optional[int] = Field(
+        default=None, sa_column=Column(Integer, ForeignKey("message.id", ondelete="CASCADE"))
+    )
+
+    message: Optional["Message"] = Relationship(back_populates="feedback")
 
 
 class Session(BaseDBModel, table=True):
     __table_args__ = {"sqlite_autoincrement": True}
-    team_id: Optional[int] = Field(default=None, sa_column=Column(Integer, ForeignKey("team.id", ondelete="CASCADE")))
-    team_state: Optional[dict] = Field(default=None, sa_column=Column(JSON))
     name: Optional[str] = None
+    team_id: Optional[int] = Field(default=None, sa_column=Column(Integer, ForeignKey("team.id", ondelete="CASCADE")))
 
     @field_validator("created_at", "updated_at", mode="before")
     @classmethod
@@ -150,27 +161,6 @@ class ToolServer(SQLModel, table=True):
     last_connected: Optional[datetime] = None
     version: Optional[str] = "0.0.1"
     component: Union[ComponentModel, dict] = Field(sa_column=Column(JSON))
-
-
-class Gallery(BaseDBModel, table=True):
-    __table_args__ = {"sqlite_autoincrement": True}
-
-    config: Union[GalleryConfig, dict] = Field(
-        default_factory=lambda: GalleryConfig(
-            id="",
-            name="",
-            metadata=GalleryMetadata(author="", version=""),
-            components=GalleryComponents(agents=[], models=[], tools=[], terminations=[], teams=[]),
-        ),
-        sa_column=Column(JSON),
-    )
-
-    model_config = ConfigDict(
-        json_encoders={
-            datetime: lambda v: v.isoformat(),
-            SecretStr: lambda v: v.get_secret_value(),  # Add this line
-        }
-    )  # type: ignore[call-arg]
 
 
 class Settings(BaseDBModel, table=True):

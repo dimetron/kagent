@@ -6,6 +6,11 @@ LDFLAGS := -X github.com/kagent-dev/kagent/go/cli/internal/cli.Version=$(VERSION
            -X github.com/kagent-dev/kagent/go/cli/internal/cli.GitCommit=$(GIT_COMMIT) \
            -X github.com/kagent-dev/kagent/go/cli/internal/cli.BuildDate=$(BUILD_DATE)
 
+export CGO_ENABLED=0
+export GO111MODULE=on
+export GOTOOLCHAIN=local
+export GOPROXY=http://docker-registry-proxy.corp.amdocs.com:8081/repository/goproxy
+
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
 GOBIN=$(shell go env GOPATH)/bin
@@ -87,7 +92,7 @@ bin/kagent-windows-amd64.exe.sha256: bin/kagent-windows-amd64.exe
 
 .PHONY: clean
 clean:
-	rm -f bin/* && mkdir -p bin
+	rm -f bin/kagent* && mkdir -p bin
 
 .PHONY: build
 build: bin/kagent-linux-amd64.sha256 bin/kagent-linux-arm64.sha256 bin/kagent-darwin-amd64.sha256 bin/kagent-darwin-arm64.sha256 bin/kagent-windows-amd64.exe.sha256

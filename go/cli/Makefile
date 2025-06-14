@@ -16,7 +16,7 @@ install:
 
 .PHONY: clean
 clean:
-	rm -rf bin/
+	rm -rf bin/kagent*
 
 .PHONY: test
 test:

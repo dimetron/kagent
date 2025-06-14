@@ -2,19 +2,56 @@
 debug = true
 [registry."docker.io"]
 mirrors = ["docker-registry-proxy.corp.amdocs.com"]
+http2 = true
 [registry."illin5638.corp.amdocs.com:5002"]
 http = true
+http2 = true
 insecure = true
 [registry."registry:6000"]
 http = true
+http2 = true
+insecure = true
+[registry."localhost:6000"]
+http = true
+http2 = true
 insecure = true
 [registry."illin4261.corp.amdocs.com:28090"]
 http = true
+http2 = true
 insecure = true
-[registry."docker-registry-proxy.corp.amdocs.com"]
+[registry."illin4261.corp.amdocs.com:6000"]
+http = true
+http2 = true
+insecure = true
+[registry."illin4261.corp.amdocs.com:5002"]
 http = true
 insecure = true
+[registry."docker-registry-proxy.corp.amdocs.com"]
+mirrors = ["https://localhost:6000"]
+http = true
+http2 = true
+insecure = true
+
 [worker.oci]
 enabled = true
-# platforms is manually configure platforms, detected automatically if unset.
-platforms = [ "linux/amd64", "linux/arm64"]
+platforms = [ "linux/amd64", "linux/arm64" ]
+
+max-parallelism = 8
+snapshotter = "overlayfs"
+
+[worker.containerd]
+enabled = false
+
+[gc]
+# Keep more build cache to improve rebuild times
+keepDuration = "48h"
+keepBytes = "10GB"
+# More frequent but lighter GC
+gckeepstorage = "5GB"
+
+# Enable build cache optimizations
+[frontend."dockerfile.v0"]
+enabled = true
+
+[frontend."dockerfile.v1"]
+enabled = true

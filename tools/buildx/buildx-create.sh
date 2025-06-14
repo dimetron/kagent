@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
 
-export BUILDKIT_VERSION=v0.11.6
-export OS=$(uname -o)
+export BUILDKIT_VERSION=v0.22.0
+export BUILDX_NAME=$1
 
+echo "Activate BuildX -> $BUILDX_NAME with buildkit version: $BUILDKIT_VERSION"
+
+export OS=$(uname -o)
 export script_dir=$(dirname "$0")
 
 echo "BuildKit version: $BUILDKIT_VERSION"
-pwd
 cat $script_dir/buildkitd.toml
+
 echo "-----"
 
 # in rancher we need share volume with docker.sock
@@ -68,11 +71,11 @@ cat <<EOT > $HOME/.docker/config.json
 			"auth": "bnRzZGVwbG95bWVudDpudHNkZXBsb3ltZW50QDIwMjM="
 		},
 		"artifactory-isr.corp.amdocs.com" : {
-      "auth": "bXMzNjBfc2FfY2lAYW1kb2NzLmNvbTpjbVZtZEd0dU9qQXhPakUzTlRRM016SXhPVEU2Vld4clVrdHRiVlZuYmxSMGFXVTBjM1pyZGxsTFZuTm9iVVYx"
-    },
+      		"auth": "bXMzNjBfc2FfY2lAYW1kb2NzLmNvbTpjbVZtZEd0dU9qQXhPakUzTlRRM016SXhPVEU2Vld4clVrdHRiVlZuYmxSMGFXVTBjM1pyZGxsTFZuTm9iVVYx"
+    	},
 		"artifactory.corp.amdocs.com" : {
-      "auth": "bXMzNjBfc2FfY2lAYW1kb2NzLmNvbTpjbVZtZEd0dU9qQXhPakUzTlRRM016SXhPVEU2Vld4clVrdHRiVlZuYmxSMGFXVTBjM1pyZGxsTFZuTm9iVVYx"
-    },
+      		"auth": "bXMzNjBfc2FfY2lAYW1kb2NzLmNvbTpjbVZtZEd0dU9qQXhPakUzTlRRM016SXhPVEU2Vld4clVrdHRiVlZuYmxSMGFXVTBjM1pyZGxsTFZuTm9iVVYx"
+    	},
 		"localhost:6000": {},
 		"registry:6001": {}
 	}
@@ -87,17 +90,11 @@ if [[ "$(uname -m)"  == "x86_64" ]]; then
   docker image inspect multiarch/qemu-user-static:latest 2>&1 > /dev/null || docker pull docker-registry-proxy.corp.amdocs.com/multiarch/qemu-user-static:latest
   docker image inspect multiarch/qemu-user-static:latest 2>&1 > /dev/null || rdctl shell docker tag docker-registry-proxy.corp.amdocs.com/multiarch/qemu-user-static:latest multiarch/qemu-user-static:latest
   docker run --rm --privileged multiarch/qemu-user-static --reset -p yes || true
-  #docker run --rm --privileged docker tag docker-registry-proxy.corp.amdocs.com/multiarch/qemu-user-static:latest --reset -p yes
 fi
 
-export BUILDX_NAME=kagent-builder
-echo "Activate BuildX -> $BUILDX_NAME with buildkit version: $BUILDKIT_VERSION"
 #docker buildx rm $BUILDX_NAME || true
-docker network inspect infra || docker network create infra
-docker buildx inspect $BUILDX_NAME > /dev/null 2>&1  || docker buildx create --driver-opt "network=infra,image=docker-registry-proxy.corp.amdocs.com/moby/buildkit:$BUILDKIT_VERSION" --config $script_dir/buildkitd.toml --name $BUILDX_NAME --use
+docker buildx inspect $BUILDX_NAME > /dev/null 2>&1  || docker buildx create --driver-opt "network=host,image=docker-registry-proxy.corp.amdocs.com/moby/buildkit:$BUILDKIT_VERSION" --config $script_dir/buildkitd.toml --name $BUILDX_NAME --use
 docker buildx use $BUILDX_NAME || true
 docker buildx inspect $BUILDX_NAME
 
-echo "Infra network containers:"
-docker network inspect infra | jq '.[].Containers[].Name' -r
-echo "--- buildx containers configured ---"
+echo "--- buildx $BUILDX_NAME configured ---"

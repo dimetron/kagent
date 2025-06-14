@@ -14,13 +14,15 @@ import (
 	"github.com/kagent-dev/kagent/go/cli/internal/config"
 )
 
-func CheckServerConnection(client *autogen_client.Client) error {
+func CheckServerConnection(client autogen_client.Client) error {
 	// Only check if we have a valid client
 	if client == nil {
 		return fmt.Errorf("Error connecting to server. Please run 'install' command first.")
 	}
 
-	_, err := client.GetVersion()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	_, err := client.GetVersion(ctx)
 	if err != nil {
 		return fmt.Errorf("Error connecting to server. Please run 'install' command first.")
 	}
@@ -61,7 +63,7 @@ func NewPortForward(ctx context.Context, cfg *config.Config) *portForward {
 func (p *portForward) Stop() {
 	p.cancel()
 	if err := p.cmd.Wait(); err != nil {
-		if !strings.Contains(err.Error(), "signal: killed") {
+		if !strings.Contains(err.Error(), "signal: killed") && !strings.Contains(err.Error(), "exit status 1") {
 			fmt.Fprintf(os.Stderr, "Error waiting for port-forward to exit: %v\n", err)
 		}
 	}
@@ -200,16 +202,34 @@ func StreamEvents(ch <-chan *autogen_client.SseEvent, usage *autogen_client.Mode
 			if typed.Source == "user" || typed.Source == "system" {
 				continue
 			}
-			fmt.Fprintf(os.Stdout, "%s: %s\n", config.BoldYellow("Event Type"), "TextMessage")
-			fmt.Fprintf(os.Stdout, "%s: %s\n", config.BoldGreen("Source"), typed.Source)
-			fmt.Fprintln(os.Stdout)
-			fmt.Fprintln(os.Stdout, typed.Content)
-			fmt.Fprintln(os.Stdout, "----------------------------------")
-			fmt.Fprintln(os.Stdout)
+			if verbose {
+				enc := json.NewEncoder(os.Stdout)
+				enc.SetIndent("", "  ")
+				if err := enc.Encode(typed); err != nil {
+					fmt.Fprintf(os.Stderr, "Error encoding event: %v\n", err)
+					continue
+				}
+			} else {
+				fmt.Fprintf(os.Stdout, "%s: %s\n", config.BoldYellow("Event Type"), "TextMessage")
+				fmt.Fprintf(os.Stdout, "%s: %s\n", config.BoldGreen("Source"), typed.Source)
+				fmt.Fprintln(os.Stdout)
+				fmt.Fprintln(os.Stdout, typed.Content)
+				fmt.Fprintln(os.Stdout, "----------------------------------")
+				fmt.Fprintln(os.Stdout)
+			}
 		case *ModelClientStreamingChunkEvent:
 			usage.Add(typed.ModelsUsage)
 			streaming[typed.Source] = true
-			fmt.Fprintf(os.Stdout, "%s", typed.Content)
+			if verbose {
+				enc := json.NewEncoder(os.Stdout)
+				enc.SetIndent("", "  ")
+				if err := enc.Encode(typed); err != nil {
+					fmt.Fprintf(os.Stderr, "Error encoding event: %v\n", err)
+					continue
+				}
+			} else {
+				fmt.Fprintf(os.Stdout, "%s", typed.Content)
+			}
 		case *ToolCallRequestEvent:
 			bufferedToolCallRequest = typed
 		case *ToolCallExecutionEvent:
@@ -218,26 +238,20 @@ func StreamEvents(ch <-chan *autogen_client.SseEvent, usage *autogen_client.Mode
 				continue
 			}
 			usage.Add(typed.ModelsUsage)
-			fmt.Fprintf(os.Stdout, "%s: %s\n", config.BoldYellow("Event Type"), "ToolCall(s)")
-			fmt.Fprintf(os.Stdout, "%s: %s\n", config.BoldGreen("Source"), typed.Source)
 			if verbose {
-				// For each function execution, find the corresponding tool call request and print them together
-				for i, functionExecution := range typed.Content {
-					for _, functionRequest := range bufferedToolCallRequest.Content {
-						if functionExecution.CallID == functionRequest.ID {
-							fmt.Fprintln(os.Stdout)
-							fmt.Fprintln(os.Stdout, "++++++++")
-							fmt.Fprintf(os.Stdout, "Tool Call %d: (id: %s)\n", i, functionRequest.ID)
-							fmt.Fprintln(os.Stdout)
-							fmt.Fprintf(os.Stdout, "%s(%s)\n", functionRequest.Name, functionRequest.Arguments)
-							fmt.Fprintln(os.Stdout)
-							fmt.Fprintln(os.Stdout, functionExecution.Content)
-							fmt.Fprintln(os.Stdout, "++++++++")
-							fmt.Fprintln(os.Stdout)
-						}
-					}
+				enc := json.NewEncoder(os.Stdout)
+				out := map[string]interface{}{
+					"request":   bufferedToolCallRequest,
+					"execution": typed,
+				}
+				enc.SetIndent("", "  ")
+				if err := enc.Encode(out); err != nil {
+					fmt.Fprintf(os.Stderr, "Error encoding event: %v\n", err)
+					continue
 				}
 			} else {
+				fmt.Fprintf(os.Stdout, "%s: %s\n", config.BoldYellow("Event Type"), "ToolCall(s)")
+				fmt.Fprintf(os.Stdout, "%s: %s\n", config.BoldGreen("Source"), typed.Source)
 				tw := table.NewWriter()
 				tw.AppendHeader(table.Row{"#", "Name", "Arguments"})
 				for idx, functionRequest := range bufferedToolCallRequest.Content {
@@ -246,8 +260,11 @@ func StreamEvents(ch <-chan *autogen_client.SseEvent, usage *autogen_client.Mode
 				fmt.Fprintln(os.Stdout, tw.Render())
 			}
 
-			fmt.Fprintln(os.Stdout, "----------------------------------")
-			fmt.Fprintln(os.Stdout)
+			if !verbose {
+				fmt.Fprintln(os.Stdout, "----------------------------------")
+				fmt.Fprintln(os.Stdout)
+			}
+
 			bufferedToolCallRequest = nil
 		}
 	}

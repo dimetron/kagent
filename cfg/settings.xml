@@ -1,0 +1,54 @@
+<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
+
+  <!-- TODO: remove this file entirely. It shouldn't be in the codebase and *definitely not* with credentials in it.
+  Use Jenkins secrets, or some externalised secrets source e.g. Vault etc -->
+  <servers>
+    <server>
+      <id>remoteRepo</id><!--general configuration for repository credential, parameters are suppiled via mvn command line, user+pass come from Jenkins credentials-->
+      <username>${remoteUser}</username>
+      <password>${remotePass}</password>
+    </server>
+  </servers>
+  <proxies>
+    <proxy>
+      <id>amdocs-proxy</id>
+      <active>true</active>
+      <protocol>https</protocol>
+      <host>genproxy.amdocs.com</host>
+      <port>8080</port>
+      <nonProxyHosts>*.amdocs.com|illin*</nonProxyHosts>
+    </proxy>
+  </proxies>
+  <!-- What profiles should be used? what repositories???-->
+  <profiles>
+  <profile>
+     <id>global-build-properties</id>
+        <activation>
+        <activeByDefault>true</activeByDefault>
+        </activation>
+        <properties>
+          <!--  Nexus -->
+          <nexus.url>https://illin5638.corp.amdocs.com:28081</nexus.url>
+          <release.location>${nexus.url}/repository/nt-internal-maven-repo</release.location>
+          <snapshot.location>${nexus.url}/repository/nt-internal-maven-repo</snapshot.location>
+        </properties>
+     <repositories>
+        <repository>
+          <id>mavenRepo</id>
+          <name>mavenRepo</name>
+          <url>https://repo1.maven.org/maven2</url>
+        </repository>
+        <repository>
+          <id>remoteRepo</id>
+          <name>remoteRepo</name>
+          <url>${remoteUrl}/</url>
+        </repository>
+     </repositories>
+  </profile>
+  </profiles>
+  <activeProfiles>
+     <activeProfile>global-build-properties</activeProfile>
+  </activeProfiles>
+</settings>

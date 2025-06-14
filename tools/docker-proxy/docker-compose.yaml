@@ -1,0 +1,105 @@
+version: '3.1'
+
+services:
+  jaeger-desktop:
+    image: "docker-registry-proxy.corp.amdocs.com/jaegertracing/jaeger:2.6.0"
+    container_name: 'jaeger-desktop'
+    hostname: 'jaeger-desktop'
+    restart: always
+    network_mode: host
+  security-zeek:
+    image: "docker-registry-proxy.corp.amdocs.com/zeek/zeek"
+    container_name: 'security-zeek'
+    hostname: 'security-zeek'
+    privileged: true
+    restart: always
+    network_mode: host
+    environment:
+      - ZEEK_LOG_LEVEL=info
+    working_dir: /usr/local/zeek/logs
+    command: zeek -i eth0
+    volumes:
+      - ./zeek:/usr/local/zeek/logs
+  proxy-http:
+    image: "docker-registry-proxy.corp.amdocs.com/ubuntu/squid"
+    container_name: 'proxy-http'
+    hostname: 'proxy-http'
+    restart: always
+    network_mode: host
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+      nproc:
+        soft: 65536
+        hard: 65536
+      memlock:
+        soft: -1
+        hard: -1
+    environment:
+      - SQUID_PORT=3128
+      - SQUID_LOG_LEVEL=info
+#    ports:
+#      - '3128:3128'
+    volumes:
+      - './squid/cache:/var/spool/squid'
+      - './squid/config:/etc/squid'
+      - './squid/logs:/var/log/squid'
+  proxy-npm:
+    image: "docker-registry-proxy.corp.amdocs.com/verdaccio/verdaccio"
+    container_name: 'proxy-npm'
+    hostname: 'proxy-npm'
+    restart: always
+    network_mode: host
+    #file limits
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+      nproc:
+        soft: 65536
+        hard: 65536
+      memlock:
+        soft: -1
+        hard: -1
+    depends_on:
+      - proxy-http
+    environment:
+      - VERDACCIO_PORT=4873
+      - VERDACCIO_LOG_LEVEL=info
+      - HTTP_PROXY=http://127.0.0.1:3128
+      - HTTPS_PROXY=http://127.0.0.1:3128
+      - no_proxy=localhost,127.0.0.1
+#    ports:
+#      - '4873:4873'
+    volumes:
+      - './verdaccio/storage:/verdaccio/storage'
+      - './verdaccio/config:/verdaccio/conf'
+      - './verdaccio/plugins:/verdaccio/plugins'
+      - './verdaccio/logs:/verdaccio/logs'
+  proxy-docker:
+    image: docker-registry-proxy.corp.amdocs.com/registry
+    container_name: 'proxy-docker'
+    hostname: 'proxy-docker'
+    restart: always
+    network_mode: host
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+      nproc:
+        soft: 65536
+        hard: 65536
+      memlock:
+        soft: -1
+        hard: -1
+    environment:
+      - DOCKER_REGISTRY_PROXY_REMOTEURL=http://docker-registry-proxy.corp.amdocs.com
+      - DOCKER_PROXY_PORT=6000
+      - DOCKER_LOG_LEVEL=info
+      - HTTP_PROXY=http://127.0.0.1:3128
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+      - OTEL_LOGS_EXPORTER=otlp
+      - OTEL_TRACES_EXPORTER=otlp
+    volumes:
+      - ./docker-proxy/config.yml:/etc/docker/registry/config.yml

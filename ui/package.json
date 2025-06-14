@@ -70,8 +70,5 @@
     "ts-node": "^10.9.2",
     "typescript": "5.8.3",
     "@jest/globals": "^29.7.0"
-  },
-  "engines": {
-    "bun": ">=1.2.12"
   }
 }

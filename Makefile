@@ -5,22 +5,31 @@ DOCKER_REPO ?= platform/kagent
 
 #buildx configuration
 BUILDER_NAME ?= kagent-builder
-BUILDKIT_VERSION = v0.11.0
+BUILDKIT_VERSION = v0.22.0
 LOCALARCH ?= $(shell uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/')
 
 # Proxy settings
-PROXY ?= http://10.232.233.70:8080
-export HTTP_PROXY=$(PROXY)
-export HTTPS_PROXY=$(PROXY)
-export NO_PROXY="docker.io,localhost,192.168.64.11,192.168.5.15,192.168.8,1,192.168.100.1,192.168.5.15,127.0.0.1,192.168.5.0/24,10.96.0.0/12,192.168.100.1,192.168.8.1,192.168.8.0/24,185.162.148.55,185.139.140.136,*.svc,*.default,*.local,*.internal,*.testing,ga.sock,*.qmp.sock,serial.sock,ssh.sock,docker.sock,localaddress,*.localdomain,*.localdomain.com,illinlic01,indlinsls,linvc04,bitbucket,gitlab,ldap,10.232.233.70,10.19.50.20,10.19.50.20,genproxy,genproxy.corp.amdocs.com,10.17.88.18,10.17.88.22,10.232.217.1,10.232.217.2,10.20.40.100,10.19.214.200,*.socket,127.254.254.254,teleproxy,traffic-manager.ambassador,169.254/16,10.0.0.0/8,localhost4,*.localdomain4,localhost,10.0.0.0/8,172.16.0.0/12,192.168.100.0/16,wpad,jira,awsnvportal.corp.amdocs.com,illin5646,wpad.corp.amdocs.com,185.162.148.55,185.139.140.136,dmitriyr01-mac,*.eaas.amdocs.com,*.corp.amdocs.com,*.corp.amdocs.aws,*.corp.amdocs.azr,uk-fullvpn.amdocs.com,isr-fullvpn.amdocs.com,fullvpn.amdocs.com,aus-fullvpn.amdocs.com,docker-registry-proxy.corp.amdocs.com,*.azmk8s.io"
+PROXY ?= http://genproxy:8080
+NOPROXY ?= "127.0.0.1,localhost,.sock,.internal,.local,.svc.cluster.local,svc.cluster.local,cluster.local,genproxy,chat.autox.corp.amdocs.azr,*.corp.amdocs.com,*.corp.amdocs.aws,*.corp.amdocs.azr,100.72.198.10,10.234.177.68,10.232.233.70,10.42.0.0/16,172.17.0.0/16"
+
+export https_proxy=$(PROXY)
+export no_proxy=$(NOPROXY)
+
+#NPM_REGISTRY ?= "http://127.0.0.1:4873"
+#NPM_REGISTRY ?= "https://registry.npmjs.org/"
+NPM_REGISTRY ?= "http://docker-registry-proxy.corp.amdocs.com:8081/repository/npm-external/"
 
 export CGO_ENABLED=0
 export GO111MODULE=on
 export GOTOOLCHAIN=local
+export GOPROXY=http://docker-registry-proxy.corp.amdocs.com:8081/repository/goproxy
 
+export BUILDX_NO_DEFAULT_ATTESTATIONS=1
 BUILD_DATE := $(shell date -u '+%Y-%m-%d')
 GIT_COMMIT := $(shell git rev-parse --short HEAD || echo "unknown")
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null | sed 's/-dirty//' | grep v || echo "v0.0.0-$(GIT_COMMIT)")
+
+echo "Using version: $(VERSION)"
 
 CONTROLLER_IMAGE_NAME ?= controller
 UI_IMAGE_NAME ?= ui
@@ -39,26 +48,34 @@ RETAGGED_DOCKER_REGISTRY = illin4261.corp.amdocs.com:28090
 RETAGGED_CONTROLLER_IMG = $(RETAGGED_DOCKER_REGISTRY)/$(DOCKER_REPO)/$(CONTROLLER_IMAGE_NAME):$(CONTROLLER_IMAGE_TAG)
 RETAGGED_UI_IMG = $(RETAGGED_DOCKER_REGISTRY)/$(DOCKER_REPO)/$(UI_IMAGE_NAME):$(UI_IMAGE_TAG)
 RETAGGED_APP_IMG = $(RETAGGED_DOCKER_REGISTRY)/$(DOCKER_REPO)/$(APP_IMAGE_NAME):$(APP_IMAGE_TAG)
-DOCKER_BUILDER ?= docker
-DOCKER_BUILD_ARGS ?=
+
+#buildx parameters
+DOCKER_BUILDER ?= docker buildx
+DOCKER_BUILD_ARGS ?= --progress=plain --sbom=false --provenance=false --builder $(BUILDER_NAME)
 KIND_CLUSTER_NAME ?= kagent
 
 #take from go/go.mod
 AWK ?= $(shell command -v gawk || command -v awk)
 TOOLS_GO_VERSION ?= $(shell $(AWK) '/^go / { print $$2 }' go/go.mod)
+TOOLS_PYTHON_VERSION ?= 3.12
 
 #tools versions
-TOOLS_UV_VERSION ?= 0.7.2
-TOOLS_BUN_VERSION ?= 1.2.12
-TOOLS_K9S_VERSION ?= 0.50.4
-TOOLS_KIND_VERSION ?= 0.27.0
-TOOLS_NODE_VERSION ?= 22.15.0
-TOOLS_ISTIO_VERSION ?= 1.26.0
-TOOLS_ARGO_CD_VERSION ?= 3.0.0
-TOOLS_KUBECTL_VERSION ?= 1.33.4
+TOOLS_UV_VERSION ?= 0.7.13        # https://github.com/astral-sh/uv/releases
+TOOLS_BUN_VERSION ?= 1.2.16       # https://github.com/oven-sh/bun/releases
+TOOLS_K9S_VERSION ?= 0.50.4       # https://github.com/derailed/k9s/releases
+TOOLS_KIND_VERSION ?= 0.27.0      #
+TOOLS_NODE_VERSION ?= 20.19.2     #
+TOOLS_HELM_VERSION ?= 3.18.2      #
+TOOLS_ISTIO_VERSION ?= 1.26.1     #
+TOOLS_ARGO_CD_VERSION ?= 3.0.0    #
+TOOLS_KUBECTL_VERSION ?= 1.33.4   #
 
-# build args
-TOOLS_IMAGE_BUILD_ARGS =  --build-arg LOCALARCH=${LOCALARCH}
+
+TOOLS_IMAGE_BUILD_ARGS += --build-arg VERSION=$(VERSION)
+TOOLS_IMAGE_BUILD_ARGS += --build-arg PROXY_HTTP=$(PROXY)
+TOOLS_IMAGE_BUILD_ARGS += --build-arg NO_PROXY=$(NOPROXY)
+TOOLS_IMAGE_BUILD_ARGS += --build-arg LOCALARCH=$(LOCALARCH)
+TOOLS_IMAGE_BUILD_ARGS += --build-arg NPM_REGISTRY=$(NPM_REGISTRY)
 TOOLS_IMAGE_BUILD_ARGS += --build-arg BASE_IMAGE_REGISTRY=$(BASE_IMAGE_REGISTRY)
 TOOLS_IMAGE_BUILD_ARGS += --build-arg TOOLS_GO_VERSION=$(TOOLS_GO_VERSION)
 TOOLS_IMAGE_BUILD_ARGS += --build-arg TOOLS_UV_VERSION=$(TOOLS_UV_VERSION)
@@ -66,7 +83,9 @@ TOOLS_IMAGE_BUILD_ARGS += --build-arg TOOLS_BUN_VERSION=$(TOOLS_BUN_VERSION)
 TOOLS_IMAGE_BUILD_ARGS += --build-arg TOOLS_K9S_VERSION=$(TOOLS_K9S_VERSION)
 TOOLS_IMAGE_BUILD_ARGS += --build-arg TOOLS_KIND_VERSION=$(TOOLS_KIND_VERSION)
 TOOLS_IMAGE_BUILD_ARGS += --build-arg TOOLS_NODE_VERSION=$(TOOLS_NODE_VERSION)
+TOOLS_IMAGE_BUILD_ARGS += --build-arg TOOLS_HELM_VERSION=$(TOOLS_HELM_VERSION)
 TOOLS_IMAGE_BUILD_ARGS += --build-arg TOOLS_ISTIO_VERSION=$(TOOLS_ISTIO_VERSION)
+TOOLS_IMAGE_BUILD_ARGS += --build-arg TOOLS_PYTHON_VERSION=$(TOOLS_PYTHON_VERSION)
 TOOLS_IMAGE_BUILD_ARGS += --build-arg TOOLS_ARGO_CD_VERSION=$(TOOLS_ARGO_CD_VERSION)
 TOOLS_IMAGE_BUILD_ARGS += --build-arg TOOLS_KUBECTL_VERSION=$(TOOLS_KUBECTL_VERSION)
 
@@ -94,27 +113,38 @@ check-openai-key:
 		exit 1; \
 	fi
 
+.PHONY: builds
+builds: release report/cve
+
+.PHONY: report/cve
+report/cve:
+	echo "Pulling images for CVE scan ..."
+	crane copy --insecure $(CONTROLLER_IMG) docker:$(CONTROLLER_IMG)
+	crane copy --insecure $(APP_IMG)       docker:$(APP_IMG)
+	crane copy --insecure $(UI_IMG)        docker:$(UI_IMG)
+	echo "Running CVE scan :: CVE -> CSV ... reports/$(SEMVER)/"
+	grype docker:$(CONTROLLER_IMG) -o template -t reports/report.tmpl.csv --file reports/$(SEMVER)/controller-cve.csv
+	grype docker:$(APP_IMG)        -o template -t reports/report.tmpl.csv --file reports/$(SEMVER)/app-cve.csv
+	grype docker:$(UI_IMG)         -o template -t reports/report.tmpl.csv --file reports/$(SEMVER)/ui-cve.csv
+	echo "Running CVE scan :: CVE -> HTML ... reports/$(VERSION)/"
+	grype docker:$(CONTROLLER_IMG) -o template -t reports/report.tmpl.html --file reports/$(SEMVER)/controller-cve.html
+	grype docker:$(APP_IMG)        -o template -t reports/report.tmpl.html --file reports/$(SEMVER)/app-cve.html
+	grype docker:$(UI_IMG)         -o template -t reports/report.tmpl.html --file reports/$(SEMVER)/ui-cve.html
+
 .PHONY: clean
-clean:
+clean: proxy-clean
 	docker buildx rm $(BUILDER_NAME) || :
-	
+	@tools/buildx/buildx-create.sh
+	docker system prune -f --volumes || :
+
 .PHONY: buildx-create
 buildx-create:
-	docker buildx inspect $(BUILDER_NAME)  || docker buildx create --driver-opt "network=host,image=docker-registry-proxy.corp.amdocs.com/moby/buildkit:$(BUILDKIT_VERSION)" --config build/buildkitd.toml --name $(BUILDER_NAME) --use
-	docker buildx use $(BUILDER_NAME) || true
-
-.PHONY: build-all  # build all all using buildx
-build-all: BUILDER_NAME ?= kagent-builder
-build-all: BUILDER ?=docker buildx --builder $(BUILDER_NAME) --push
-build-all: BUILD_ARGS ?= --platform linux/amd64,linux/arm64 --output type=tar,dest=/dev/null
-build-all: buildx-create
-	$(BUILDER) build $(BUILD_ARGS) $(TOOLS_IMAGE_BUILD_ARGS) -f go/Dockerfile ./go
-	$(BUILDER) build $(BUILD_ARGS) $(TOOLS_IMAGE_BUILD_ARGS) -f ui/Dockerfile ./ui
-	$(BUILDER) build $(BUILD_ARGS) $(TOOLS_IMAGE_BUILD_ARGS) -f python/Dockerfile ./python
-
+	@tools/buildx/buildx-create.sh $(BUILDER_NAME)
+	
 .PHONY: create-kind-cluster
 create-kind-cluster:
-	kind create cluster --name $(KIND_CLUSTER_NAME)
+	docker pull $(BASE_IMAGE_REGISTRY)/kindest/node:v1.32.5 || true
+	kind get nodes --name $(KIND_CLUSTER_NAME)  || kind create cluster --name $(KIND_CLUSTER_NAME) --image $(BASE_IMAGE_REGISTRY)/kindest/node:v1.32.5
 
 .PHONY: use-kind-cluster
 use-kind-cluster:
@@ -133,8 +163,20 @@ prune-kind-cluster:
 	docker exec $(KIND_CLUSTER_NAME)-control-plane crictl images --filter dangling=true --no-trunc --quiet | \
 	awk '{print $3}' | xargs -r docker exec $(KIND_CLUSTER_NAME)-control-plane crictl rmi || :
 
+.PHONY: update-lock-files
+update-lock-files:
+	make -C ui build
+	make -C python build
+
 .PHONY: build
+build: DOCKER_BUILD_ARGS += --load --platform linux/$(LOCALARCH)
 build: build-controller build-ui build-app
+
+#use make proxy-log to see proxy logs
+.PHONY: build-offline
+build-offline: PROXY ?= "http://127.0.0.1:3128"
+build-offline: NPM_REGISTRY ?= "http://127.0.0.1:4873"
+build-offline: build
 
 .PHONY: build-cli
 build-cli:
@@ -151,21 +193,17 @@ build-img-versions:
 	@echo ui=$(UI_IMG)
 	@echo app=$(APP_IMG)
 
-.PHONY: push
-push: push-controller push-ui push-app
-
 .PHONY: controller-manifests
 controller-manifests:
 	make -C go manifests
 	cp go/config/crd/bases/* helm/kagent-crds/templates/
 
 .PHONY: build-controller
-build-controller: controller-manifests
+build-controller: controller-manifests buildx-create
 	$(DOCKER_BUILDER) build $(DOCKER_BUILD_ARGS) $(TOOLS_IMAGE_BUILD_ARGS) -t $(CONTROLLER_IMG) -f go/Dockerfile ./go
 
 .PHONY: release
-release: BUILDER ?=docker buildx
-release: BUILD_ARGS ?= --platform linux/amd64,linux/arm64 --builder $(BUILDER_NAME)
+release: DOCKER_BUILD_ARGS ?= --progress=plain --sbom false --provenance=false --sbom=false --provenance=false --builder $BUILDX_NAME  --builder $(BUILDER_NAME)
 release: buildx-create
 release: release-controller
 release: release-app
@@ -177,8 +215,7 @@ release-controller: DOCKER_BUILDER = docker buildx
 release-controller: build-controller
 
 .PHONY: build-ui
-build-ui:
-	# Build the combined UI and backend image
+build-ui: buildx-create
 	$(DOCKER_BUILDER) build $(DOCKER_BUILD_ARGS) $(TOOLS_IMAGE_BUILD_ARGS) -t $(UI_IMG) -f ui/Dockerfile ./ui
 
 .PHONY: release-ui
@@ -187,7 +224,7 @@ release-ui: DOCKER_BUILDER = docker buildx
 release-ui: build-ui
 
 .PHONY: build-app
-build-app:
+build-app: buildx-create
 	$(DOCKER_BUILDER) build $(DOCKER_BUILD_ARGS) $(TOOLS_IMAGE_BUILD_ARGS) -t $(APP_IMG) -f python/Dockerfile ./python
 
 .PHONY: release-app
@@ -216,6 +253,7 @@ retag-docker-images: build
 .PHONY: helm-cleanup
 helm-cleanup:
 	rm -f *.tgz
+	mkdir -p dist
 
 .PHONY: helm-test
 helm-test: helm-version
@@ -228,29 +266,33 @@ helm-test: helm-version
 .PHONY: helm-agents
 helm-agents:
 	VERSION=$(VERSION) envsubst < helm/agents/k8s/Chart-template.yaml > helm/agents/k8s/Chart.yaml
-	helm package helm/agents/k8s
+	helm package helm/agents/k8s            -d dist
 	VERSION=$(VERSION) envsubst < helm/agents/kgateway/Chart-template.yaml > helm/agents/kgateway/Chart.yaml
-	helm package helm/agents/kgateway
+	helm package helm/agents/kgateway       -d dist
 	VERSION=$(VERSION) envsubst < helm/agents/istio/Chart-template.yaml > helm/agents/istio/Chart.yaml
-	helm package helm/agents/istio
+	helm package helm/agents/istio          -d dist
 	VERSION=$(VERSION) envsubst < helm/agents/promql/Chart-template.yaml > helm/agents/promql/Chart.yaml
-	helm package helm/agents/promql
+	helm package helm/agents/promql         -d dist
 	VERSION=$(VERSION) envsubst < helm/agents/observability/Chart-template.yaml > helm/agents/observability/Chart.yaml
-	helm package helm/agents/observability
+	helm package helm/agents/observability  -d dist
 	VERSION=$(VERSION) envsubst < helm/agents/helm/Chart-template.yaml > helm/agents/helm/Chart.yaml
-	helm package helm/agents/helm
+	helm package helm/agents/helm           -d dist
 	VERSION=$(VERSION) envsubst < helm/agents/argo-rollouts/Chart-template.yaml > helm/agents/argo-rollouts/Chart.yaml
-	helm package helm/agents/argo-rollouts
-	VERSION=$(VERSION) envsubst < helm/agents/cilium-crd/Chart-template.yaml > helm/agents/cilium-crd/Chart.yaml
-	helm package helm/agents/cilium-crd
+	helm package helm/agents/argo-rollouts  -d dist
+	VERSION=$(VERSION) envsubst < helm/agents/cilium-policy/Chart-template.yaml > helm/agents/cilium-policy/Chart.yaml
+	helm package helm/agents/cilium-policy  -d dist
+	VERSION=$(VERSION) envsubst < helm/agents/cilium-debug/Chart-template.yaml > helm/agents/cilium-debug/Chart.yaml
+	helm package helm/agents/cilium-debug   -d dist
+	VERSION=$(VERSION) envsubst < helm/agents/cilium-manager/Chart-template.yaml > helm/agents/cilium-manager/Chart.yaml
+	helm package helm/agents/cilium-manager -d dist
 
 .PHONY: helm-version
 helm-version: helm-cleanup helm-agents
 	VERSION=$(VERSION) envsubst < helm/kagent-crds/Chart-template.yaml > helm/kagent-crds/Chart.yaml
 	VERSION=$(VERSION) envsubst < helm/kagent/Chart-template.yaml > helm/kagent/Chart.yaml
 	helm dependency update helm/kagent || :
-	helm package helm/kagent-crds
-	helm package helm/kagent
+	helm package helm/kagent-crds -d dist
+	helm package helm/kagent      -d dist
 
 .PHONY: helm-install-provider
 helm-install-provider: helm-version check-openai-key
@@ -265,6 +307,7 @@ helm-install-provider: helm-version check-openai-key
 		--history-max 2    \
 		--timeout 5m       \
 		--wait \
+		--set service.type=LoadBalancer \
 		--set controller.image.registry=$(RETAGGED_DOCKER_REGISTRY) \
 		--set ui.image.registry=$(RETAGGED_DOCKER_REGISTRY) \
 		--set app.image.registry=$(RETAGGED_DOCKER_REGISTRY) \
@@ -301,19 +344,30 @@ helm-publish: helm-version
 	helm push promql-agent-$(VERSION).tgz oci://ghcr.io/kagent-dev/kagent/agents
 	helm push observability-agent-$(VERSION).tgz oci://ghcr.io/kagent-dev/kagent/agents
 	helm push argo-rollouts-agent-$(VERSION).tgz oci://ghcr.io/kagent-dev/kagent/agents
-	helm push cilium-crd-agent-$(VERSION).tgz oci://ghcr.io/kagent-dev/kagent/agents
+	helm push cilium-policy-agent-$(VERSION).tgz oci://ghcr.io/kagent-dev/kagent/agents
+	helm push cilium-manager-agent-$(VERSION).tgz oci://ghcr.io/kagent-dev/kagent/agents
+	helm push cilium-debug-agent-$(VERSION).tgz oci://ghcr.io/kagent-dev/kagent/agents
 	helm push kgateway-agent-$(VERSION).tgz oci://ghcr.io/kagent-dev/kagent/agents
 
+test/e2e:
+	@echo "Running E2E tests..."
+
 .PHONY: kagent-cli-install
-kagent-cli-install: build-cli-local kind-load-docker-images helm-version
+kagent-cli-install: build build-cli-local kind-load-docker-images helm-version
 kagent-cli-install:
+	ps -ef | grep port-forward | grep -v grep | awk '{print $2}' | xargs kill -9 || true
+	KAGENT_HELM_REPO=./helm/ ./go/bin/kagent-local install
+	KAGENT_HELM_REPO=./helm/ ./go/bin/kagent-local dashboard
+
+kagent-cli-dashboard:
+	ps -ef | grep port-forward | grep -v grep | awk '{print $2}' | xargs kill -9 || true
 	KAGENT_HELM_REPO=./helm/ ./go/bin/kagent-local install
 	KAGENT_HELM_REPO=./helm/ ./go/bin/kagent-local dashboard
 
 .PHONY: kagent-cli-port-forward
-kagent-cli-port-forward: use-kind-cluster
+kagent-cli-port-forward:
 	@echo "Port forwarding to kagent CLI..."
-	kubectl port-forward -n kagent service/kagent 8081:8081 8082:80
+	kubectl port-forward -n kagent service/kagent 8082:80
 
 .PHONY: open-dev-container
 open-dev-container:
@@ -323,6 +377,55 @@ open-dev-container:
 
 .PHONY: otel-local
 otel-local:
-	#docker run -d --name otel-desktop --restart=always -p 8000:8000 -p 4317:4317 -p 4318:4318 $(BASE_IMAGE_REGISTRY)/davetron5000/otel-desktop-viewer:alpine-3
+	docker rm -f jaeger-desktop || true
 	docker run -d --name jaeger-desktop --restart=always -p 16686:16686 -p 4317:4317 -p 4318:4318 $(BASE_IMAGE_REGISTRY)/jaegertracing/jaeger:2.6.0
 	open http://localhost:16686
+
+.PHONY: proxy-start
+proxy-start:
+	@echo "Setting up proxy..."
+	cd tools/docker-proxy 	\
+	&& docker compose pull	\
+	&& docker compose down 	\
+	&& docker compose up -d	\
+	&& sleep 7
+
+proxy-stop:
+	@echo "Stoping up proxy..."
+	cd tools/docker-proxy 	\
+	&& docker compose down
+
+.PHONY: proxy-log
+proxy-log:
+	cd tools/docker-proxy 		\
+	&& docker compose logs -f | grep -v proxy-docker
+
+.PHONY: check-proxy
+proxy-test:
+	@echo "Checking proxy return 200."
+	export export https_proxy=http://127.0.0.1:3128 	\
+	&& curl -L https://dl-cdn.alpinelinux.org/MIRRORS.txt -o /dev/null	\
+	&& curl -L https://apk.cgr.dev/chainguard/x86_64/APKINDEX.tar.gz -o /dev/null
+
+.PHONY: proxy-clean
+proxy-clean:
+	@echo "Cleaning up proxy..."
+	cd tools/docker-proxy 		\
+	&& docker compose pull		\
+	&& docker compose down 		\
+	&& rm -rf verdaccio/storage \
+	&& rm -rf squid/cache		\
+	&& rm -rf zeek				\
+	&& docker compose up -d		\
+	&& sleep 5
+
+.PHONY: tshark
+tshark:
+	@echo "Building tshark image..."
+	docker exec -t buildx_buildkit_$(BUILDER_NAME)0 /bin/sh -c "which tshark   || https_proxy=http://192.168.8.1:3128 apk update"
+	docker exec -t buildx_buildkit_$(BUILDER_NAME)0 /bin/sh -c "which tshark   || https_proxy=http://192.168.8.1:3128 apk add tshark"
+	docker exec -t buildx_buildkit_$(BUILDER_NAME)0 /bin/sh -c "tshark -Y 'dns or http' || echo 'tshark not found, please install it manually'"
+
+.PHONY: docker-shell-python
+docker-shell-python:
+	docker run --rm -it --entrypoint busybox $(APP_IMG) sh
