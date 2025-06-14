@@ -159,7 +159,7 @@ istio-agent:
   enabled: true
 
 promql-agent:
-  enabled: true
+  enabled: false
 
 observability-agent:
   enabled: true

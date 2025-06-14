@@ -10,7 +10,7 @@ LOCALARCH ?= $(shell uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/')
 
 # Proxy settings
 PROXY ?= http://genproxy:8080
-NOPROXY ?= "127.0.0.1,localhost,.sock,.internal,.local,.svc.cluster.local,svc.cluster.local,cluster.local,genproxy,chat.autox.corp.amdocs.azr,*.corp.amdocs.com,*.corp.amdocs.aws,*.corp.amdocs.azr,100.72.198.10,10.234.177.68,10.232.233.70,10.42.0.0/16,172.17.0.0/16"
+NOPROXY ?= "127.0.0.1,10.42.0.0/16,10.43.0.0/16,172.17.0.0/16,localhost,.sock,.internal,.local,.svc.cluster.local,svc.cluster.local,cluster.local,genproxy,chat.autox.corp.amdocs.azr,*.corp.amdocs.com,*.corp.amdocs.aws,*.corp.amdocs.azr,100.72.198.10,10.234.177.68,10.232.233.70"
 
 export https_proxy=$(PROXY)
 export no_proxy=$(NOPROXY)
@@ -135,6 +135,9 @@ report/cve:
 clean: proxy-clean
 	docker buildx rm $(BUILDER_NAME) || :
 	@tools/buildx/buildx-create.sh
+	docker images | grep kagent | grep -v $(VERSION) | awk '{print $2}' sort | uniq | xargs -n1 -I{} docker rmi illin4261.corp.amdocs.com:28090/platform/kagent/ui:{}
+	docker images | grep kagent | grep -v $(VERSION) | awk '{print $2}' sort | uniq | xargs -n1 -I{} docker rmi illin4261.corp.amdocs.com:28090/platform/kagent/app:{}
+	docker images | grep kagent | grep -v $(VERSION) | awk '{print $2}' sort | uniq | xargs -n1 -I{} docker rmi illin4261.corp.amdocs.com:28090/platform/kagent/controller:{}
 	docker system prune -f --volumes || :
 
 .PHONY: buildx-create
