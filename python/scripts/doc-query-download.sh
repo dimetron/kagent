@@ -11,7 +11,7 @@ for file in kubernetes istio argo argo-rollouts helm prometheus kgateway otel; d
   target_file="$target_dir/$file.db"
   if [ ! -f "$target_file" ]; then
     echo "Downloading $target_file from $url"
-    curl -sLo $target_file $url
+    curl -sLo $target_file $url || curl -sLo $target_file $url
     #sqlite3 "$target_file" "VACUUM;"
   else
     echo "File $target_file already exists, skipping download."

@@ -161,7 +161,7 @@ COPY --chown=python:pythongroup scripts/doc-query-download.sh /doc-query-downloa
 RUN export https_proxy=$PROXY_HTTP                                                  \
     && chmod +x /doc-query-download.sh                                              \
     && /doc-query-download.sh  /app/python/.kagent/cache/doc-query                  \
-    rm -f /doc-query-download.sh
+    && rm -f /doc-query-download.sh
 
 EXPOSE 8081
 ARG VERSION
