@@ -14,12 +14,12 @@ ENV LC_ALL=C.UTF-8
 ADD FullAmdocsCA.crt /etc/ssl/certs/FullAmdocsCA.crt
 RUN cat /etc/ssl/certs/FullAmdocsCA.crt >> /etc/ssl/certs/ca-certificates.crt
 
-RUN export PKS="curl openssl unzip bash git ca-certificates-bundle nginx supervisor sqlite python3 uv nodejs npm" \
+RUN --mount=type=cache,target=/var/cache/,rw                  \
+    export PKS="curl openssl unzip bash git ca-certificates-bundle nginx supervisor sqlite python3 uv nodejs npm" \
     && echo "Installing -> $LOCALARCH on $TARGETARCH :: $PKS" \
     && export https_proxy=$PROXY_HTTP                         \
     && apk update   || apk update                             \
-    && apk add $PKS || apk add $PKS                           \
-    && rm -f /var/cache/apk/* /var/cache/apk/*-old
+    && apk add $PKS || apk add $PKS
 
 ### STAGE 2: python
 FROM base-os AS python-os

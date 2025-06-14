@@ -16,10 +16,11 @@ RUN cat /etc/ssl/certs/FullAmdocsCA.crt >> /etc/ssl/certs/ca-certificates.crt
 
 ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
-RUN echo "Installing $LOCALARCH -> $TARGETARCH"   \
+RUN --mount=type=cache,target=/var/cache/,rw      \
+    echo "Installing $LOCALARCH -> $TARGETARCH"   \
     && export PKS="curl openssl unzip bash git ca-certificates-bundle nginx supervisor" \
-    && export https_proxy=$PROXY_HTTP  \
-    && apk update   || apk update      \
+    && export https_proxy=$PROXY_HTTP             \
+    && apk update   || apk update                 \
     && apk add $PKS || apk add $PKS
 
 # Use host machine's npm registry (can be overridden with --build-arg NPM_REGISTRY)
@@ -95,10 +96,11 @@ RUN cat /etc/ssl/certs/FullAmdocsCA.crt >> /etc/ssl/certs/ca-certificates.crt
 
 ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
-RUN echo "Installing -> $LOCALARCH on $TARGETARCH"    \
+RUN --mount=type=cache,target=/var/cache/,rw      \
+    echo "Installing $LOCALARCH -> $TARGETARCH"   \
     && export PKS="curl openssl unzip bash git ca-certificates-bundle nginx supervisor" \
-    && export https_proxy=$PROXY_HTTP                 \
-    && apk update   || apk update                     \
+    && export https_proxy=$PROXY_HTTP             \
+    && apk update   || apk update                 \
     && apk add $PKS || apk add $PKS
 
 ARG TOOLS_BUN_VERSION
