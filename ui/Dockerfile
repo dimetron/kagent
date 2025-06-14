@@ -136,10 +136,12 @@ RUN chown -R nextjs:nginx /app/ui && \
     chmod -R 755 /app
 
 EXPOSE 80
+ARG VERSION
 
 LABEL org.opencontainers.image.source=https://github.com/kagent-dev/kagent
 LABEL org.opencontainers.image.description="Kagent app is the UI and apiserver for running agents."
 LABEL org.opencontainers.image.authors="Kagent Creators 🤖"
+LABEL org.opencontainers.image.version="$VERSION"
 
 USER nextjs
 

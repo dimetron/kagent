@@ -133,7 +133,7 @@ RUN export https_proxy=${PROXY_HTTP}                               \
 ENV UV_OFFLINE=1
 
 # Generate configs
-RUN export https_proxy=${PROXY_HTTP}                               \
+RUN export https_proxy=${PROXY_HTTP}                                \
     && mkdir -p /app/python/.autogenstudio/configs                  \
     && uv run tool_gen -o /app/python/.autogenstudio/configs
 
@@ -141,21 +141,16 @@ RUN export https_proxy=${PROXY_HTTP}                               \
 RUN export https_proxy=$PROXY_HTTP                                 \
     && uv run kagent-engine --help
 
-#    && uv run kagent-engine prometheus  --help                    \
-#    && uv run kagent-engine argo        --help                    \
-#    && uv run kagent-engine istio       --help                    \
-#    && uv run kagent-engine k8s         --help                    \
-#    && uv run kagent-engine helm        --help
-
 # Install Kubescape
-#RUN export https_proxy=$PROXY_HTTP                                                            \
-#    && curl -Lo install.sh https://raw.githubusercontent.com/kubescape/kubescape/master/install.sh      \
-#    && chmod +x install.sh                        \
-#    && /bin/bash install.sh  2>&1
-#
-#RUN mv /app/python/.kubescape/bin/kubescape bin/kubescape  \
-#    && kubescape download artifacts || :                   \
-#    && echo -e "\033[0m"
+RUN export https_proxy=$PROXY_HTTP                                                                  \
+    && curl -Lo install.sh https://raw.githubusercontent.com/kubescape/kubescape/master/install.sh  \
+    && chmod +x install.sh                                                                          \
+    && /bin/bash install.sh  2>&1
+
+RUN export https_proxy=$PROXY_HTTP                            \
+    && mv /app/python/.kubescape/bin/kubescape bin/kubescape  \
+    && kubescape download artifacts || :                      \
+    && echo -e "\033[0m"
 
 #set custom certificates
 ENV CERT_PATH='/app/python/amdcerts.pem'
@@ -164,9 +159,11 @@ ENV REQUESTS_CA_BUNDLE=$CERT_PATH
 ENV SSL_CERT_FILE=$CERT_PATH
 
 EXPOSE 8081
+ARG VERSION
 
 LABEL org.opencontainers.image.source=https://github.com/kagent-dev/kagent
 LABEL org.opencontainers.image.description="Kagent app is the apiserver for running agents."
 LABEL org.opencontainers.image.authors="Kagent Creators 🤖"
+LABEL org.opencontainers.image.version="$VERSION"
 
 CMD ["uv", "run", "kagent-engine", "serve", "--host", "0.0.0.0", "--port", "8081"]

@@ -43,6 +43,7 @@ RUN --mount=type=cache,target=/root/go/pkg/mod,rw         \
 FROM $BASE_IMAGE_REGISTRY/distroless/static:nonroot
 ARG TARGETPLATFORM
 ARG TARGETARCH
+ARG VERSION
 
 WORKDIR /
 COPY --from=builder /workspace/manager .
@@ -50,5 +51,7 @@ USER 65532:65532
 
 LABEL org.opencontainers.image.source=https://github.com/kagent-dev/kagent
 LABEL org.opencontainers.image.description="Kagent controller is the controller for the Kagent app."
+LABEL org.opencontainers.image.authors="Kagent Creators 🤖"
+LABEL org.opencontainers.image.version="$VERSION"
 
 ENTRYPOINT ["/manager"]
