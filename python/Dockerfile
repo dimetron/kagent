@@ -157,11 +157,11 @@ COPY --chown=python:pythongroup amdcerts.pem $CERT_PATH
 ENV REQUESTS_CA_BUNDLE=$CERT_PATH
 ENV SSL_CERT_FILE=$CERT_PATH
 
-COPY --chown=python:pythongroup scripts/doc-query-download.sh /doc-query-download.sh
-RUN export https_proxy=$PROXY_HTTP                                                  \
-    && chmod +x /doc-query-download.sh                                              \
-    && /doc-query-download.sh  /app/python/.kagent/cache/doc-query                  \
-    && rm -f /doc-query-download.sh
+COPY --chown=python:pythongroup scripts/doc-query-download.sh /app/python/bin/doc-query-download.sh
+RUN export https_proxy=$PROXY_HTTP                                                                  \
+    && chmod +x /app/python/bin/doc-query-download.sh                                               \
+    && /app/python/bin/doc-query-download.sh  /app/python/.kagent/cache/doc-query                   \
+    && rm -f /app/python/bin/doc-query-download.sh
 
 EXPOSE 8081
 ARG VERSION

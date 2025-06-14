@@ -22,3 +22,5 @@ for file in kubernetes istio argo argo-rollouts helm prometheus kgateway otel; d
   #  gzip -9 $target_file
   #  echo "Compressed and vacuumed $target_file.gz".
 done
+
+echo "All files downloaded."
