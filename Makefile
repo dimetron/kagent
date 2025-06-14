@@ -364,6 +364,10 @@ kagent-cli-dashboard:
 	KAGENT_HELM_REPO=./helm/ ./go/bin/kagent-local install
 	KAGENT_HELM_REPO=./helm/ ./go/bin/kagent-local dashboard
 
+kagent-cli-chat:
+	KAGENT_HELM_REPO=./helm/ ./go/bin/kagent-local invoke --agent istio-agent --session "check installation" --task hack/prompts/check_istio_installation.md | jq
+
+
 .PHONY: kagent-cli-port-forward
 kagent-cli-port-forward:
 	@echo "Port forwarding to kagent CLI..."

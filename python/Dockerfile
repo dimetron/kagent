@@ -14,11 +14,12 @@ ENV LC_ALL=C.UTF-8
 ADD FullAmdocsCA.crt /etc/ssl/certs/FullAmdocsCA.crt
 RUN cat /etc/ssl/certs/FullAmdocsCA.crt >> /etc/ssl/certs/ca-certificates.crt
 
-RUN echo "Installing -> $LOCALARCH on $TARGETARCH"    \
-    && export PKS="curl openssl unzip bash git ca-certificates-bundle nginx supervisor" \
-    && export https_proxy=$PROXY_HTTP                 \
-    && apk update   || apk update                     \
-    && apk add $PKS || apk add $PKS
+RUN export PKS="curl openssl unzip bash git ca-certificates-bundle nginx supervisor sqlite python3 uv nodejs npm" \
+    && echo "Installing -> $LOCALARCH on $TARGETARCH :: $PKS" \
+    && export https_proxy=$PROXY_HTTP                         \
+    && apk update   || apk update                             \
+    && apk add $PKS || apk add $PKS                           \
+    && rm -f /var/cache/apk/* /var/cache/apk/*-old
 
 ### STAGE 2: python
 FROM base-os AS python-os
@@ -31,11 +32,6 @@ ARG NO_PROXY
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
-
-RUN export https_proxy=$PROXY_HTTP  \
-    && apk update || apk update               \
-    && apk add python3 uv nodejs npm
-
 ENV GIT_LFS_SKIP_SMUDGE=1
 
 ENV UV_LINK_MODE=copy
@@ -44,7 +40,6 @@ ENV UV_PROJECT_ENVIRONMENT="/app/python/.venv"
 
 ENV BUN_INSTALL=/usr/local/bun
 ENV BUN_INSTALL_CACHE_DIR=/app/python/.cache/bun
-
 ENV PATH=$BUN_INSTALL/bin:/app/python/bin/:$PATH
 
 RUN --mount=type=cache,target=/app/python/.cache,rw       \
@@ -157,6 +152,12 @@ ENV CERT_PATH='/app/python/amdcerts.pem'
 COPY --chown=python:pythongroup amdcerts.pem $CERT_PATH
 ENV REQUESTS_CA_BUNDLE=$CERT_PATH
 ENV SSL_CERT_FILE=$CERT_PATH
+
+COPY --chown=python:pythongroup scripts/doc-query-download.sh /doc-query-download.sh
+RUN export https_proxy=$PROXY_HTTP                                                  \
+    && chmod +x /doc-query-download.sh                                              \
+    && /doc-query-download.sh  /app/python/.kagent/cache/doc-query                  \
+    rm -f /doc-query-download.sh
 
 EXPOSE 8081
 ARG VERSION
