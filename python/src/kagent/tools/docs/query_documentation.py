@@ -91,6 +91,7 @@ class SQLiteDownloader:
         db_path = self.get_db_path(product_name)
 
         if not db_path.exists():
+            logging.info(f"Database for {product_name} not found locally. Downloading...")
             db_filename = self.product_map[product_name]
             db_url = f"{self.base_url}/{db_filename}"
 

@@ -12,12 +12,13 @@ for file in kubernetes istio argo argo-rollouts helm prometheus kgateway otel; d
   if [ ! -f "$target_file" ]; then
     echo "Downloading $target_file from $url"
     curl -sLo $target_file $url
-    sqlite3 "$target_file" "VACUUM;"
+    #sqlite3 "$target_file" "VACUUM;"
   else
     echo "File $target_file already exists, skipping download."
   fi
+  #  sqlite3 "$target_file" 'SELECT count(*) FROM vec_items;'
   #  echo "Compressing $target_file"
   #  rm -f $target_file.gz"
   #  gzip -9 $target_file
-  #  echo "Compressed and vacuumed $target_file.gz"
+  #  echo "Compressed and vacuumed $target_file.gz".
 done

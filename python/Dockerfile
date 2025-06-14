@@ -15,7 +15,7 @@ ADD FullAmdocsCA.crt /etc/ssl/certs/FullAmdocsCA.crt
 RUN cat /etc/ssl/certs/FullAmdocsCA.crt >> /etc/ssl/certs/ca-certificates.crt
 
 RUN --mount=type=cache,target=/var/cache/,rw                  \
-    export PKS="curl openssl unzip bash git ca-certificates-bundle nginx supervisor sqlite python3 uv nodejs npm" \
+    export PKS="curl openssl unzip bash git ca-certificates-bundle nginx supervisor sqlite python3 uv nodejs npm " \
     && echo "Installing -> $LOCALARCH on $TARGETARCH :: $PKS" \
     && export https_proxy=$PROXY_HTTP                         \
     && apk update   || apk update                             \
@@ -143,6 +143,7 @@ RUN export https_proxy=$PROXY_HTTP                                              
     && curl -Lo install.sh https://raw.githubusercontent.com/kubescape/kubescape/master/install.sh  \
     && chmod +x install.sh                                                                          \
     && /bin/bash install.sh  2>&1                                                                   \
+    && rm -f install.sh                                                                             \
     && echo -e "\033[0m"
 
 RUN export https_proxy=$PROXY_HTTP                                        \
