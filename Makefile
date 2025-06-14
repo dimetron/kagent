@@ -166,7 +166,7 @@ prune-kind-cluster:
 .PHONY: update-lock-files
 update-lock-files:
 	make -C ui build
-	make -C python build
+	make -C python buildsd
 
 .PHONY: build
 build: DOCKER_BUILD_ARGS += --load --platform linux/$(LOCALARCH)
@@ -285,6 +285,8 @@ helm-agents:
 	helm package helm/agents/cilium-debug   -d dist
 	VERSION=$(VERSION) envsubst < helm/agents/cilium-manager/Chart-template.yaml > helm/agents/cilium-manager/Chart.yaml
 	helm package helm/agents/cilium-manager -d dist
+	VERSION=$(VERSION) envsubst < helm/agents/kubescape/Chart-template.yaml > helm/agents/kubescape/Chart.yaml
+	helm package helm/agents/kubescape -d dist
 
 .PHONY: helm-version
 helm-version: helm-cleanup helm-agents

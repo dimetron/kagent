@@ -137,14 +137,17 @@ RUN export https_proxy=$PROXY_HTTP                                 \
     && uv run kagent-engine --help
 
 # Install Kubescape
+ENV KS_CACHE_DIR=/app/python/.kubescape
+ENV PATH=$PATH:$KS_CACHE_DIR/bin
 RUN export https_proxy=$PROXY_HTTP                                                                  \
     && curl -Lo install.sh https://raw.githubusercontent.com/kubescape/kubescape/master/install.sh  \
     && chmod +x install.sh                                                                          \
-    && /bin/bash install.sh  2>&1
+    && /bin/bash install.sh  2>&1                                                                   \
+    && echo -e "\033[0m"
 
-RUN export https_proxy=$PROXY_HTTP                            \
-    && mv /app/python/.kubescape/bin/kubescape bin/kubescape  \
-    && kubescape download artifacts || :                      \
+RUN export https_proxy=$PROXY_HTTP                                        \
+    && mv /app/python/.kubescape/bin/kubescape bin/kubescape              \
+    && kubescape download artifacts || kubescape download artifacts || :  \
     && echo -e "\033[0m"
 
 #set custom certificates
