@@ -5,8 +5,6 @@ import subprocess
 def run_command(command: str, args: list[str]) -> str:
     """Run the given command and return the output."""
     try:
-        # use timeout to avoid hanging
-        # use shell=True to allow for shell features like pipes and redirection
         output = subprocess.check_output([command] + args, stderr=subprocess.STDOUT)
         return output.decode("utf-8")
     except subprocess.CalledProcessError as e:
