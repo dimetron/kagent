@@ -144,7 +144,7 @@ clean: proxy-clean
 
 .PHONY: buildx-create
 buildx-create:
-	@tools/buildx/buildx-create.sh $(BUILDER_NAME)
+	@tools/buildx/buildx-create.sh $(BUILDER_NAME) $(BUILDKIT_VERSION)
 	
 .PHONY: create-kind-cluster
 create-kind-cluster:

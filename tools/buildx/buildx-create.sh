@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-export BUILDKIT_VERSION=v0.22.0
+export BUILDKIT_VERSION=$2
 export BUILDX_NAME=$1
 
 echo "Activate BuildX -> $BUILDX_NAME with buildkit version: $BUILDKIT_VERSION"

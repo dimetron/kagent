@@ -36,22 +36,10 @@ insecure = true
 enabled = true
 platforms = [ "linux/amd64", "linux/arm64" ]
 
-max-parallelism = 8
-snapshotter = "overlayfs"
-
 [worker.containerd]
 enabled = false
 
 [gc]
-# Keep more build cache to improve rebuild times
 keepDuration = "48h"
 keepBytes = "10GB"
-# More frequent but lighter GC
 gckeepstorage = "5GB"
-
-# Enable build cache optimizations
-[frontend."dockerfile.v0"]
-enabled = true
-
-[frontend."dockerfile.v1"]
-enabled = true

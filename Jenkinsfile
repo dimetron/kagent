@@ -171,7 +171,7 @@ pipeline {
                 tools: {
                     echo 'Building TOOL..!!!'
                     sh """
-                    sleep 5
+                    sleep 30
                     cd $HOME_PATH;
                     source $HOME/.bash_profile
                     export GOPATH=$HOME/workspace/${jobName}
@@ -181,7 +181,7 @@ pipeline {
                 python: {
                     echo 'Building APP..!!!'
                     sh """
-                    sleep 5
+                    sleep 30
                     cd $HOME_PATH;
                     source $HOME/.bash_profile
                     export GOPATH=$HOME/workspace/${jobName}
@@ -191,7 +191,7 @@ pipeline {
                 ui: {
                     echo 'Building UI..!!!'
                     sh """
-                    sleep 5
+                    sleep 60
                     cd $HOME_PATH;
                     source $HOME/.bash_profile
                     export GOPATH=$HOME/workspace/${jobName}
