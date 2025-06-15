@@ -134,7 +134,7 @@ report/cve:
 	grype docker:$(UI_IMG)         -o template -t reports/report.tmpl.html --file reports/$(SEMVER)/ui-cve.html
 
 .PHONY: clean
-clean: proxy-clean
+clean:
 	docker buildx rm $(BUILDER_NAME) || :
 	@tools/buildx/buildx-create.sh
 	docker images | grep kagent | grep -v $(VERSION) | awk '{print $2}' sort | uniq | xargs -n1 -I{} docker rmi illin4261.corp.amdocs.com:28090/platform/kagent/ui:{}
