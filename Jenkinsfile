@@ -151,13 +151,58 @@ pipeline {
                 cd $HOME_PATH;
                 source $HOME/.bash_profile
                 export GOPATH=$HOME/workspace/${jobName}
-                make SEMVER=${SEMVER}  HUBS=${env.PLATFORM_DOCKER_REPO}/platform/kagent buildx-create
                 """
             }
         }
     }
 
     stage('Build') {
+        steps {
+            parallel(
+              controller: {
+                    echo 'Building GO..!!!'
+                    sh """
+                    cd $HOME_PATH;
+                    source $HOME/.bash_profile
+                    export GOPATH=$HOME/workspace/${jobName}
+                    make SEMVER=${SEMVER}  HUBS=${env.PLATFORM_DOCKER_REPO}/platform/kagent build-controller
+                    """
+                },
+                tools: {
+                    echo 'Building TOOL..!!!'
+                    sh """
+                    sleep 5
+                    cd $HOME_PATH;
+                    source $HOME/.bash_profile
+                    export GOPATH=$HOME/workspace/${jobName}
+                    make SEMVER=${SEMVER}  HUBS=${env.PLATFORM_DOCKER_REPO}/platform/build release-tools
+                    """
+                },
+                app: {
+                    echo 'Building APP..!!!'
+                    sh """
+                    sleep 5
+                    cd $HOME_PATH;
+                    source $HOME/.bash_profile
+                    export GOPATH=$HOME/workspace/${jobName}
+                    make SEMVER=${SEMVER}  HUBS=${env.PLATFORM_DOCKER_REPO}/platform/build release-app
+                    """
+                },
+                ui: {
+                    echo 'Building UI..!!!'
+                    sh """
+                    sleep 5
+                    cd $HOME_PATH;
+                    source $HOME/.bash_profile
+                    export GOPATH=$HOME/workspace/${jobName}
+                    make SEMVER=${SEMVER}  HUBS=${env.PLATFORM_DOCKER_REPO}/platform/build release-ui
+                    """
+                }
+           )
+        }
+    }
+
+    stage('Release') {
         steps {
             parallel(
               controller: {
@@ -182,7 +227,7 @@ pipeline {
                 app: {
                     echo 'Building APP..!!!'
                     sh """
-                    sleep 10
+                    sleep 5
                     cd $HOME_PATH;
                     source $HOME/.bash_profile
                     export GOPATH=$HOME/workspace/${jobName}
@@ -192,7 +237,7 @@ pipeline {
                 ui: {
                     echo 'Building UI..!!!'
                     sh """
-                    sleep 15
+                    sleep 5
                     cd $HOME_PATH;
                     source $HOME/.bash_profile
                     export GOPATH=$HOME/workspace/${jobName}
