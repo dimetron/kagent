@@ -277,23 +277,25 @@ helm-agents:
 	VERSION=$(VERSION) envsubst < helm/agents/promql/Chart-template.yaml > helm/agents/promql/Chart.yaml
 	helm package helm/agents/promql         -d dist
 	VERSION=$(VERSION) envsubst < helm/agents/observability/Chart-template.yaml > helm/agents/observability/Chart.yaml
-	helm package helm/agents/observability  -d dist
+	helm package helm/agents/observability   -d dist
 	VERSION=$(VERSION) envsubst < helm/agents/helm/Chart-template.yaml > helm/agents/helm/Chart.yaml
-	helm package helm/agents/helm           -d dist
+	helm package helm/agents/helm            -d dist
 	VERSION=$(VERSION) envsubst < helm/agents/argo-rollouts/Chart-template.yaml > helm/agents/argo-rollouts/Chart.yaml
-	helm package helm/agents/argo-rollouts  -d dist
+	helm package helm/agents/argo-rollouts   -d dist
 	VERSION=$(VERSION) envsubst < helm/agents/cilium-policy/Chart-template.yaml > helm/agents/cilium-policy/Chart.yaml
-	helm package helm/agents/cilium-policy  -d dist
+	helm package helm/agents/cilium-policy   -d dist
 	VERSION=$(VERSION) envsubst < helm/agents/cilium-debug/Chart-template.yaml > helm/agents/cilium-debug/Chart.yaml
-	helm package helm/agents/cilium-debug   -d dist
+	helm package helm/agents/cilium-debug    -d dist
 	VERSION=$(VERSION) envsubst < helm/agents/cilium-manager/Chart-template.yaml > helm/agents/cilium-manager/Chart.yaml
-	helm package helm/agents/cilium-manager -d dist
+	helm package helm/agents/cilium-manager  -d dist
 	VERSION=$(VERSION) envsubst < helm/agents/ms360-security/Chart-template.yaml > helm/agents/ms360-security/Chart.yaml
-	helm package helm/agents/ms360-security -d dist
+	helm package helm/agents/ms360-security  -d dist
 	VERSION=$(VERSION) envsubst < helm/agents/ms360-armo/Chart-template.yaml > helm/agents/ms360-armo/Chart.yaml
-	helm package helm/agents/ms360-armo     -d dist
+	helm package helm/agents/ms360-armo      -d dist
 	VERSION=$(VERSION) envsubst < helm/agents/ms360-milcy/Chart-template.yaml > helm/agents/ms360-milcy/Chart.yaml
-	helm package helm/agents/ms360-milcy    -d dist
+	helm package helm/agents/ms360-milcy     -d dist
+	VERSION=$(VERSION) envsubst < helm/agents/ms360-couchbase/Chart-template.yaml > helm/agents/ms360-couchbase/Chart.yaml
+	helm package helm/agents/ms360-couchbase -d dist
 
 .PHONY: helm-version
 helm-version: helm-cleanup helm-agents

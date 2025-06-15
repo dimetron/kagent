@@ -1,0 +1,5 @@
+apiVersion: v2
+name: ms360-couchbase-agent
+description: A MS360-ARMo Agent for kagent
+type: application
+version: ${VERSION}

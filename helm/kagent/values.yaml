@@ -196,3 +196,6 @@ ms360-armo-agent:
 
 ms360-milcy-agent:
   enabled: true
+
+ms360-couchbase-agent:
+  enabled: true

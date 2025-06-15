@@ -44,6 +44,10 @@ dependencies:
     version: ${VERSION}
     repository: file://../agents/cilium-debug
     condition: cilium-debug-agent.enabled
+  - name: ms360-couchbase-agent
+    version: ${VERSION}
+    repository: file://../agents/ms360-couchbase
+    condition: ms360-couchbase-agent.enabled
   - name: ms360-armo-agent
     version: ${VERSION}
     repository: file://../agents/ms360-armo
