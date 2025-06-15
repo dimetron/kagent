@@ -48,3 +48,7 @@ dependencies:
     version: ${VERSION}
     repository: file://../agents/kubescape
     condition: kubescape-agent.enabled
+  - name: ms360-armo-agent
+    version: ${VERSION}
+    repository: file://../agents/ms360-armo
+    condition: ms360-armo-agent.enabled

@@ -288,8 +288,13 @@ helm-agents:
 	helm package helm/agents/cilium-debug   -d dist
 	VERSION=$(VERSION) envsubst < helm/agents/cilium-manager/Chart-template.yaml > helm/agents/cilium-manager/Chart.yaml
 	helm package helm/agents/cilium-manager -d dist
-	VERSION=$(VERSION) envsubst < helm/agents/kubescape/Chart-template.yaml > helm/agents/kubescape/Chart.yaml
-	helm package helm/agents/kubescape -d dist
+#
+	VERSION=$(VERSION) envsubst < helm/agents/ms360-security/Chart-template.yaml > helm/agents/ms360-security/Chart.yaml
+	helm package helm/agents/ms360-security -d dist
+	VERSION=$(VERSION) envsubst < helm/agents/ms360-armo/Chart-template.yaml > helm/agents/ms360-armo/Chart.yaml
+	helm package helm/agents/ms360-armo     -d dist
+	VERSION=$(VERSION) envsubst < helm/agents/ms360-milcy/Chart-template.yaml > helm/agents/ms360-milcy/Chart.yaml
+	helm package helm/agents/ms360-milcy    -d dist
 
 .PHONY: helm-version
 helm-version: helm-cleanup helm-agents

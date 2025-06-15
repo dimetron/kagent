@@ -147,7 +147,7 @@ RUN export https_proxy=$PROXY_HTTP                                              
     && echo -e "\033[0m"
 
 RUN export https_proxy=$PROXY_HTTP                                        \
-    && mv /app/python/.kubescape/bin/kubescape bin/kubescape              \
+    && mv /app/python/.kubescape/bin/kubescape /app/python/bin/kubescape  \
     && kubescape download artifacts || kubescape download artifacts || :  \
     && echo -e "\033[0m"
 
