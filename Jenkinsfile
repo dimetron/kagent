@@ -165,7 +165,7 @@ pipeline {
                     cd $HOME_PATH;
                     source $HOME/.bash_profile
                     export GOPATH=$HOME/workspace/${jobName}
-                    make SEMVER=${SEMVER} BUILDKIT_VERSION=v0.11.0 HUBS=${env.PLATFORM_DOCKER_REPO}/platform/kagent build
+                    make SEMVER=${SEMVER}  HUBS=${env.PLATFORM_DOCKER_REPO}/platform/kagent build
                     """
                 }
            )
