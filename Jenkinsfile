@@ -151,21 +151,6 @@ pipeline {
         }
     }
 
-    stage('Start Proxy') {
-        steps {
-            script {
-                sh """
-                cd $HOME_PATH;
-                source $HOME/.bash_profile
-                export GOPATH=$HOME/workspace/${jobName}
-                make SEMVER=${SEMVER} clean
-                make SEMVER=${SEMVER} buildx-create proxy-start
-                sleep 5
-                """
-            }
-        }
-    }
-
     stage('Build') {
         steps {
             parallel(
@@ -178,9 +163,20 @@ pipeline {
                     make SEMVER=${SEMVER}  HUBS=${env.PLATFORM_DOCKER_REPO}/platform/kagent build-controller
                     """
                 },
+                tools: {
+                    echo 'Docker Building..'
+                    sh """
+                    sleep 5
+                    cd $HOME_PATH;
+                    source $HOME/.bash_profile
+                    export GOPATH=$HOME/workspace/${jobName}
+                    make SEMVER=${SEMVER}  HUBS=${env.PLATFORM_DOCKER_REPO}/platform/kagent build-tools
+                    """
+                }
                 app: {
                     echo 'Docker Building..'
                     sh """
+                    sleep 10
                     cd $HOME_PATH;
                     source $HOME/.bash_profile
                     export GOPATH=$HOME/workspace/${jobName}
@@ -190,6 +186,7 @@ pipeline {
                 ui: {
                     echo 'Docker Building..'
                     sh """
+                    sleep 15
                     cd $HOME_PATH;
                     source $HOME/.bash_profile
                     export GOPATH=$HOME/workspace/${jobName}
@@ -197,19 +194,6 @@ pipeline {
                     """
                 }
            )
-        }
-    }
-
-    stage('Stop Proxy') {
-        steps {
-            script {
-                sh """
-                cd $HOME_PATH;
-                source $HOME/.bash_profile
-                export GOPATH=$HOME/workspace/${jobName}
-                make SEMVER=${SEMVER}  proxy-stop
-                """
-            }
         }
     }
 
