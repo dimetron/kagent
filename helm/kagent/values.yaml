@@ -162,7 +162,7 @@ promql-agent:
   enabled: false
 
 observability-agent:
-  enabled: true
+  enabled: false
   prometheus:
     url: ""
     username: ""

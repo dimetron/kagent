@@ -438,3 +438,9 @@ tshark:
 .PHONY: docker-shell-python
 docker-shell-python:
 	docker run --rm -it --entrypoint busybox $(APP_IMG) sh
+
+.PHONY: docker-inspect
+docker-inspect:
+	docker buildx imagetools inspect $(RETAGGED_CONTROLLER_IMG)
+	docker buildx imagetools inspect $(RETAGGED_APP_IMG)
+	docker buildx imagetools inspect $(RETAGGED_UI_IMG)
