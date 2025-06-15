@@ -193,3 +193,6 @@ ms36-security-agent:
 
 ms360-armo-agent:
   enabled: true
+
+ms360-milcy-agent:
+  enabled: true

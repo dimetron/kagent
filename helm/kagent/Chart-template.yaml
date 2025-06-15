@@ -52,3 +52,11 @@ dependencies:
     version: ${VERSION}
     repository: file://../agents/ms360-armo
     condition: ms360-armo-agent.enabled
+  - name: ms360-security-agent
+    version: ${VERSION}
+    repository: file://../agents/ms360-security
+    condition: ms360-security-agent.enabled
+  - name: ms360-milcy-agent
+    version: ${VERSION}
+    repository: file://../agents/ms360-milcy
+    condition: ms360-milcy-agent.enabled
