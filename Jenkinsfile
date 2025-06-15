@@ -159,43 +159,13 @@ pipeline {
     stage('Build') {
         steps {
             parallel(
-              go: {
+              all: {
                     echo 'Building GO..!!!'
                     sh """
                     cd $HOME_PATH;
                     source $HOME/.bash_profile
                     export GOPATH=$HOME/workspace/${jobName}
-                    make SEMVER=${SEMVER} BUILDKIT_VERSION=v0.11.0 HUBS=${env.PLATFORM_DOCKER_REPO}/platform/kagent build-controller
-                    """
-                },
-                tools: {
-                    echo 'Building TOOL..!!!'
-                    sh """
-                    sleep 30
-                    cd $HOME_PATH;
-                    source $HOME/.bash_profile
-                    export GOPATH=$HOME/workspace/${jobName}
-                    make SEMVER=${SEMVER} BUILDKIT_VERSION=v0.11.0 HUBS=${env.PLATFORM_DOCKER_REPO}/platform/build release-tools
-                    """
-                },
-                python: {
-                    echo 'Building APP..!!!'
-                    sh """
-                    sleep 30
-                    cd $HOME_PATH;
-                    source $HOME/.bash_profile
-                    export GOPATH=$HOME/workspace/${jobName}
-                    make SEMVER=${SEMVER} BUILDKIT_VERSION=v0.11.0 HUBS=${env.PLATFORM_DOCKER_REPO}/platform/build release-app
-                    """
-                },
-                ui: {
-                    echo 'Building UI..!!!'
-                    sh """
-                    sleep 60
-                    cd $HOME_PATH;
-                    source $HOME/.bash_profile
-                    export GOPATH=$HOME/workspace/${jobName}
-                    make SEMVER=${SEMVER} BUILDKIT_VERSION=v0.11.0 HUBS=${env.PLATFORM_DOCKER_REPO}/platform/build release-ui
+                    make SEMVER=${SEMVER} BUILDKIT_VERSION=v0.11.0 HUBS=${env.PLATFORM_DOCKER_REPO}/platform/kagent build
                     """
                 }
            )
