@@ -159,7 +159,7 @@ pipeline {
     stage('Build') {
         steps {
             parallel(
-              controller: {
+              go: {
                     echo 'Building GO..!!!'
                     sh """
                     cd $HOME_PATH;
@@ -178,7 +178,7 @@ pipeline {
                     make SEMVER=${SEMVER}  HUBS=${env.PLATFORM_DOCKER_REPO}/platform/build release-tools
                     """
                 },
-                app: {
+                python: {
                     echo 'Building APP..!!!'
                     sh """
                     sleep 5
@@ -205,7 +205,7 @@ pipeline {
     stage('Release') {
         steps {
             parallel(
-              controller: {
+              go: {
                     echo 'Building GO..!!!'
                     sh """
                     cd $HOME_PATH;
@@ -224,7 +224,7 @@ pipeline {
                     make SEMVER=${SEMVER}  HUBS=${env.PLATFORM_DOCKER_REPO}/platform/kagent release-tools
                     """
                 },
-                app: {
+                python: {
                     echo 'Building APP..!!!'
                     sh """
                     sleep 5
