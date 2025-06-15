@@ -17,7 +17,7 @@ echo "-----"
 if [ "${OS}" == "Darwin" ] ; then
   echo "Running on Mac"
   rdctl shell sudo chmod 777 /var/run/docker.sock || true
-  timeout 10 sudo chmod 777 /var/run/docker.sock  || true
+  #sudo chmod 777 /var/run/docker.sock  || true
 fi
 
 #make sure no osxauth is present

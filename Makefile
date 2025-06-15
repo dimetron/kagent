@@ -363,7 +363,7 @@ test/e2e:
 	@echo "Running E2E tests..."
 
 .PHONY: kagent-cli-install
-kagent-cli-install: build build-cli-local kind-load-docker-images helm-version
+kagent-cli-install: buildx-create build build-cli-local kind-load-docker-images helm-version
 kagent-cli-install:
 	ps -ef | grep port-forward | grep -v grep | awk '{print $2}' | xargs kill -9 || true
 	KAGENT_HELM_REPO=./helm/ ./go/bin/kagent-local install
