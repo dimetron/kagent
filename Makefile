@@ -288,7 +288,6 @@ helm-agents:
 	helm package helm/agents/cilium-debug   -d dist
 	VERSION=$(VERSION) envsubst < helm/agents/cilium-manager/Chart-template.yaml > helm/agents/cilium-manager/Chart.yaml
 	helm package helm/agents/cilium-manager -d dist
-#
 	VERSION=$(VERSION) envsubst < helm/agents/ms360-security/Chart-template.yaml > helm/agents/ms360-security/Chart.yaml
 	helm package helm/agents/ms360-security -d dist
 	VERSION=$(VERSION) envsubst < helm/agents/ms360-armo/Chart-template.yaml > helm/agents/ms360-armo/Chart.yaml
@@ -366,6 +365,8 @@ test/e2e:
 kagent-cli-install: buildx-create build build-cli-local kind-load-docker-images helm-version
 kagent-cli-install:
 	ps -ef | grep port-forward | grep -v grep | awk '{print $2}' | xargs kill -9 || true
+	kubectl delete toolserver --all -n kagent || true
+	kubectl delete agent      --all -n kagent || true
 	KAGENT_HELM_REPO=./helm/ ./go/bin/kagent-local install
 	KAGENT_HELM_REPO=./helm/ ./go/bin/kagent-local dashboard
 

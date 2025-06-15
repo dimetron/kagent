@@ -188,7 +188,7 @@ cilium-manager-agent:
 cilium-debug-agent:
   enabled: false
 
-ms36-security-agent:
+ms360-security-agent:
   enabled: true
 
 ms360-armo-agent:
