@@ -34,14 +34,17 @@ echo "Using version: $(VERSION)"
 CONTROLLER_IMAGE_NAME ?= controller
 UI_IMAGE_NAME ?= ui
 APP_IMAGE_NAME ?= app
+TOOLS_IMAGE_NAME ?= tools
 
 CONTROLLER_IMAGE_TAG ?= $(VERSION)
 UI_IMAGE_TAG ?= $(VERSION)
 APP_IMAGE_TAG ?= $(VERSION)
+TOOLS_IMAGE_TAG ?= $(VERSION)
 
 CONTROLLER_IMG ?= $(DOCKER_REGISTRY)/$(DOCKER_REPO)/$(CONTROLLER_IMAGE_NAME):$(CONTROLLER_IMAGE_TAG)
 UI_IMG ?= $(DOCKER_REGISTRY)/$(DOCKER_REPO)/$(UI_IMAGE_NAME):$(UI_IMAGE_TAG)
 APP_IMG ?= $(DOCKER_REGISTRY)/$(DOCKER_REPO)/$(APP_IMAGE_NAME):$(APP_IMAGE_TAG)
+TOOLS_IMG ?= $(DOCKER_REGISTRY)/$(DOCKER_REPO)/$(TOOLS_IMAGE_NAME):$(TOOLS_IMAGE_TAG)
 
 # Retagged image variables for kind loading; the Helm chart uses these
 RETAGGED_DOCKER_REGISTRY = illin4261.corp.amdocs.com:28090
@@ -70,8 +73,7 @@ TOOLS_ISTIO_VERSION ?= 1.26.1     #
 TOOLS_ARGO_CD_VERSION ?= 3.0.0    #
 TOOLS_KUBECTL_VERSION ?= 1.33.4   #
 
-
-TOOLS_IMAGE_BUILD_ARGS += --build-arg VERSION=$(VERSION)
+TOOLS_IMAGE_BUILD_ARGS = --build-arg VERSION=$(VERSION)
 TOOLS_IMAGE_BUILD_ARGS += --build-arg PROXY_HTTP=$(PROXY)
 TOOLS_IMAGE_BUILD_ARGS += --build-arg NO_PROXY=$(NOPROXY)
 TOOLS_IMAGE_BUILD_ARGS += --build-arg LOCALARCH=$(LOCALARCH)
@@ -207,7 +209,7 @@ build-controller: controller-manifests buildx-create
 
 .PHONY: build-tools
 build-tools:
-	$(DOCKER_BUILDER) build $(DOCKER_BUILD_ARGS) $(TOOLS_IMAGE_BUILD_ARGS) -t dryruntool:v2 -f mcp-servers/milcy-dry-run/Dockerfile ./mcp-servers/milcy-dry-run
+	$(DOCKER_BUILDER) build $(DOCKER_BUILD_ARGS) $(TOOLS_IMAGE_BUILD_ARGS) -t $(TOOLS_IMG) -f mcp-servers/milcy-dry-run/Dockerfile ./mcp-servers/milcy-dry-run
 
 .PHONY: release
 release: DOCKER_BUILD_ARGS ?= --progress=plain --sbom false --provenance=false --sbom=false --provenance=false --builder $BUILDX_NAME  --builder $(BUILDER_NAME)
@@ -215,6 +217,12 @@ release: buildx-create
 release: release-controller
 release: release-app
 release: release-ui
+release: release-tools
+
+.PHONY: release-tools
+release-tools: DOCKER_BUILD_ARGS += --push --platform linux/amd64,linux/arm64
+release-tools: DOCKER_BUILDER = docker buildx
+release-tools: build-tools
 
 .PHONY: release-controller
 release-controller: DOCKER_BUILD_ARGS += --push --platform linux/amd64,linux/arm64

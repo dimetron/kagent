@@ -1,9 +1,9 @@
 ARG LOCALARCH
-FROM --platform=linux/$LOCALARCH docker-registry-proxy.corp.amdocs.com/chainguard/go:latest AS builder
+ARG BASE_IMAGE_REGISTRY
+FROM --platform=linux/$LOCALARCH $BASE_IMAGE_REGISTRY/chainguard/go:latest AS builder
+
 ARG TARGETPLATFORM
-ARG BUILDPLATFORM
 ARG TARGETARCH
-ARG BUILDARCH
 ARG LOCALARCH
 
 ENV GO111MODULE=on
@@ -31,7 +31,7 @@ RUN --mount=type=cache,target=/root/go/pkg/mod,rw         \
     echo "Building for GOARCH=${TARGETARCH} on ${BUILDARCH}..." && \
     CGO_ENABLED=0 GOARCH=${TARGETARCH} go build -a -o /mcp-milcy-dryrun
 
-FROM docker-registry-proxy.corp.amdocs.com/distroless/static:nonroot
+FROM $BASE_IMAGE_REGISTRY/distroless/static:nonroot
 ARG TARGETPLATFORM
 ARG BUILDPLATFORM
 
