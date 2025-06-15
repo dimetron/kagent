@@ -147,6 +147,12 @@ pipeline {
             script {
                 env.GIT_COMMIT_HASH = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
                 echo "Latest Git Commit Hash: ${env.GIT_COMMIT_HASH}"
+                sh """
+                cd $HOME_PATH;
+                source $HOME/.bash_profile
+                export GOPATH=$HOME/workspace/${jobName}
+                make SEMVER=${SEMVER}  HUBS=${env.PLATFORM_DOCKER_REPO}/platform/kagent buildx-create
+                """
             }
         }
     }
@@ -155,42 +161,42 @@ pipeline {
         steps {
             parallel(
               controller: {
-                    echo 'Docker Building..'
+                    echo 'Building GO..!!!'
                     sh """
                     cd $HOME_PATH;
                     source $HOME/.bash_profile
                     export GOPATH=$HOME/workspace/${jobName}
-                    make SEMVER=${SEMVER}  HUBS=${env.PLATFORM_DOCKER_REPO}/platform/kagent build-controller
+                    make SEMVER=${SEMVER}  HUBS=${env.PLATFORM_DOCKER_REPO}/platform/kagent release-controller
                     """
                 },
                 tools: {
-                    echo 'Docker Building..'
+                    echo 'Building TOOL..!!!'
                     sh """
                     sleep 5
                     cd $HOME_PATH;
                     source $HOME/.bash_profile
                     export GOPATH=$HOME/workspace/${jobName}
-                    make SEMVER=${SEMVER}  HUBS=${env.PLATFORM_DOCKER_REPO}/platform/kagent build-tools
+                    make SEMVER=${SEMVER}  HUBS=${env.PLATFORM_DOCKER_REPO}/platform/kagent release-tools
                     """
                 },
                 app: {
-                    echo 'Docker Building..'
+                    echo 'Building APP..!!!'
                     sh """
                     sleep 10
                     cd $HOME_PATH;
                     source $HOME/.bash_profile
                     export GOPATH=$HOME/workspace/${jobName}
-                    make SEMVER=${SEMVER}  HUBS=${env.PLATFORM_DOCKER_REPO}/platform/kagent build-app
+                    make SEMVER=${SEMVER}  HUBS=${env.PLATFORM_DOCKER_REPO}/platform/kagent release-app
                     """
                 },
                 ui: {
-                    echo 'Docker Building..'
+                    echo 'Building UI..!!!'
                     sh """
                     sleep 15
                     cd $HOME_PATH;
                     source $HOME/.bash_profile
                     export GOPATH=$HOME/workspace/${jobName}
-                    make SEMVER=${SEMVER}  HUBS=${env.PLATFORM_DOCKER_REPO}/platform/kagent build-ui
+                    make SEMVER=${SEMVER}  HUBS=${env.PLATFORM_DOCKER_REPO}/platform/kagent release-ui
                     """
                 }
            )
