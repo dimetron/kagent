@@ -173,7 +173,7 @@ update-lock-files:
 
 .PHONY: build
 build: DOCKER_BUILD_ARGS += --load --platform linux/$(LOCALARCH)
-build: build-controller build-ui build-app
+build: build-controller build-ui build-app build-tools
 
 #use make proxy-log to see proxy logs
 .PHONY: build-offline
@@ -204,6 +204,10 @@ controller-manifests:
 .PHONY: build-controller
 build-controller: controller-manifests buildx-create
 	$(DOCKER_BUILDER) build $(DOCKER_BUILD_ARGS) $(TOOLS_IMAGE_BUILD_ARGS) -t $(CONTROLLER_IMG) -f go/Dockerfile ./go
+
+.PHONY: build-tools
+build-tools:
+	$(DOCKER_BUILDER) build $(DOCKER_BUILD_ARGS) $(TOOLS_IMAGE_BUILD_ARGS) -t dryruntool:v2 -f mcp-servers/milcy-dry-run/Dockerfile ./mcp-servers/milcy-dry-run
 
 .PHONY: release
 release: DOCKER_BUILD_ARGS ?= --progress=plain --sbom false --provenance=false --sbom=false --provenance=false --builder $BUILDX_NAME  --builder $(BUILDER_NAME)
