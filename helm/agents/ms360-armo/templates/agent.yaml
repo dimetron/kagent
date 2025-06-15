@@ -154,7 +154,7 @@ subjects:
 apiVersion: kagent.dev/v1alpha1
 kind: Agent
 metadata:
-  name: ms360-security-agent
+  name: ms360-armo-agent
   labels:
     {{- include "kagent.labels" . | nindent 4 }}
 spec:
