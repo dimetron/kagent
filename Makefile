@@ -4,7 +4,7 @@ BASE_IMAGE_REGISTRY ?= docker-registry-proxy.corp.amdocs.com
 DOCKER_REPO ?= platform/kagent
 
 #buildx configuration
-BUILDKIT_VERSION = v0.22.0
+BUILDKIT_VERSION = v0.16.0
 BUILDER_NAME ?= kagent-builder-$(BUILDKIT_VERSION)
 LOCALARCH ?= $(shell uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/')
 
