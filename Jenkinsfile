@@ -172,7 +172,7 @@ pipeline {
                     export GOPATH=$HOME/workspace/${jobName}
                     make SEMVER=${SEMVER}  HUBS=${env.PLATFORM_DOCKER_REPO}/platform/kagent build-tools
                     """
-                }
+                },
                 app: {
                     echo 'Docker Building..'
                     sh """
