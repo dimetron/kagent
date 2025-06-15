@@ -165,7 +165,7 @@ pipeline {
                     cd $HOME_PATH;
                     source $HOME/.bash_profile
                     export GOPATH=$HOME/workspace/${jobName}
-                    make SEMVER=${SEMVER}  HUBS=${env.PLATFORM_DOCKER_REPO}/platform/kagent build-controller
+                    make SEMVER=${SEMVER} BUILDKIT_VERSION=v0.11.0 HUBS=${env.PLATFORM_DOCKER_REPO}/platform/kagent build-controller
                     """
                 },
                 tools: {
@@ -175,7 +175,7 @@ pipeline {
                     cd $HOME_PATH;
                     source $HOME/.bash_profile
                     export GOPATH=$HOME/workspace/${jobName}
-                    make SEMVER=${SEMVER}  HUBS=${env.PLATFORM_DOCKER_REPO}/platform/build release-tools
+                    make SEMVER=${SEMVER} BUILDKIT_VERSION=v0.11.0 HUBS=${env.PLATFORM_DOCKER_REPO}/platform/build release-tools
                     """
                 },
                 python: {
@@ -185,7 +185,7 @@ pipeline {
                     cd $HOME_PATH;
                     source $HOME/.bash_profile
                     export GOPATH=$HOME/workspace/${jobName}
-                    make SEMVER=${SEMVER}  HUBS=${env.PLATFORM_DOCKER_REPO}/platform/build release-app
+                    make SEMVER=${SEMVER} BUILDKIT_VERSION=v0.11.0 HUBS=${env.PLATFORM_DOCKER_REPO}/platform/build release-app
                     """
                 },
                 ui: {
@@ -195,7 +195,7 @@ pipeline {
                     cd $HOME_PATH;
                     source $HOME/.bash_profile
                     export GOPATH=$HOME/workspace/${jobName}
-                    make SEMVER=${SEMVER}  HUBS=${env.PLATFORM_DOCKER_REPO}/platform/build release-ui
+                    make SEMVER=${SEMVER} BUILDKIT_VERSION=v0.11.0 HUBS=${env.PLATFORM_DOCKER_REPO}/platform/build release-ui
                     """
                 }
            )
