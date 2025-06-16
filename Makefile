@@ -16,8 +16,8 @@ export https_proxy=$(PROXY)
 export no_proxy=$(NOPROXY)
 
 #NPM_REGISTRY ?= "http://127.0.0.1:4873"
-#NPM_REGISTRY ?= "https://registry.npmjs.org/"
-NPM_REGISTRY ?= "http://docker-registry-proxy.corp.amdocs.com:8081/repository/npm-external/"
+#NPM_REGISTRY ?= "http://docker-registry-proxy.corp.amdocs.com:8081/repository/npm-external/"
+NPM_REGISTRY ?= "https://registry.npmjs.org/"
 
 export CGO_ENABLED=0
 export GO111MODULE=on
