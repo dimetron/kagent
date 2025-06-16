@@ -1,0 +1,7 @@
+{"auths":{
+    "illin4261.corp.amdocs.com:28090":{"username":"ntsdeployment","password":"ntsdeployment@2023","email":"test@test.com","auth":"bnRzZGVwbG95bWVudDpudHNkZXBsb3ltZW50QDIwMjM="},
+    "illin4261.corp.amdocs.com:6000":{"username":"ntsdeployment","password":"ntsdeployment@2023","email":"test@test.com","auth":"bnRzZGVwbG95bWVudDpudHNkZXBsb3ltZW50QDIwMjM="},
+    "illin5564.corp.amdocs.com:5000":{"username":"ntsdeployment","password":"ntsdeployment@2023","email":"test@test.com","auth":"bnRzZGVwbG95bWVudDpudHNkZXBsb3ltZW50QDIwMjM"},
+    "illin5638.corp.amdocs.com:5002":{"username":"ntsdeployment","password":"ntsdeployment@2023","email":"test@test.com","auth":"bnRzZGVwbG95bWVudDpudHNkZXBsb3ltZW50QDIwMjM"},
+    "illin5225.corp.amdocs.com:5000":{"username":"psmdocker","password":"unix11","email":"test@test.com","auth": "cHNtZG9ja2VyOnVuaXgxMQ=="}}
+}

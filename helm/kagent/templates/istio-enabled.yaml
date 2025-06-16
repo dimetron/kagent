@@ -1,5 +1,4 @@
-#// Generate helm template with istio sidecar and virtual service for deployment
-
+{{if and .Values.istio.enabled}}
 apiVersion: networking.istio.io/v1beta1
 kind: ServiceEntry
 metadata:
@@ -26,3 +25,4 @@ spec:
         - "istio-system/*"   # allow access to istio-system (e.g., for telemetry)
         - "*/*"              # allow ServiceEntries (optional; can restrict more)
 
+  {{end}}}

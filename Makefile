@@ -378,6 +378,7 @@ test/e2e:
 .PHONY: kagent-cli-install
 kagent-cli-install: buildx-create build build-cli-local kind-load-docker-images helm-version
 kagent-cli-install:
+	kubectl --kubeconfig=${KUBECONFIG_VCLUSTER} create secret generic amdocs-nexus-pull-secret --from-file=.dockerconfigjson=hack/namespace/dockerconfig.json --type=kubernetes.io/dockerconfigjson -n kagent || echo "secret amdocs-nexus-pull-secret already exists"
 	ps -ef | grep port-forward | grep -v grep | awk '{print $2}' | xargs kill -9 || true
 	kubectl delete toolserver --all -n kagent || true
 	kubectl delete agent      --all -n kagent || true
@@ -389,9 +390,13 @@ kagent-cli-dashboard:
 	KAGENT_HELM_REPO=./helm/ ./go/bin/kagent-local install
 	KAGENT_HELM_REPO=./helm/ ./go/bin/kagent-local dashboard
 
+.PHONY: kagent-cli-chat
 kagent-cli-chat:
-	KAGENT_HELM_REPO=./helm/ ./go/bin/kagent-local invoke --agent istio-agent --session "check installation" --task hack/prompts/check_istio_installation.md | jq
+	KAGENT_HELM_REPO=./helm/ ./go/bin/kagent-local
 
+.PHONY: kagent-cli-task
+kagent-cli-task:
+	./go/bin/kagent-local invoke --agent istio-agent --session "check installation" --task hack/prompts/check_istio_installation.md | jq
 
 .PHONY: kagent-cli-port-forward
 kagent-cli-port-forward:
