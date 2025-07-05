@@ -88,6 +88,7 @@ jobs:
       - name: Cache debug - Before build
         run: |
           hostname
+          docker info
           docker buildx ls
           echo "::group::Cache Configuration for ${{ matrix.image }}"
           echo "Cache keys for build-arm64-${{ matrix.image }}:"
@@ -133,7 +134,8 @@ jobs:
           docker buildx du --builder ${{ env.BUILDX_BUILDER_NAME }}
           docker logs buildx_buildkit_${{ env.BUILDX_BUILDER_NAME }}0 || true
           echo "::endgroup::"
-  e2e-test:
+
+  test-e2e:
     needs:
       - setup
       - kind
@@ -165,6 +167,7 @@ jobs:
       - name: Cache debug - Before build
         run: |
           hostname
+          docker info
           docker buildx ls
           docker images --format "{{.Repository}}:{{.Tag}}"
           echo "::group::Cache Configuration"
@@ -195,6 +198,7 @@ jobs:
             --load
         run: |
           hostname
+          docker info
           docker buildx ls
           docker images --format "{{.Repository}}:{{.Tag}}"
           echo "::group::Cache Configuration"
@@ -202,7 +206,7 @@ jobs:
           echo "  Primary: ${{ needs.setup.outputs.cache-key }}-e2e"
           echo "  Fallback: ${{ env.CACHE_KEY_PREFIX }}-main-e2e"
           echo "::endgroup::"
-          make helm-install-provider
+          make helm-install
           kubectl wait --for=condition=Accepted  agents.kagent.dev -n kagent --all --timeout=60s
 
       - name: Cache debug - After build
@@ -320,6 +324,7 @@ jobs:
       - name: Cache debug - Before build
         run: |
           hostname
+          docker info
           docker buildx ls
           echo "::group::Cache Configuration for ${{ matrix.image }}"
           echo "Cache keys for build-arm64-${{ matrix.image }}:"
