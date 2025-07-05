@@ -65,6 +65,7 @@ jobs:
           buildkitd-flags: --debug
       - name: Cache debug - Before build
         run: |
+          hostname
           docker buildx ls
           echo "::group::Cache Configuration"
           echo "Cache keys for e2e-test:"
