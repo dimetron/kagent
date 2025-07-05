@@ -37,8 +37,92 @@ jobs:
           echo "  Builder name: ${BUILDX_BUILDER_NAME}"
           echo "  Buildx version: ${BUILDX_VERSION}"
 
-  e2e-test:
+  build-local:
     needs: setup
+    env:
+      VERSION: v0.0.1-test
+      DOCKER_BUILDKIT: 1
+    strategy:
+      matrix:
+        image:
+          - controller
+          - ui
+          - app
+          - cli
+          - tools
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: linux/amd64,linux/arm64
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          name: ${{ env.BUILDX_BUILDER_NAME }}
+          platforms: linux/amd64,linux/arm64
+          version: ${{ env.BUILDX_VERSION }}
+          buildkitd-config: scripts/buildx/buildkitd.toml
+          use: 'true'
+          driver: docker-container
+          driver-opts: |
+            image=moby/buildkit:${{ env.BUILDX_VERSION }}
+            network=host
+          buildkitd-flags: --debug
+      - name: Cache debug - Before build
+        run: |
+          hostname
+          docker buildx ls
+          echo "::group::Cache Configuration for ${{ matrix.image }}"
+          echo "Cache keys for build-arm64-${{ matrix.image }}:"
+          echo "  Primary: ${{ needs.setup.outputs.cache-key }}-${{ matrix.image }}"
+          echo "  Fallback: ${{ env.CACHE_KEY_PREFIX }}-main-${{ matrix.image }}"
+          echo "::endgroup::"
+          
+          echo "::group::Buildx Info"
+          docker buildx ls
+          docker buildx inspect ${{ env.BUILDX_BUILDER_NAME }}
+          echo "::endgroup::"
+
+      - name: Run make build
+        env:
+          BUILDX_BUILDER_NAME: ${{ env.BUILDX_BUILDER_NAME }}
+          DOCKER_BUILD_ARGS: >-
+            --cache-from=type=gha,scope=${{ needs.setup.outputs.cache-key }}-${{ matrix.image }}
+            --cache-from=type=gha,scope=${{ env.CACHE_KEY_PREFIX }}-main-${{ matrix.image }}
+            --cache-to=type=gha,scope=${{ needs.setup.outputs.cache-key }}-${{ matrix.image }},mode=max
+            --platform=linux/amd64
+            --load
+          DOCKER_REPO: "${{ github.repository_owner }}/kagent"
+          DOCKER_BUILDER: "docker buildx"
+        run: |
+          echo "::group::Cache Configuration"
+          echo "Building ${{ matrix.image }} with cache keys:"
+          echo "  Primary: ${{ needs.setup.outputs.cache-key }}-${{ matrix.image }}"
+          echo "  Fallback: ${{ env.CACHE_KEY_PREFIX }}-main-${{ matrix.image }}"
+          echo "::endgroup::"
+          make build-${{ matrix.image }}
+        working-directory: ./
+
+      - name: Cache debug - After build
+        run: |
+          echo "::group::Build Cache Status for ${{ matrix.image }}"
+          docker buildx du --builder ${{ env.BUILDX_BUILDER_NAME }}
+          echo "::endgroup::"
+
+      - name: Cache size analysis
+        run: |
+          echo "::group::Cache Size Analysis"
+          docker system df
+          docker buildx du --builder ${{ env.BUILDX_BUILDER_NAME }}
+          docker logs buildx_buildkit_${{ env.BUILDX_BUILDER_NAME }}0 || true
+          echo "::endgroup::"
+  e2e-test:
+    needs:
+      - setup
+      - build-local
     env:
       VERSION: v0.0.1-test
       DOCKER_BUILDKIT: 1
@@ -67,6 +151,7 @@ jobs:
         run: |
           hostname
           docker buildx ls
+          docker images --format "{{.Repository}}:{{.Tag}}"
           echo "::group::Cache Configuration"
           echo "Cache keys for e2e-test:"
           echo "  Primary: ${{ needs.setup.outputs.cache-key }}-e2e"
@@ -106,12 +191,13 @@ jobs:
         run: |
           hostname
           docker buildx ls
+          docker images --format "{{.Repository}}:{{.Tag}}"
           echo "::group::Cache Configuration"
           echo "Cache keys being used:"
           echo "  Primary: ${{ needs.setup.outputs.cache-key }}-e2e"
           echo "  Fallback: ${{ env.CACHE_KEY_PREFIX }}-main-e2e"
           echo "::endgroup::"
-          make helm-install
+          make helm-install-provider
           kubectl wait --for=condition=Accepted  agents.kagent.dev -n kagent --all --timeout=60s
 
       - name: Cache debug - After build
