@@ -209,7 +209,7 @@ jobs:
           echo "  Primary: ${{ needs.setup.outputs.cache-key }}-e2e"
           echo "  Fallback: ${{ env.CACHE_KEY_PREFIX }}-main-e2e"
           echo "::endgroup::"
-          mkdir -k $HOME/.kube
+          mkdir -p $HOME/.kube
           kind get kubeconfig > $HOME/.kube/config
           make helm-install-provider
           kubectl wait --for=condition=Accepted  agents.kagent.dev -n kagent --all --timeout=60s
