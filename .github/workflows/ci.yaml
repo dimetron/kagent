@@ -116,28 +116,8 @@ jobs:
           echo "  Primary: ${{ needs.setup.outputs.cache-key }}-e2e"
           echo "  Fallback: ${{ env.CACHE_KEY_PREFIX }}-main-e2e"
           echo "::endgroup::"
-          
-          # Verify images are available before installation
-          echo "::group::Pre-installation Image Check"
-          docker images | grep kagent || echo "No kagent images found yet"
-          echo "::endgroup::"
-          
-          # Setup kubeconfig for kind cluster
-          mkdir -p $HOME/.kube
-          kind get kubeconfig --name kagent > $HOME/.kube/config
-          export KUBECONFIG=$HOME/.kube/config
-          
-          # Load images into kind cluster
-          echo "::group::Loading images into Kind cluster"
-          kind load docker-image ghcr.io/${{ github.repository_owner }}/kagent/controller:v0.0.1-test --name kagent
-          kind load docker-image ghcr.io/${{ github.repository_owner }}/kagent/ui:v0.0.1-test --name kagent
-          kind load docker-image ghcr.io/${{ github.repository_owner }}/kagent/app:v0.0.1-test --name kagent
-          kind load docker-image ghcr.io/${{ github.repository_owner }}/kagent/tools:v0.0.1-test --name kagent
-          echo "::endgroup::"
-          
-          # Install kagent using helm
-          make helm-install-provider
-          kubectl wait --for=condition=Accepted agents.kagent.dev -n kagent --all --timeout=60s
+          make helm-install
+          kubectl wait --for=condition=Accepted  agents.kagent.dev -n kagent --all --timeout=60s
 
       - name: Cache debug - After build
         run: |

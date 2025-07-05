@@ -1,3 +1,5 @@
+//go:build integration
+
 package autogen_test
 
 import (
