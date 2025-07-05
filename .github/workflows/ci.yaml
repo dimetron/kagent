@@ -20,8 +20,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       cache-key: ${{ steps.cache-key.outputs.key }}
-      base-cache-key: ${{ steps.cache-key.outputs.base-key }}
-      branch-cache-key: ${{ steps.cache-key.outputs.branch-key }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -32,21 +30,14 @@ jobs:
       - name: Generate cache keys
         id: cache-key
         run: |
-          # Generate hierarchical cache keys for optimal reuse
-          BASE_KEY="${CACHE_KEY_PREFIX}-base"
+          # Generate branch-based cache key
           BRANCH_KEY="${CACHE_KEY_PREFIX}-${BRANCH_CACHE_KEY}"
-          FULL_KEY="${CACHE_KEY_PREFIX}-${BRANCH_CACHE_KEY}-${{ github.sha }}"
-          
-          echo "base-key=${BASE_KEY}" >> $GITHUB_OUTPUT
-          echo "branch-key=${BRANCH_KEY}" >> $GITHUB_OUTPUT
-          echo "key=${FULL_KEY}" >> $GITHUB_OUTPUT
-
+          echo "key=${BRANCH_KEY}" >> $GITHUB_OUTPUT
+          echo "::notice title=Cache Key::Branch: ${BRANCH_KEY}"
       - name: Cache debug info
         run: |
-          echo "Cache key hierarchy:"
-          echo "  Base cache key: ${{ steps.cache-key.outputs.base-key }}"
-          echo "  Branch cache key: ${{ steps.cache-key.outputs.branch-key }}"
-          echo "  Full cache key: ${{ steps.cache-key.outputs.key }}"
+          echo "Cache configuration:"
+          echo "  Cache key: ${{ steps.cache-key.outputs.key }}"
           echo "  Builder name: ${BUILDX_BUILDER_NAME}"
           echo "  Buildx version: ${BUILDX_VERSION}"
 
@@ -76,10 +67,8 @@ jobs:
         run: |
           echo "::group::Cache Configuration"
           echo "Cache keys for e2e-test:"
-          echo "  Primary: ${{ needs.setup.outputs.key }}-e2e"
-          echo "  Fallback 1: ${{ needs.setup.outputs.branch-key }}-e2e"
-          echo "  Fallback 2: ${{ needs.setup.outputs.base-key }}-e2e"
-          echo "  Final fallback: ${{ env.CACHE_KEY_PREFIX }}-main-e2e"
+          echo "  Primary: ${{ needs.setup.outputs.cache-key }}-e2e"
+          echo "  Fallback: ${{ env.CACHE_KEY_PREFIX }}-main-e2e"
           echo "::endgroup::"
           
           echo "::group::Buildx Info"
@@ -107,21 +96,16 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           BUILDX_BUILDER_NAME: ${{ env.BUILDX_BUILDER_NAME }}
           DOCKER_BUILD_ARGS: >-
-            --cache-from=type=gha,scope=${{ needs.setup.outputs.key }}-e2e
-            --cache-from=type=gha,scope=${{ needs.setup.outputs.branch-key }}-e2e
-            --cache-from=type=gha,scope=${{ needs.setup.outputs.base-key }}-e2e
+            --cache-from=type=gha,scope=${{ needs.setup.outputs.cache-key }}-e2e
             --cache-from=type=gha,scope=${{ env.CACHE_KEY_PREFIX }}-main-e2e
-            --cache-to=type=gha,scope=${{ needs.setup.outputs.key }}-e2e,mode=max
-            --cache-to=type=gha,scope=${{ needs.setup.outputs.branch-key }}-e2e,mode=max
+            --cache-to=type=gha,scope=${{ needs.setup.outputs.cache-key }}-e2e,mode=max
             --platform=linux/amd64
             --load
         run: |
           echo "::group::Cache Configuration"
           echo "Cache keys being used:"
-          echo "  Primary: ${{ needs.setup.outputs.key }}-e2e"
-          echo "  Branch: ${{ needs.setup.outputs.branch-key }}-e2e"
-          echo "  Base: ${{ needs.setup.outputs.base-key }}-e2e"
-          echo "  Main fallback: ${{ env.CACHE_KEY_PREFIX }}-main-e2e"
+          echo "  Primary: ${{ needs.setup.outputs.cache-key }}-e2e"
+          echo "  Fallback: ${{ env.CACHE_KEY_PREFIX }}-main-e2e"
           echo "::endgroup::"
           make helm-install
           kubectl wait --for=condition=Accepted  agents.kagent.dev -n kagent --all --timeout=60s
@@ -129,7 +113,7 @@ jobs:
       - name: Cache debug - After build
         run: |
           echo "::group::Build Cache Status"
-          docker buildx du ${{ env.BUILDX_BUILDER_NAME }}
+          docker buildx du --builder ${{ env.BUILDX_BUILDER_NAME }}
           echo "::endgroup::"
 
       - name: Run e2e tests
@@ -240,11 +224,8 @@ jobs:
         run: |
           echo "::group::Cache Configuration for ${{ matrix.image }}"
           echo "Cache keys for build-arm64-${{ matrix.image }}:"
-          echo "  Primary: ${{ needs.setup.outputs.key }}-${{ matrix.image }}"
-          echo "  Fallback 1: ${{ needs.setup.outputs.branch-key }}-${{ matrix.image }}"
-          echo "  Fallback 2: ${{ needs.setup.outputs.base-key }}-${{ matrix.image }}"
-          echo "  Shared base: ${{ needs.setup.outputs.base-key }}-shared"
-          echo "  Final fallback: ${{ env.CACHE_KEY_PREFIX }}-main-${{ matrix.image }}"
+          echo "  Primary: ${{ needs.setup.outputs.cache-key }}-${{ matrix.image }}"
+          echo "  Fallback: ${{ env.CACHE_KEY_PREFIX }}-main-${{ matrix.image }}"
           echo "::endgroup::"
           
           echo "::group::Buildx Info"
@@ -256,14 +237,9 @@ jobs:
         env:
           BUILDX_BUILDER_NAME: ${{ env.BUILDX_BUILDER_NAME }}
           DOCKER_BUILD_ARGS: >-
-            --cache-from=type=gha,scope=${{ needs.setup.outputs.key }}-${{ matrix.image }}
-            --cache-from=type=gha,scope=${{ needs.setup.outputs.branch-key }}-${{ matrix.image }}
-            --cache-from=type=gha,scope=${{ needs.setup.outputs.base-key }}-${{ matrix.image }}
-            --cache-from=type=gha,scope=${{ needs.setup.outputs.base-key }}-shared
+            --cache-from=type=gha,scope=${{ needs.setup.outputs.cache-key }}-${{ matrix.image }}
             --cache-from=type=gha,scope=${{ env.CACHE_KEY_PREFIX }}-main-${{ matrix.image }}
-            --cache-to=type=gha,scope=${{ needs.setup.outputs.key }}-${{ matrix.image }},mode=max
-            --cache-to=type=gha,scope=${{ needs.setup.outputs.branch-key }}-${{ matrix.image }},mode=max
-            --cache-to=type=gha,scope=${{ needs.setup.outputs.base-key }}-shared,mode=max
+            --cache-to=type=gha,scope=${{ needs.setup.outputs.cache-key }}-${{ matrix.image }},mode=max
             --platform=linux/amd64,linux/arm64
             --output=type=tar,dest=/dev/null
           DOCKER_REPO: "${{ github.repository_owner }}/kagent"
@@ -271,10 +247,8 @@ jobs:
         run: |
           echo "::group::Cache Configuration"
           echo "Building ${{ matrix.image }} with cache keys:"
-          echo "  Primary: ${{ needs.setup.outputs.key }}-${{ matrix.image }}"
-          echo "  Branch: ${{ needs.setup.outputs.branch-key }}-${{ matrix.image }}"
-          echo "  Base: ${{ needs.setup.outputs.base-key }}-${{ matrix.image }}"
-          echo "  Shared: ${{ needs.setup.outputs.base-key }}-shared"
+          echo "  Primary: ${{ needs.setup.outputs.cache-key }}-${{ matrix.image }}"
+          echo "  Fallback: ${{ env.CACHE_KEY_PREFIX }}-main-${{ matrix.image }}"
           echo "::endgroup::"
           make build-${{ matrix.image }}
         working-directory: ./
@@ -282,7 +256,7 @@ jobs:
       - name: Cache debug - After build
         run: |
           echo "::group::Build Cache Status for ${{ matrix.image }}"
-          docker buildx du ${{ env.BUILDX_BUILDER_NAME }}
+          docker buildx du --builder ${{ env.BUILDX_BUILDER_NAME }}
           echo "::endgroup::"
 
       - name: Cache size analysis
