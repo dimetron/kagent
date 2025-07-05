@@ -56,7 +56,7 @@ jobs:
           name: ${{ env.BUILDX_BUILDER_NAME }}
           platforms: linux/amd64,linux/arm64
           version: ${{ env.BUILDX_VERSION }}
-          config: scripts/buildx/buildkitd.toml
+          buildkitd-config: scripts/buildx/buildkitd.toml
           use: 'true'
           driver: docker-container
           driver-opts: |
@@ -219,7 +219,7 @@ jobs:
           name: ${{ env.BUILDX_BUILDER_NAME }}
           platforms: linux/amd64,linux/arm64
           version: ${{ env.BUILDX_VERSION }}
-          config: scripts/buildx/buildkitd.toml
+          buildkitd-config: scripts/buildx/buildkitd.toml
           use: 'true'
           driver: docker-container
           driver-opts: |
