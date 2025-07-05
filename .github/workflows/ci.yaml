@@ -88,6 +88,7 @@ jobs:
       - name: Cache debug - Before build
         run: |
           hostname
+          docker ps
           docker info
           docker buildx ls
           echo "::group::Cache Configuration for ${{ matrix.image }}"
@@ -167,6 +168,7 @@ jobs:
       - name: Cache debug - Before build
         run: |
           hostname
+          docker ps
           docker info
           docker buildx ls
           docker images --format "{{.Repository}}:{{.Tag}}"
@@ -198,6 +200,7 @@ jobs:
             --load
         run: |
           hostname
+          docker ps
           docker info
           docker buildx ls
           docker images --format "{{.Repository}}:{{.Tag}}"
@@ -206,7 +209,9 @@ jobs:
           echo "  Primary: ${{ needs.setup.outputs.cache-key }}-e2e"
           echo "  Fallback: ${{ env.CACHE_KEY_PREFIX }}-main-e2e"
           echo "::endgroup::"
-          make helm-install
+          mkdir -k $HOME/.kube
+          kind get kubeconfig > $HOME/.kube/config
+          make helm-install-provider
           kubectl wait --for=condition=Accepted  agents.kagent.dev -n kagent --all --timeout=60s
 
       - name: Cache debug - After build
@@ -324,6 +329,7 @@ jobs:
       - name: Cache debug - Before build
         run: |
           hostname
+          docker ps
           docker info
           docker buildx ls
           echo "::group::Cache Configuration for ${{ matrix.image }}"

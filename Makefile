@@ -263,7 +263,7 @@ helm-version: helm-cleanup helm-agents
 	helm package -d $(HELM_DIST_FOLDER) helm/kagent
 
 .PHONY: helm-install-provider
-helm-install-provider: helm-version check-openai-key
+helm-install-provider: use-kind-cluster helm-version check-openai-key
 	helm $(HELM_ACTION) kagent-crds helm/kagent-crds \
 		--namespace kagent \
 		--create-namespace \
