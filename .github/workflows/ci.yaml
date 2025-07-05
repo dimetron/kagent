@@ -117,7 +117,9 @@ jobs:
       - name: Cache debug - After build
         run: |
           echo "::group::Build Cache Status"
+          docker system df
           docker buildx du --builder ${{ env.BUILDX_BUILDER_NAME }}
+          docker logs buildx_buildkit_${{ env.BUILDX_BUILDER_NAME }}0 || true
           echo "::endgroup::"
 
       - name: Run e2e tests
@@ -268,6 +270,7 @@ jobs:
       - name: Cache size analysis
         run: |
           echo "::group::Cache Size Analysis"
-          echo "Analyzing cache usage for better optimization..."
           docker system df
+          docker buildx du --builder ${{ env.BUILDX_BUILDER_NAME }}
+          docker logs buildx_buildkit_${{ env.BUILDX_BUILDER_NAME }}0 || true
           echo "::endgroup::"
