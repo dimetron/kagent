@@ -23,22 +23,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: linux/amd64,linux/arm64
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-        with:
-          name: ${{ env.BUILDX_BUILDER_NAME }}
-          platforms: linux/amd64,linux/arm64
-          version: ${{ env.BUILDX_VERSION }}
-          use: 'true'
-          buildkitd-flags: --debug
-          driver: docker-container
-          driver-opts: |
-            image=moby/buildkit:${{ env.BUILDX_VERSION }}
-            network=host
       - name: Generate cache keys
         id: cache-key
         run: |
@@ -58,10 +42,27 @@ jobs:
       - setup
     env:
       VERSION: v0.0.1-test
+      DOCKER_BUILDKIT: 1
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: linux/amd64,linux/arm64
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          name: ${{ env.BUILDX_BUILDER_NAME }}
+          platforms: linux/amd64,linux/arm64
+          version: ${{ env.BUILDX_VERSION }}
+          use: 'true'
+          driver: docker-container
+          driver-opts: |
+            image=moby/buildkit:${{ env.BUILDX_VERSION }}
+            network=host
+          buildkitd-flags: --debug
       - name: Cache debug - Before build
         run: |
           docker buildx ls
@@ -193,6 +194,7 @@ jobs:
       - setup
     env:
       VERSION: v0.0.1-test
+      DOCKER_BUILDKIT: 1
     strategy:
       matrix:
         image:
@@ -205,6 +207,22 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: linux/amd64,linux/arm64
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          name: ${{ env.BUILDX_BUILDER_NAME }}
+          platforms: linux/amd64,linux/arm64
+          version: ${{ env.BUILDX_VERSION }}
+          use: 'true'
+          driver: docker-container
+          driver-opts: |
+            image=moby/buildkit:${{ env.BUILDX_VERSION }}
+            network=host
+          buildkitd-flags: --debug
       - name: Cache debug - Before build
         run: |
           hostname
