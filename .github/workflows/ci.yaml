@@ -22,8 +22,6 @@ jobs:
     outputs:
       cache-key: ${{ steps.cache-key.outputs.key }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
       - name: Generate cache keys
         id: cache-key
         run: |
@@ -37,111 +35,9 @@ jobs:
           echo "  Cache key: ${{ steps.cache-key.outputs.key }}"
           echo "  Builder name: ${BUILDX_BUILDER_NAME}"
           echo "  Buildx version: ${BUILDX_VERSION}"
-
-  kind:
-    needs: setup
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      - name: Create k8s Kind Cluster
-        uses: helm/kind-action@v1
-        with:
-          cluster_name: kagent
-      - name: Setup Metallb
-        run: |
-          bash scripts/kind/setup-metallb.sh
-
-  build-local:
-    needs: setup
-    env:
-      VERSION: v0.0.1-test
-    strategy:
-      matrix:
-        image:
-          - controller
-          - ui
-          - app
-          - cli
-          - tools
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: linux/amd64,linux/arm64
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-        with:
-          name: ${{ env.BUILDX_BUILDER_NAME }}
-          version: ${{ env.BUILDX_VERSION }}
-          platforms: linux/amd64,linux/arm64
-          github-token: ${{ env.GITHUB_TOKEN }}
-          buildkitd-config: scripts/buildx/buildkitd.toml
-          use: 'true'
-          driver: docker-container
-          driver-opts: |
-            image=moby/buildkit:${{ env.BUILDX_VERSION }}
-            network=host
-          buildkitd-flags: --debug
-      - name: Cache debug - Before build
-        run: |
-          hostname
-          docker ps
-          docker info
-          docker buildx ls
-          echo "::group::Cache Configuration for ${{ matrix.image }}"
-          echo "Cache keys for build-arm64-${{ matrix.image }}:"
-          echo "  Primary: ${{ needs.setup.outputs.cache-key }}-${{ matrix.image }}"
-          echo "  Fallback: ${{ env.CACHE_KEY_PREFIX }}-main-${{ matrix.image }}"
-          echo "::endgroup::"
-          
-          echo "::group::Buildx Info"
-          docker buildx ls
-          docker buildx inspect ${{ env.BUILDX_BUILDER_NAME }}
-          echo "::endgroup::"
-
-      - name: Run make build
-        env:
-          BUILDX_BUILDER_NAME: ${{ env.BUILDX_BUILDER_NAME }}
-          DOCKER_BUILD_ARGS: >-
-            --cache-from=type=gha,scope=${{ needs.setup.outputs.cache-key }}-${{ matrix.image }}
-            --cache-from=type=gha,scope=${{ env.CACHE_KEY_PREFIX }}-main-${{ matrix.image }}
-            --cache-to=type=gha,scope=${{ needs.setup.outputs.cache-key }}-${{ matrix.image }},mode=max
-            --platform=linux/amd64
-            --load
-          DOCKER_REPO: "${{ github.repository_owner }}/kagent"
-          DOCKER_BUILDER: "docker buildx"
-        run: |
-          echo "::group::Cache Configuration"
-          echo "Building ${{ matrix.image }} with cache keys:"
-          echo "  Primary: ${{ needs.setup.outputs.cache-key }}-${{ matrix.image }}"
-          echo "  Fallback: ${{ env.CACHE_KEY_PREFIX }}-main-${{ matrix.image }}"
-          echo "::endgroup::"
-          make build-${{ matrix.image }}
-        working-directory: ./
-
-      - name: Cache debug - After build
-        run: |
-          echo "::group::Build Cache Status for ${{ matrix.image }}"
-          docker buildx du --builder ${{ env.BUILDX_BUILDER_NAME }}
-          echo "::endgroup::"
-
-      - name: Cache size analysis
-        run: |
-          echo "::group::Cache Size Analysis"
-          docker system df
-          docker buildx du --builder ${{ env.BUILDX_BUILDER_NAME }}
-          docker logs buildx_buildkit_${{ env.BUILDX_BUILDER_NAME }}0 || true
-          echo "::endgroup::"
-
   test-e2e:
     needs:
       - setup
-      - kind
-      - build-local
     env:
       VERSION: v0.0.1-test
     runs-on: ubuntu-latest
@@ -189,6 +85,16 @@ jobs:
         with:
           version: v3.17.0
 
+      - name: Create k8s Kind Cluster
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: kagent
+
+      # This allows us to not rely on port-forwarding which is flaky
+      - name: Setup Metallb
+        run: |
+          bash scripts/kind/setup-metallb.sh
+
       - name: Install Kagent
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -210,10 +116,28 @@ jobs:
           echo "  Primary: ${{ needs.setup.outputs.cache-key }}-e2e"
           echo "  Fallback: ${{ env.CACHE_KEY_PREFIX }}-main-e2e"
           echo "::endgroup::"
+          
+          # Verify images are available before installation
+          echo "::group::Pre-installation Image Check"
+          docker images | grep kagent || echo "No kagent images found yet"
+          echo "::endgroup::"
+          
+          # Setup kubeconfig for kind cluster
           mkdir -p $HOME/.kube
-          kind get kubeconfig > $HOME/.kube/config
-          make helm-install
-          kubectl wait --for=condition=Accepted  agents.kagent.dev -n kagent --all --timeout=60s
+          kind get kubeconfig --name kagent > $HOME/.kube/config
+          export KUBECONFIG=$HOME/.kube/config
+          
+          # Load images into kind cluster
+          echo "::group::Loading images into Kind cluster"
+          kind load docker-image ghcr.io/${{ github.repository_owner }}/kagent/controller:v0.0.1-test --name kagent
+          kind load docker-image ghcr.io/${{ github.repository_owner }}/kagent/ui:v0.0.1-test --name kagent
+          kind load docker-image ghcr.io/${{ github.repository_owner }}/kagent/app:v0.0.1-test --name kagent
+          kind load docker-image ghcr.io/${{ github.repository_owner }}/kagent/tools:v0.0.1-test --name kagent
+          echo "::endgroup::"
+          
+          # Install kagent using helm
+          make helm-install-provider
+          kubectl wait --for=condition=Accepted agents.kagent.dev -n kagent --all --timeout=60s
 
       - name: Cache debug - After build
         run: |
