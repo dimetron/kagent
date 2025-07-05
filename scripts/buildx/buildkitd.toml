@@ -1,0 +1,44 @@
+# Shared buildx configuration for all CI jobs
+# This ensures consistent node behavior across all buildx instances
+
+debug = true
+insecure-entitlements = ["security.insecure"]
+
+# Worker configuration - ensures consistent node behavior
+[worker.oci]
+  enabled = true
+  # Use same worker configuration across all instances
+  max-parallelism = 4
+  
+[worker.containerd]
+  enabled = false
+
+# Cache configuration 
+[cache]
+  # Export cache configuration
+  export = { type = "gha" }
+  # Import cache configuration  
+  import = { type = "gha" }
+
+# Registry configuration
+[registry]
+  # Configure registry mirrors for consistent behavior
+  # This ensures all nodes use the same registry configuration
+  
+# Log configuration for debugging
+[log]
+  level = "debug"
+  
+# Network configuration
+[network]
+  # Use consistent network settings across all instances
+  mode = "auto"
+
+# DNS configuration for consistent resolution
+[dns]
+  # Use default DNS configuration
+  
+# Entitlements for advanced features
+[entitlements]
+  "security.insecure" = true
+  "network.host" = true
