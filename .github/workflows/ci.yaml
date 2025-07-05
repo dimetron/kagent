@@ -14,7 +14,8 @@ env:
   # Consistent builder configuration
   BUILDX_BUILDER_NAME: kagent-builder-v0.23.0
   BUILDX_VERSION: v0.23.0
-  
+  # Github token for docker login
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 jobs:
   setup:
     runs-on: ubuntu-latest
@@ -55,7 +56,6 @@ jobs:
     needs: setup
     env:
       VERSION: v0.0.1-test
-      DOCKER_BUILDKIT: 1
     strategy:
       matrix:
         image:
@@ -76,8 +76,9 @@ jobs:
         uses: docker/setup-buildx-action@v3
         with:
           name: ${{ env.BUILDX_BUILDER_NAME }}
-          platforms: linux/amd64,linux/arm64
           version: ${{ env.BUILDX_VERSION }}
+          platforms: linux/amd64,linux/arm64
+          github-token: ${{ env.GITHUB_TOKEN }}
           buildkitd-config: scripts/buildx/buildkitd.toml
           use: 'true'
           driver: docker-container
@@ -143,7 +144,6 @@ jobs:
       - build-local
     env:
       VERSION: v0.0.1-test
-      DOCKER_BUILDKIT: 1
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -156,8 +156,9 @@ jobs:
         uses: docker/setup-buildx-action@v3
         with:
           name: ${{ env.BUILDX_BUILDER_NAME }}
-          platforms: linux/amd64,linux/arm64
           version: ${{ env.BUILDX_VERSION }}
+          platforms: linux/amd64,linux/arm64
+          github-token: ${{ env.GITHUB_TOKEN }}
           buildkitd-config: scripts/buildx/buildkitd.toml
           use: 'true'
           driver: docker-container
@@ -211,7 +212,7 @@ jobs:
           echo "::endgroup::"
           mkdir -p $HOME/.kube
           kind get kubeconfig > $HOME/.kube/config
-          make helm-install-provider
+          make helm-install
           kubectl wait --for=condition=Accepted  agents.kagent.dev -n kagent --all --timeout=60s
 
       - name: Cache debug - After build
@@ -319,6 +320,7 @@ jobs:
           name: ${{ env.BUILDX_BUILDER_NAME }}
           platforms: linux/amd64,linux/arm64
           version: ${{ env.BUILDX_VERSION }}
+          github-token: ${{ env.GITHUB_TOKEN }}
           buildkitd-config: scripts/buildx/buildkitd.toml
           use: 'true'
           driver: docker-container
