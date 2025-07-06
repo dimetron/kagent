@@ -14,8 +14,6 @@ env:
   # Consistent builder configuration
   BUILDX_BUILDER_NAME: kagent-builder-v0.23.0
   BUILDX_VERSION: v0.23.0
-  # Github token for docker login
-  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 jobs:
   setup:
     runs-on: ubuntu-latest
@@ -54,7 +52,6 @@ jobs:
           name: ${{ env.BUILDX_BUILDER_NAME }}
           version: ${{ env.BUILDX_VERSION }}
           platforms: linux/amd64,linux/arm64
-          github-token: ${{ env.GITHUB_TOKEN }}
           buildkitd-config: scripts/buildx/buildkitd.toml
           use: 'true'
           driver: docker-container
@@ -223,7 +220,6 @@ jobs:
           name: ${{ env.BUILDX_BUILDER_NAME }}
           platforms: linux/amd64,linux/arm64
           version: ${{ env.BUILDX_VERSION }}
-          github-token: ${{ env.GITHUB_TOKEN }}
           buildkitd-config: scripts/buildx/buildkitd.toml
           use: 'true'
           driver: docker-container
