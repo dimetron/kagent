@@ -63,7 +63,7 @@ controller:
       cpu: 100m
       memory: 128Mi
     limits:
-      cpu: 500m
+      cpu: 1
       memory: 512Mi
   env: [] # Additional environment variables for the controller can be added here
 
@@ -72,7 +72,7 @@ tools:
   image:
     registry: ghcr.io
     repository: kagent-dev/kagent/tools
-    tag: "0.0.9"
+    tag: "0.0.10"
     pullPolicy: IfNotPresent
   resources:
     requests:
@@ -180,7 +180,7 @@ securityContext: {}
 
 otel:
   tracing:
-    enabled: false
+    enabled: true
     exporter:
       otlp:
         endpoint: http://host.docker.internal:4317
