@@ -198,7 +198,7 @@ querydoc:
   image:
     registry: ghcr.io
     repository: kagent-dev/doc2vec/mcp
-    tag: 1.1.11
+    tag: 1.1.12
     pullPolicy: IfNotPresent
   resources:
     requests:

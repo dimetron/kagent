@@ -269,7 +269,8 @@ func defaultDeploymentSpec(name string, labels map[string]string, configHash uin
 								},
 							},
 							InitialDelaySeconds: 15,
-							PeriodSeconds:       3,
+							TimeoutSeconds:      10,
+							PeriodSeconds:       15,
 						},
 						VolumeMounts: []corev1.VolumeMount{
 							{

@@ -352,7 +352,6 @@ kind-debug:
 	@echo "Debugging the kind cluster..."
 	@echo "Enter the kind cluster control plane container..."
 	docker exec -it $(KIND_CLUSTER_NAME)-control-plane bash -c 'apt-get update && apt-get install -y btop htop'
-	docker exec -it $(KIND_CLUSTER_NAME)-control-plane bash -c 'htop'
 	docker exec -it $(KIND_CLUSTER_NAME)-control-plane bash -c 'btop --utf-force'
 
 .PHONY: report/image-cve

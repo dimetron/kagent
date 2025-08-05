@@ -12,7 +12,11 @@ RUN --mount=type=cache,target=/var/cache/apk,rw \
 FROM base-os AS python-os
 ARG TOOLS_PYTHON_VERSION=3.13
 
+ENV PYTHONOPTIMIZE=2
 ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV MALLOC_TRIM_THRESHOLD_=131072
+
 ENV GIT_LFS_SKIP_SMUDGE=1
 
 ENV UV_LINK_MODE=copy
@@ -67,5 +71,8 @@ LABEL org.opencontainers.image.source=https://github.com/kagent-dev/kagent
 LABEL org.opencontainers.image.description="Kagent app is the apiserver for running agents."
 LABEL org.opencontainers.image.authors="Kagent Creators 🤖"
 LABEL org.opencontainers.image.version="$VERSION"
+
+ENV KAGENT_MAX_SESSIONS="50"
+ENV KAGENT_SESSION_TTL="1800"
 
 CMD ["kagent", "--host", "0.0.0.0", "--port", "8080"]
