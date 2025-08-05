@@ -229,6 +229,14 @@ func defaultDeploymentSpec(name string, labels map[string]string, configHash uin
 
 	return appsv1.DeploymentSpec{
 		Replicas: ptr.To(int32(1)),
+		// Add min and max replicas constraints
+		Strategy: appsv1.DeploymentStrategy{
+			Type: appsv1.RollingUpdateDeploymentStrategyType,
+			RollingUpdate: &appsv1.RollingUpdateDeployment{
+				MaxUnavailable: &intstr.IntOrString{Type: intstr.Int, IntVal: 0},
+				MaxSurge:       &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
+			},
+		},
 		Selector: &metav1.LabelSelector{
 			MatchLabels: labels,
 		},
@@ -269,7 +277,7 @@ func defaultDeploymentSpec(name string, labels map[string]string, configHash uin
 								},
 							},
 							InitialDelaySeconds: 15,
-							TimeoutSeconds:      10,
+							TimeoutSeconds:      15,
 							PeriodSeconds:       15,
 						},
 						VolumeMounts: []corev1.VolumeMount{
