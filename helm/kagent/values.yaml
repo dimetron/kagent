@@ -216,7 +216,7 @@ querydoc:
 
 otel:
   tracing:
-    enabled: false
+    enabled: true
     exporter:
       otlp:
         endpoint: http://host.docker.internal:4317

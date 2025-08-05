@@ -12,11 +12,12 @@ RUN --mount=type=cache,target=/var/cache/apk,rw \
 FROM base-os AS python-os
 ARG TOOLS_PYTHON_VERSION=3.13
 
-ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV GIT_LFS_SKIP_SMUDGE=1
 
-ENV UV_LINK_MODE=symlink
+ENV UV_LINK_MODE=copy
+ENV UV_COMPILE_BYTECODE=1
+
 ENV UV_CACHE_DIR=/app/python/.cache/uv
 ENV UV_PROJECT_ENVIRONMENT="/app/python/.venv"
 
@@ -49,10 +50,8 @@ ARG VERSION
 # Install dependencies
 RUN echo "Installing dependencies..."                   \
     && uv venv --python=python$TOOLS_PYTHON_VERSION     \
-    && uv sync --locked --refresh
-
-RUN uv version ${VERSION%%-*} --package kagent \
-    && uv build --package kagent \
+    && uv sync --locked --refresh                       \
+    && uv build --package kagent                        \
     && uv cache prune
 
 # Offline mode
