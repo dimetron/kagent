@@ -90,12 +90,22 @@ def _convert_content_to_ollama_messages(
 
             for func_call in function_calls:
                 tool_call_id = func_call.id or "call_1"
+
+                # Safely serialize function arguments
+                arguments = "{}"
+                if func_call.args:
+                    try:
+                        arguments = json.dumps(func_call.args)
+                    except (TypeError, ValueError):
+                        # If serialization fails, try str conversion
+                        arguments = str(func_call.args)
+
                 tool_call = {
                     "id": tool_call_id,
                     "type": "function",
                     "function": {
                         "name": func_call.name or "",
-                        "arguments": json.dumps(func_call.args) if func_call.args else "{}",
+                        "arguments": arguments,
                     },
                 }
                 tool_calls.append(tool_call)
@@ -103,10 +113,25 @@ def _convert_content_to_ollama_messages(
                 # Check if we have a response for this tool call
                 if tool_call_id in all_function_responses:
                     func_response = all_function_responses[tool_call_id]
+
+                    # Handle different response types
+                    content = ""
+                    if func_response.response:
+                        if isinstance(func_response.response, str):
+                            content = func_response.response
+                        elif isinstance(func_response.response, (dict, list)):
+                            try:
+                                content = json.dumps(func_response.response)
+                            except (TypeError, ValueError) as e:
+                                # If serialization fails, convert to string
+                                content = str(func_response.response)
+                        else:
+                            content = str(func_response.response)
+
                     tool_message = {
                         "role": "tool",
                         "tool_call_id": tool_call_id,
-                        "content": json.dumps(func_response.response) if func_response.response else "",
+                        "content": content,
                     }
                     tool_response_messages.append(tool_message)
 
