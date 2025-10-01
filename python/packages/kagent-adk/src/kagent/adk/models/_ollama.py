@@ -103,7 +103,8 @@ def _convert_content_to_ollama_messages(
             for func_call in function_calls:
                 tool_call_id = func_call.id or "call_1"
 
-                # Ollama expects arguments as a dict, not a JSON string
+                # Pass arguments as dict for ollama-python library
+                # The ollama-python library expects arguments as Mapping[str, Any], not a JSON string
                 arguments = func_call.args if func_call.args else {}
 
                 tool_call = {
