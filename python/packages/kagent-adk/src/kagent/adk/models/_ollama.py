@@ -13,6 +13,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import logging
 from functools import cached_property
 from typing import TYPE_CHECKING, Any, AsyncGenerator, Literal, Optional
 
@@ -334,6 +335,9 @@ class OllamaNative(BaseLlm):
         Returns:
             ollama.AsyncClient configured with host, headers, and timeout
         """
+
+        logging.info("Connecting to Ollama[%s] %s ...", self.model, self.base_url)
+
         # Create AsyncClient with configuration
         client_kwargs = {}
 

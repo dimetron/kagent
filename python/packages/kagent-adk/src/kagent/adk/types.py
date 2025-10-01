@@ -131,7 +131,7 @@ class AgentConfig(BaseModel):
         elif self.model.type == "ollama":
             ollama_kwargs = {
                 "model": self.model.model,
-                "base_url": self.model.base_url,
+                "base_url": self.model.ollama.base_url,
                 "headers": extra_headers,
                 "type": "ollama",
             }
