@@ -334,15 +334,34 @@ class OllamaNative(BaseLlm):
             LlmResponse objects (partial if streaming, complete if not)
         """
         try:
+            # Extract system instruction from config
+            system_instruction = None
+            if llm_request.config and llm_request.config.system_instruction:
+                if isinstance(llm_request.config.system_instruction, str):
+                    system_instruction = llm_request.config.system_instruction
+                elif hasattr(llm_request.config.system_instruction, "parts"):
+                    # Handle Content type system instruction
+                    text_parts = []
+                    parts = getattr(llm_request.config.system_instruction, "parts", [])
+                    if parts:
+                        for part in parts:
+                            if hasattr(part, "text") and part.text:
+                                text_parts.append(part.text)
+                        system_instruction = "\n".join(text_parts)
+
             # Convert ADK format to Ollama format
-            messages = _convert_content_to_ollama_messages(
-                llm_request.contents, system_instruction=llm_request.system_instruction
-            )
+            messages = _convert_content_to_ollama_messages(llm_request.contents, system_instruction=system_instruction)
 
             # Convert tools if present
             tools = None
-            if llm_request.tools:
-                tools = _convert_tools_to_ollama(llm_request.tools)
+            if llm_request.config and llm_request.config.tools:
+                # Filter to only google.genai.types.Tool objects
+                genai_tools = []
+                for tool in llm_request.config.tools:
+                    if hasattr(tool, "function_declarations"):
+                        genai_tools.append(tool)
+                if genai_tools:
+                    tools = _convert_tools_to_ollama(genai_tools)
 
             # Prepare request options
             options = {}
@@ -352,10 +371,12 @@ class OllamaNative(BaseLlm):
                 options["num_predict"] = self.max_tokens
 
             # Make request
+            model_name = llm_request.model or self.model
+
             if stream:
                 # Streaming mode
                 async for chunk in await self._client.chat(
-                    model=self.model,
+                    model=model_name,
                     messages=messages,
                     tools=tools if tools else None,
                     stream=True,
@@ -373,7 +394,7 @@ class OllamaNative(BaseLlm):
             else:
                 # Non-streaming mode
                 response = await self._client.chat(
-                    model=self.model,
+                    model=model_name,
                     messages=messages,
                     tools=tools if tools else None,
                     stream=False,
