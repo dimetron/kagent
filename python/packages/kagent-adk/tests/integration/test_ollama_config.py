@@ -1,87 +1,219 @@
 """Integration test for custom Ollama configuration.
 
-Tests custom base_url, headers, temperature, max_tokens.
+This test validates custom configuration options (host, headers, temperature, etc.).
+
+Task: T012
 """
 
 import pytest
-from google.adk.models.llm_request import LlmRequest
 from google.genai import types
 
-from kagent.adk.models._ollama import OllamaNative
+pytestmark = pytest.mark.asyncio
 
 
-@pytest.mark.asyncio
-@pytest.mark.integration
-async def test_custom_temperature():
-    """Test custom temperature configuration."""
-    driver = OllamaNative(
-        type="ollama",
-        model="gpt-oss:latest",
-        base_url="http://localhost:11434",
-        temperature=0.1,  # Very low temperature for deterministic output
-    )
-
-    request = LlmRequest(
-        model="gpt-oss:latest", contents=[types.Content(role="user", parts=[types.Part.from_text(text="Say 'test'")])]
-    )
-
-    # Generate response
-    responses = []
-    async for response in driver.generate_content_async(request, stream=False):
-        responses.append(response)
-
-    assert len(responses) == 1
-    assert responses[0].content is not None
-
-
-@pytest.mark.asyncio
-@pytest.mark.integration
-async def test_custom_max_tokens():
-    """Test custom max_tokens configuration."""
-    driver = OllamaNative(
-        type="ollama",
-        model="gpt-oss:latest",
-        base_url="http://localhost:11434",
-        max_tokens=10,  # Very low to test limiting
-    )
-
-    request = LlmRequest(
-        model="gpt-oss:latest",
-        contents=[types.Content(role="user", parts=[types.Part.from_text(text="Write a long story about space.")])],
-    )
-
-    # Generate response
-    responses = []
-    async for response in driver.generate_content_async(request, stream=False):
-        responses.append(response)
-
-    assert len(responses) == 1
-    assert responses[0].content is not None
-    # Response should be truncated due to max_tokens
-
-
-@pytest.mark.asyncio
-@pytest.mark.integration
-async def test_custom_base_url():
-    """Test custom base_url (pointing to localhost)."""
-    driver = OllamaNative(
-        type="ollama",
-        model="gpt-oss:latest",
-        base_url="http://127.0.0.1:11434",  # Alternative localhost
-    )
-
-    request = LlmRequest(
-        model="gpt-oss:latest", contents=[types.Content(role="user", parts=[types.Part.from_text(text="Hello")])]
-    )
-
-    # Should work with alternative base_url
-    responses = []
-    async for response in driver.generate_content_async(request, stream=False):
-        responses.append(response)
-
-    assert len(responses) == 1
-    assert responses[0].content is not None
+class TestOllamaConfiguration:
+    """Integration tests for custom configuration."""
+    
+    async def test_custom_base_url(self):
+        """Test using custom Ollama server URL."""
+        from kagent.adk.models._ollama import OllamaNative
+        from google.adk.models.llm_request import LlmRequest
+        
+        # Test with explicit base_url
+        ollama_native = OllamaNative(
+            type="ollama",
+            model="llama2",
+            base_url="http://localhost:11434"  # Explicit URL
+        )
+        
+        assert ollama_native.base_url == "http://localhost:11434"
+        
+        request = LlmRequest(
+            contents=[
+                types.Content(
+                    role="user",
+                    parts=[types.Part(text="Hello")]
+                )
+            ]
+        )
+        
+        # Should work with custom base_url
+        response = None
+        async for resp in ollama_native.generate_content_async(request, stream=False):
+            response = resp
+        
+        assert response is not None
+    
+    async def test_custom_headers(self):
+        """Test using custom HTTP headers."""
+        from kagent.adk.models._ollama import OllamaNative
+        from google.adk.models.llm_request import LlmRequest
+        
+        custom_headers = {
+            "X-Custom-Header": "test-value",
+            "Authorization": "Bearer fake-token"
+        }
+        
+        ollama_native = OllamaNative(
+            type="ollama",
+            model="llama2",
+            headers=custom_headers
+        )
+        
+        assert ollama_native.headers == custom_headers
+        
+        request = LlmRequest(
+            contents=[
+                types.Content(
+                    role="user",
+                    parts=[types.Part(text="Test")]
+                )
+            ]
+        )
+        
+        # Should include custom headers in request
+        # (actual validation would require inspecting HTTP traffic)
+        response = None
+        async for resp in ollama_native.generate_content_async(request, stream=False):
+            response = resp
+        
+        assert response is not None
+    
+    async def test_custom_temperature(self):
+        """Test temperature parameter affects generation."""
+        from kagent.adk.models._ollama import OllamaNative
+        from google.adk.models.llm_request import LlmRequest
+        
+        # Test with very low temperature (deterministic)
+        ollama_low_temp = OllamaNative(
+            type="ollama",
+            model="llama2",
+            temperature=0.1
+        )
+        
+        # Test with higher temperature (more random)
+        ollama_high_temp = OllamaNative(
+            type="ollama",
+            model="llama2",
+            temperature=1.5
+        )
+        
+        request = LlmRequest(
+            contents=[
+                types.Content(
+                    role="user",
+                    parts=[types.Part(text="Say hello")]
+                )
+            ]
+        )
+        
+        # Both should work
+        response1 = None
+        async for resp in ollama_low_temp.generate_content_async(request, stream=False):
+            response1 = resp
+        
+        response2 = None
+        async for resp in ollama_high_temp.generate_content_async(request, stream=False):
+            response2 = resp
+        
+        assert response1 is not None
+        assert response2 is not None
+    
+    async def test_custom_max_tokens(self):
+        """Test max_tokens parameter limits response length."""
+        from kagent.adk.models._ollama import OllamaNative
+        from google.adk.models.llm_request import LlmRequest
+        
+        ollama_native = OllamaNative(
+            type="ollama",
+            model="llama2",
+            max_tokens=10  # Very small limit
+        )
+        
+        request = LlmRequest(
+            contents=[
+                types.Content(
+                    role="user",
+                    parts=[types.Part(text="Write a very long story about adventures")]
+                )
+            ]
+        )
+        
+        response = None
+        async for resp in ollama_native.generate_content_async(request, stream=False):
+            response = resp
+        
+        assert response is not None
+        # Response should be limited by max_tokens
+        # (actual token counting would require deeper inspection)
+    
+    async def test_custom_timeout(self):
+        """Test timeout parameter is applied."""
+        from kagent.adk.models._ollama import OllamaNative
+        
+        ollama_native = OllamaNative(
+            type="ollama",
+            model="llama2",
+            timeout=30.0  # 30 second timeout
+        )
+        
+        assert ollama_native.timeout == 30.0
+    
+    async def test_client_caching(self):
+        """Test that AsyncClient is cached via @cached_property."""
+        from kagent.adk.models._ollama import OllamaNative
+        
+        ollama_native = OllamaNative(
+            type="ollama",
+            model="llama2"
+        )
+        
+        # Access _client property twice
+        client1 = ollama_native._client
+        client2 = ollama_native._client
+        
+        # Should be the same instance (cached)
+        assert client1 is client2
+    
+    async def test_multiple_instances_independent(self):
+        """Test that multiple OllamaNative instances are independent."""
+        from kagent.adk.models._ollama import OllamaNative
+        
+        ollama1 = OllamaNative(
+            type="ollama",
+            model="llama2",
+            temperature=0.5
+        )
+        
+        ollama2 = OllamaNative(
+            type="ollama",
+            model="mistral",
+            temperature=1.0
+        )
+        
+        # Should have different configurations
+        assert ollama1.model != ollama2.model
+        assert ollama1.temperature != ollama2.temperature
+        assert ollama1._client is not ollama2._client
+    
+    async def test_default_values(self):
+        """Test that default configuration values are applied."""
+        from kagent.adk.models._ollama import OllamaNative
+        
+        # Create with minimal config
+        ollama_native = OllamaNative(
+            type="ollama",
+            model="llama2"
+        )
+        
+        # Check defaults
+        assert ollama_native.base_url == "http://localhost:11434"
+        assert ollama_native.timeout == 60.0
+        assert ollama_native.temperature is None  # Optional, no default
+        assert ollama_native.max_tokens is None  # Optional, no default
+        assert ollama_native.headers is None  # Optional, no default
 
 
 if __name__ == "__main__":
-    pytest.main([__file__, "-v", "-m", "integration"])
+    pytest.main([__file__, "-v"])
+

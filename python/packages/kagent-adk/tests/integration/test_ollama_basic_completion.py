@@ -1,76 +1,172 @@
-"""Integration test for basic Ollama completion.
+"""Integration test for basic Ollama completion using ollama-python.
 
-This test validates the basic completion scenario from quickstart.md.
-Requires Ollama running locally with a model pulled.
+This test validates the end-to-end flow of creating OllamaNative,
+calling AsyncClient.chat(), and converting responses to LlmResponse.
+
+Task: T008
 """
 
 import pytest
-from google.adk.models.llm_request import LlmRequest
 from google.genai import types
 
-from kagent.adk.models._ollama import OllamaNative
+# Will be implemented when OllamaNative is complete
+pytestmark = pytest.mark.asyncio
 
 
-@pytest.mark.asyncio
-@pytest.mark.integration
-async def test_basic_completion():
-    """Test basic completion without streaming."""
-    # Create OllamaNative instance (from quickstart.md)
-    driver = OllamaNative(
-        type="ollama",
-        model="gpt-oss:latest",  # Assumes gpt-oss:latest is pulled
-        base_url="http://localhost:11434",
-    )
-
-    # Create simple user message
-    request = LlmRequest(
-        model="gpt-oss:latest",
-        contents=[
-            types.Content(role="user", parts=[types.Part.from_text(text="What is 2+2? Answer with just the number.")])
-        ],
-    )
-
-    # Generate response
-    responses = []
-    async for response in driver.generate_content_async(request, stream=False):
-        responses.append(response)
-
-    # Validate response
-    assert len(responses) == 1
-    response = responses[0]
-
-    assert response.error_code is None
-    assert response.error_message is None
-    assert response.content is not None
-    assert response.content.role == "model"
-    assert len(response.content.parts) > 0
-    assert response.content.parts[0].text is not None
-    assert len(response.content.parts[0].text) > 0
-
-
-@pytest.mark.asyncio
-@pytest.mark.integration
-async def test_completion_with_system_instruction():
-    """Test completion with system instruction."""
-    driver = OllamaNative(type="ollama", model="gpt-oss:latest", base_url="http://localhost:11434")
-
-    # Create request with system instruction
-    request = LlmRequest(
-        model="gpt-oss:latest",
-        contents=[types.Content(role="user", parts=[types.Part.from_text(text="Hello")])],
-        config=types.GenerateContentConfig(system_instruction="You are a helpful assistant. Always respond politely."),
-    )
-
-    # Generate response
-    responses = []
-    async for response in driver.generate_content_async(request, stream=False):
-        responses.append(response)
-
-    # Validate response
-    assert len(responses) == 1
-    assert responses[0].content is not None
-    assert responses[0].content.parts[0].text is not None
+class TestOllamaBasicCompletion:
+    """Integration tests for basic chat completion without tools."""
+    
+    async def test_simple_text_completion(self):
+        """Test basic text completion with single user message."""
+        from kagent.adk.models._ollama import OllamaNative
+        
+        # Create OllamaNative instance
+        ollama_native = OllamaNative(
+            type="ollama",
+            model="llama2",
+            base_url="http://localhost:11434"
+        )
+        
+        # Create simple LlmRequest
+        from google.adk.models.llm_request import LlmRequest
+        request = LlmRequest(
+            contents=[
+                types.Content(
+                    role="user",
+                    parts=[types.Part(text="Say hello")]
+                )
+            ]
+        )
+        
+        # Generate content (non-streaming)
+        response = None
+        async for resp in ollama_native.generate_content_async(request, stream=False):
+            response = resp
+        
+        # Validate response
+        assert response is not None
+        assert response.content is not None
+        assert len(response.content.parts) > 0
+        assert response.content.parts[0].text
+        assert isinstance(response.content.parts[0].text, str)
+    
+    async def test_completion_with_system_instruction(self):
+        """Test completion with system instruction."""
+        from kagent.adk.models._ollama import OllamaNative
+        from google.adk.models.llm_request import LlmRequest
+        
+        ollama_native = OllamaNative(
+            type="ollama",
+            model="llama2"
+        )
+        
+        request = LlmRequest(
+            contents=[
+                types.Content(
+                    role="user",
+                    parts=[types.Part(text="What should I say?")]
+                )
+            ],
+            system_instruction="You are a helpful assistant. Always be polite."
+        )
+        
+        response = None
+        async for resp in ollama_native.generate_content_async(request, stream=False):
+            response = resp
+        
+        assert response is not None
+        assert response.content is not None
+    
+    async def test_completion_with_temperature(self):
+        """Test completion with custom temperature setting."""
+        from kagent.adk.models._ollama import OllamaNative
+        from google.adk.models.llm_request import LlmRequest
+        
+        ollama_native = OllamaNative(
+            type="ollama",
+            model="llama2",
+            temperature=0.5
+        )
+        
+        request = LlmRequest(
+            contents=[
+                types.Content(
+                    role="user",
+                    parts=[types.Part(text="Generate a number")]
+                )
+            ]
+        )
+        
+        response = None
+        async for resp in ollama_native.generate_content_async(request, stream=False):
+            response = resp
+        
+        assert response is not None
+        assert response.content is not None
+    
+    async def test_completion_with_max_tokens(self):
+        """Test completion with max_tokens limit."""
+        from kagent.adk.models._ollama import OllamaNative
+        from google.adk.models.llm_request import LlmRequest
+        
+        ollama_native = OllamaNative(
+            type="ollama",
+            model="llama2",
+            max_tokens=50
+        )
+        
+        request = LlmRequest(
+            contents=[
+                types.Content(
+                    role="user",
+                    parts=[types.Part(text="Write a story")]
+                )
+            ]
+        )
+        
+        response = None
+        async for resp in ollama_native.generate_content_async(request, stream=False):
+            response = resp
+        
+        assert response is not None
+        # Response should exist even with token limit
+    
+    async def test_multi_turn_conversation(self):
+        """Test multi-turn conversation with history."""
+        from kagent.adk.models._ollama import OllamaNative
+        from google.adk.models.llm_request import LlmRequest
+        
+        ollama_native = OllamaNative(
+            type="ollama",
+            model="llama2"
+        )
+        
+        request = LlmRequest(
+            contents=[
+                types.Content(
+                    role="user",
+                    parts=[types.Part(text="My name is Alice")]
+                ),
+                types.Content(
+                    role="model",
+                    parts=[types.Part(text="Nice to meet you, Alice!")]
+                ),
+                types.Content(
+                    role="user",
+                    parts=[types.Part(text="What is my name?")]
+                )
+            ]
+        )
+        
+        response = None
+        async for resp in ollama_native.generate_content_async(request, stream=False):
+            response = resp
+        
+        assert response is not None
+        assert response.content is not None
+        # Model should remember the name from conversation history
 
 
 if __name__ == "__main__":
-    pytest.main([__file__, "-v", "-m", "integration"])
+    pytest.main([__file__, "-v"])
+

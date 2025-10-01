@@ -1,71 +1,255 @@
-"""Integration test for Ollama tool calling.
+"""Integration test for Ollama tool calling (function calling).
 
-Tests function calling with llama3.1 model.
-Requires Ollama running locally with llama3.1 pulled.
+This test validates tool/function calling with compatible models like llama3.1.
+
+Task: T010
 """
 
 import pytest
-from google.adk.models.llm_request import LlmRequest
 from google.genai import types
+from google.genai.types import FunctionDeclaration, Tool, Schema
 
-from kagent.adk.models._ollama import OllamaNative
+pytestmark = pytest.mark.asyncio
 
 
-@pytest.mark.asyncio
-@pytest.mark.integration
-async def test_tool_calling():
-    """Test function calling with compatible model."""
-    driver = OllamaNative(
-        type="ollama",
-        model="gpt-oss:latest",  # gpt-oss supports tool calling
-        base_url="http://localhost:11434",
-    )
-
-    # Define a simple tool
-    get_weather_tool = types.Tool(
-        function_declarations=[
-            types.FunctionDeclaration(
-                name="get_weather",
-                description="Get the current weather for a location",
-                parameters=types.Schema(
-                    type=types.Type.OBJECT,
-                    properties={"location": types.Schema(type=types.Type.STRING, description="City name")},
-                    required=["location"],
-                ),
+class TestOllamaToolCalling:
+    """Integration tests for function calling with Ollama."""
+    
+    async def test_tool_call_generation(self):
+        """Test that model generates tool call when appropriate."""
+        from kagent.adk.models._ollama import OllamaNative
+        from google.adk.models.llm_request import LlmRequest
+        
+        ollama_native = OllamaNative(
+            type="ollama",
+            model="llama3.1",  # Model that supports tool calling
+            base_url="http://localhost:11434"
+        )
+        
+        # Define a tool
+        get_weather_tool = Tool(
+            function_declarations=[
+                FunctionDeclaration(
+                    name="get_weather",
+                    description="Get current weather for a location",
+                    parameters=Schema(
+                        type="object",
+                        properties={
+                            "location": Schema(
+                                type="string",
+                                description="City name"
+                            ),
+                            "unit": Schema(
+                                type="string",
+                                enum=["celsius", "fahrenheit"]
+                            )
+                        },
+                        required=["location"]
+                    )
+                )
+            ]
+        )
+        
+        request = LlmRequest(
+            contents=[
+                types.Content(
+                    role="user",
+                    parts=[types.Part(text="What's the weather in Paris?")]
+                )
+            ],
+            tools=[get_weather_tool]
+        )
+        
+        response = None
+        async for resp in ollama_native.generate_content_async(request, stream=False):
+            response = resp
+        
+        # Validate tool call in response
+        assert response is not None
+        assert response.content is not None
+        
+        # Check for function call in parts
+        has_function_call = any(
+            part.function_call is not None 
+            for part in response.content.parts
+        )
+        
+        assert has_function_call, "Response should contain function call"
+    
+    async def test_tool_call_with_response(self):
+        """Test full tool calling flow: call → response → final answer."""
+        from kagent.adk.models._ollama import OllamaNative
+        from google.adk.models.llm_request import LlmRequest
+        
+        ollama_native = OllamaNative(
+            type="ollama",
+            model="llama3.1"
+        )
+        
+        # Define tool
+        get_time_tool = Tool(
+            function_declarations=[
+                FunctionDeclaration(
+                    name="get_current_time",
+                    description="Get current time",
+                    parameters=Schema(
+                        type="object",
+                        properties={}
+                    )
+                )
+            ]
+        )
+        
+        # First request: Model should call the tool
+        request1 = LlmRequest(
+            contents=[
+                types.Content(
+                    role="user",
+                    parts=[types.Part(text="What time is it?")]
+                )
+            ],
+            tools=[get_time_tool]
+        )
+        
+        response1 = None
+        async for resp in ollama_native.generate_content_async(request1, stream=False):
+            response1 = resp
+        
+        assert response1 is not None
+        
+        # Simulate tool response
+        from google.genai.types import FunctionCall, FunctionResponse
+        
+        # Find the function call
+        function_call = None
+        for part in response1.content.parts:
+            if part.function_call:
+                function_call = part.function_call
+                break
+        
+        if function_call:
+            # Second request: Provide tool response
+            request2 = LlmRequest(
+                contents=[
+                    types.Content(
+                        role="user",
+                        parts=[types.Part(text="What time is it?")]
+                    ),
+                    response1.content,  # Model's tool call
+                    types.Content(
+                        role="user",
+                        parts=[types.Part(
+                            function_response=FunctionResponse(
+                                name=function_call.name,
+                                response={"time": "14:30:00"}
+                            )
+                        )]
+                    )
+                ],
+                tools=[get_time_tool]
             )
+            
+            response2 = None
+            async for resp in ollama_native.generate_content_async(request2, stream=False):
+                response2 = resp
+            
+            # Model should now provide natural language answer
+            assert response2 is not None
+            assert response2.content is not None
+    
+    async def test_multiple_tool_calls(self):
+        """Test model calling multiple tools in one response."""
+        from kagent.adk.models._ollama import OllamaNative
+        from google.adk.models.llm_request import LlmRequest
+        
+        ollama_native = OllamaNative(
+            type="ollama",
+            model="llama3.1"
+        )
+        
+        # Define multiple tools
+        tools = [
+            Tool(function_declarations=[
+                FunctionDeclaration(
+                    name="get_weather",
+                    description="Get weather",
+                    parameters=Schema(
+                        type="object",
+                        properties={
+                            "location": Schema(type="string")
+                        }
+                    )
+                )
+            ]),
+            Tool(function_declarations=[
+                FunctionDeclaration(
+                    name="get_time",
+                    description="Get time",
+                    parameters=Schema(type="object", properties={})
+                )
+            ])
         ]
-    )
-
-    # Create request with tools
-    request = LlmRequest(
-        model="gpt-oss:latest",
-        contents=[
-            types.Content(role="user", parts=[types.Part.from_text(text="What's the weather in San Francisco?")])
-        ],
-        config=types.GenerateContentConfig(tools=[get_weather_tool]),
-    )
-
-    # Generate response
-    responses = []
-    async for response in driver.generate_content_async(request, stream=False):
-        responses.append(response)
-
-    # Validate tool call in response
-    assert len(responses) == 1
-    response = responses[0]
-
-    assert response.content is not None
-
-    # Check if model made a function call
-    has_function_call = any(part.function_call is not None for part in response.content.parts)
-
-    # With a tool-capable model and appropriate prompt,
-    # we expect a function call
-    if has_function_call:
-        func_call_part = next(part for part in response.content.parts if part.function_call is not None)
-        assert func_call_part.function_call.name == "get_weather"
-        assert "location" in func_call_part.function_call.args
+        
+        request = LlmRequest(
+            contents=[
+                types.Content(
+                    role="user",
+                    parts=[types.Part(text="What's the weather and time in Paris?")]
+                )
+            ],
+            tools=tools
+        )
+        
+        response = None
+        async for resp in ollama_native.generate_content_async(request, stream=False):
+            response = resp
+        
+        assert response is not None
+        # Model may call one or both tools
+    
+    async def test_tool_calling_with_streaming(self):
+        """Test tool calls work with streaming responses."""
+        from kagent.adk.models._ollama import OllamaNative
+        from google.adk.models.llm_request import LlmRequest
+        
+        ollama_native = OllamaNative(
+            type="ollama",
+            model="llama3.1"
+        )
+        
+        tool = Tool(
+            function_declarations=[
+                FunctionDeclaration(
+                    name="calculator",
+                    description="Perform calculation",
+                    parameters=Schema(
+                        type="object",
+                        properties={
+                            "expression": Schema(type="string")
+                        }
+                    )
+                )
+            ]
+        )
+        
+        request = LlmRequest(
+            contents=[
+                types.Content(
+                    role="user",
+                    parts=[types.Part(text="Calculate 2+2")]
+                )
+            ],
+            tools=[tool]
+        )
+        
+        chunks = []
+        async for chunk in ollama_native.generate_content_async(request, stream=True):
+            chunks.append(chunk)
+        
+        assert len(chunks) > 0
+        # Tool call should appear in one of the chunks
 
 
 if __name__ == "__main__":
-    pytest.main([__file__, "-v", "-m", "integration"])
+    pytest.main([__file__, "-v"])
+
