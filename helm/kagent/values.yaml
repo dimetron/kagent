@@ -151,7 +151,7 @@ providers:
     # apiKey: ""
   ollama:
     provider: Ollama
-    model: "llama3.2"
+    model: "gpt-oss:latest"
     config:
       host: host.docker.internal:11434
   anthropic:
@@ -337,7 +337,7 @@ querydoc:
 
 otel:
   tracing:
-    enabled: false
+    enabled: true
     exporter:
       otlp:
         endpoint: http://host.docker.internal:4317
