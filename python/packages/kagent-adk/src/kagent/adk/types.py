@@ -14,6 +14,7 @@ from google.adk.tools.mcp_tool import MCPToolset, SseConnectionParams, Streamabl
 from pydantic import BaseModel, Field
 
 from .models import AzureOpenAI as OpenAIAzure
+from .models import OllamaNative
 from .models import OpenAI as OpenAINative
 
 logger = logging.getLogger(__name__)
@@ -67,6 +68,7 @@ class GeminiAnthropic(BaseLLM):
 
 
 class Ollama(BaseLLM):
+    base_url: str | None = None
     type: Literal["ollama"]
 
 
@@ -127,7 +129,12 @@ class AgentConfig(BaseModel):
         elif self.model.type == "gemini_anthropic":
             model = ClaudeLLM(model=self.model.model)
         elif self.model.type == "ollama":
-            model = LiteLlm(model=f"ollama_chat/{self.model.model}", extra_headers=extra_headers)
+            model = OllamaNative(
+                model=self.model.model,
+                base_url=self.model.base_url if hasattr(self.model, "base_url") else None,
+                headers=extra_headers,
+                type="ollama",
+            )
         elif self.model.type == "azure_openai":
             model = OpenAIAzure(model=self.model.model, type="azure_openai", headers=extra_headers)
         elif self.model.type == "gemini":
