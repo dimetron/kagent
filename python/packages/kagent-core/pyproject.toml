@@ -20,8 +20,23 @@ dependencies = [
   "opentelemetry-instrumentation-google-generativeai>=0.47.3",
 ]
 
+[project.optional-dependencies]
+test = [
+  "pytest>=8.0.0",
+  "pytest-asyncio>=0.23.0",
+  "pytest-cov>=4.1.0",
+]
+
 [tool.ruff]
 extend = "../../pyproject.toml"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/kagent"]

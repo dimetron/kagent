@@ -1,4 +1,4 @@
-from typing import override
+from typing import Any, override
 
 import httpx
 from a2a.server.tasks import TaskStore
@@ -19,11 +19,12 @@ class KAgentTaskStore(TaskStore):
         self.client = client
 
     @override
-    async def save(self, task: Task) -> None:
+    async def save(self, task: Task, call_context: Any = None) -> None:
         """Save a task to KAgent.
 
         Args:
             task: The task to save
+            call_context: The call context (unused in this implementation)
 
         Raises:
             httpx.HTTPStatusError: If the API request fails
@@ -32,11 +33,12 @@ class KAgentTaskStore(TaskStore):
         response.raise_for_status()
 
     @override
-    async def get(self, task_id: str) -> Task | None:
+    async def get(self, task_id: str, call_context: Any = None) -> Task | None:
         """Retrieve a task from KAgent.
 
         Args:
             task_id: The ID of the task to retrieve
+            call_context: The call context (unused in this implementation)
 
         Returns:
             The task if found, None otherwise
@@ -51,11 +53,12 @@ class KAgentTaskStore(TaskStore):
         return Task.model_validate(response.json())
 
     @override
-    async def delete(self, task_id: str) -> None:
+    async def delete(self, task_id: str, call_context: Any = None) -> None:
         """Delete a task from KAgent.
 
         Args:
             task_id: The ID of the task to delete
+            call_context: The call context (unused in this implementation)
 
         Raises:
             httpx.HTTPStatusError: If the API request fails

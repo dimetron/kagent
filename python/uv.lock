@@ -1875,6 +1875,13 @@ dependencies = [
     { name = "opentelemetry-sdk" },
 ]
 
+[package.optional-dependencies]
+test = [
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-cov" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "a2a-sdk", specifier = ">=0.2.16" },
@@ -1886,7 +1893,11 @@ requires-dist = [
     { name = "opentelemetry-instrumentation-httpx", specifier = ">=0.52.0" },
     { name = "opentelemetry-instrumentation-openai", specifier = ">=0.44.3" },
     { name = "opentelemetry-sdk", specifier = ">=1.36.0" },
+    { name = "pytest", marker = "extra == 'test'", specifier = ">=8.0.0" },
+    { name = "pytest-asyncio", marker = "extra == 'test'", specifier = ">=0.23.0" },
+    { name = "pytest-cov", marker = "extra == 'test'", specifier = ">=4.1.0" },
 ]
+provides-extras = ["test"]
 
 [[package]]
 name = "kagent-crewai"
