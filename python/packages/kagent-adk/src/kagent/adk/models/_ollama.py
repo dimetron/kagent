@@ -265,7 +265,7 @@ def _convert_ollama_response_to_llm_response(response: dict[str, Any]) -> LlmRes
         parts.append(Part(text=content_text))
 
     # Add tool calls if present
-    for tool_call in tool_calls:
+    for tool_call in tool_calls or []:
         function_info = tool_call.get("function", {})
         function_name = function_info.get("name", "")
         arguments_str = function_info.get("arguments", "{}")
