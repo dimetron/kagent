@@ -9,21 +9,21 @@ import pytest
 from google.genai import types
 from google.genai.types import FunctionDeclaration, Tool, Schema
 
-pytestmark = pytest.mark.asyncio
+pytestmark = [pytest.mark.asyncio, pytest.mark.integration]
 
 
 class TestOllamaToolCalling:
     """Integration tests for function calling with Ollama."""
     
-    async def test_tool_call_generation(self):
+    async def test_tool_call_generation(self, ollama_tool_model, ollama_base_url):
         """Test that model generates tool call when appropriate."""
         from kagent.adk.models._ollama import OllamaNative
         from google.adk.models.llm_request import LlmRequest
         
         ollama_native = OllamaNative(
             type="ollama",
-            model="llama3.1",  # Model that supports tool calling
-            base_url="http://localhost:11434"
+            model=ollama_tool_model,
+            base_url=ollama_base_url
         )
         
         # Define a tool
@@ -76,14 +76,14 @@ class TestOllamaToolCalling:
         
         assert has_function_call, "Response should contain function call"
     
-    async def test_tool_call_with_response(self):
+    async def test_tool_call_with_response(self, ollama_tool_model):
         """Test full tool calling flow: call → response → final answer."""
         from kagent.adk.models._ollama import OllamaNative
         from google.adk.models.llm_request import LlmRequest
         
         ollama_native = OllamaNative(
             type="ollama",
-            model="llama3.1"
+            model=ollama_tool_model
         )
         
         # Define tool
@@ -157,14 +157,14 @@ class TestOllamaToolCalling:
             assert response2 is not None
             assert response2.content is not None
     
-    async def test_multiple_tool_calls(self):
+    async def test_multiple_tool_calls(self, ollama_tool_model):
         """Test model calling multiple tools in one response."""
         from kagent.adk.models._ollama import OllamaNative
         from google.adk.models.llm_request import LlmRequest
         
         ollama_native = OllamaNative(
             type="ollama",
-            model="llama3.1"
+            model=ollama_tool_model
         )
         
         # Define multiple tools
@@ -207,14 +207,14 @@ class TestOllamaToolCalling:
         assert response is not None
         # Model may call one or both tools
     
-    async def test_tool_calling_with_streaming(self):
+    async def test_tool_calling_with_streaming(self, ollama_tool_model):
         """Test tool calls work with streaming responses."""
         from kagent.adk.models._ollama import OllamaNative
         from google.adk.models.llm_request import LlmRequest
         
         ollama_native = OllamaNative(
             type="ollama",
-            model="llama3.1"
+            model=ollama_tool_model
         )
         
         tool = Tool(

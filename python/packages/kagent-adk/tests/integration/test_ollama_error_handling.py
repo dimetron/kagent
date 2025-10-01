@@ -8,13 +8,13 @@ Task: T011
 import pytest
 from google.genai import types
 
-pytestmark = pytest.mark.asyncio
+pytestmark = [pytest.mark.asyncio, pytest.mark.integration]
 
 
 class TestOllamaErrorHandling:
     """Integration tests for error handling."""
     
-    async def test_model_not_found_404(self):
+    async def test_model_not_found_404(self, ollama_base_url):
         """Test handling of 404 error when model doesn't exist."""
         from kagent.adk.models._ollama import OllamaNative
         from google.adk.models.llm_request import LlmRequest
@@ -22,7 +22,7 @@ class TestOllamaErrorHandling:
         ollama_native = OllamaNative(
             type="ollama",
             model="nonexistent-model-12345",
-            base_url="http://localhost:11434"
+            base_url=ollama_base_url
         )
         
         request = LlmRequest(
@@ -72,15 +72,15 @@ class TestOllamaErrorHandling:
         assert response.error_code is not None
         assert response.error_message is not None
     
-    async def test_timeout_error(self):
+    async def test_timeout_error(self, ollama_model, ollama_base_url):
         """Test handling of timeout errors."""
         from kagent.adk.models._ollama import OllamaNative
         from google.adk.models.llm_request import LlmRequest
         
         ollama_native = OllamaNative(
             type="ollama",
-            model="llama2",
-            base_url="http://localhost:11434",
+            model=ollama_model,
+            base_url=ollama_base_url,
             timeout=0.001  # Very short timeout to trigger error
         )
         
@@ -105,14 +105,14 @@ class TestOllamaErrorHandling:
         if response:
             assert response.error_code is not None or response.error_message is not None
     
-    async def test_invalid_request_format(self):
+    async def test_invalid_request_format(self, ollama_model):
         """Test handling of invalid request parameters."""
         from kagent.adk.models._ollama import OllamaNative
         from google.adk.models.llm_request import LlmRequest
         
         ollama_native = OllamaNative(
             type="ollama",
-            model="llama2"
+            model=ollama_model
         )
         
         # Create request with potentially problematic content
@@ -132,7 +132,7 @@ class TestOllamaErrorHandling:
         # Should handle gracefully
         assert response is not None
     
-    async def test_server_error_500(self):
+    async def test_server_error_500(self, ollama_model):
         """Test handling of 500 internal server errors."""
         # This test would require mocking or a specially configured Ollama instance
         # to return 500 errors. For now, we test the error conversion logic.
@@ -140,14 +140,14 @@ class TestOllamaErrorHandling:
         
         ollama_native = OllamaNative(
             type="ollama",
-            model="llama2"
+            model=ollama_model
         )
         
         # Test will be implemented when we can trigger 500 errors
         # For now, just verify the class can be instantiated
         assert ollama_native is not None
     
-    async def test_streaming_error_handling(self):
+    async def test_streaming_error_handling(self, ollama_base_url):
         """Test error handling in streaming mode."""
         from kagent.adk.models._ollama import OllamaNative
         from google.adk.models.llm_request import LlmRequest
@@ -155,7 +155,7 @@ class TestOllamaErrorHandling:
         ollama_native = OllamaNative(
             type="ollama",
             model="nonexistent-streaming-model",
-            base_url="http://localhost:11434"
+            base_url=ollama_base_url
         )
         
         request = LlmRequest(
@@ -176,7 +176,7 @@ class TestOllamaErrorHandling:
         # Should receive error in streaming mode too
         assert error_received
     
-    async def test_error_response_structure(self):
+    async def test_error_response_structure(self, ollama_base_url):
         """Test that error responses have correct structure."""
         from kagent.adk.models._ollama import OllamaNative
         from google.adk.models.llm_request import LlmRequest
@@ -184,7 +184,7 @@ class TestOllamaErrorHandling:
         ollama_native = OllamaNative(
             type="ollama",
             model="bad-model",
-            base_url="http://localhost:11434"
+            base_url=ollama_base_url
         )
         
         request = LlmRequest(

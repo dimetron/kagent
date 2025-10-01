@@ -8,13 +8,13 @@ Task: T012
 import pytest
 from google.genai import types
 
-pytestmark = pytest.mark.asyncio
+pytestmark = [pytest.mark.asyncio, pytest.mark.integration]
 
 
 class TestOllamaConfiguration:
     """Integration tests for custom configuration."""
     
-    async def test_custom_base_url(self):
+    async def test_custom_base_url(self, ollama_model, ollama_base_url):
         """Test using custom Ollama server URL."""
         from kagent.adk.models._ollama import OllamaNative
         from google.adk.models.llm_request import LlmRequest
@@ -22,11 +22,11 @@ class TestOllamaConfiguration:
         # Test with explicit base_url
         ollama_native = OllamaNative(
             type="ollama",
-            model="llama2",
-            base_url="http://localhost:11434"  # Explicit URL
+            model=ollama_model,
+            base_url=ollama_base_url
         )
         
-        assert ollama_native.base_url == "http://localhost:11434"
+        assert ollama_native.base_url == ollama_base_url
         
         request = LlmRequest(
             contents=[
@@ -44,7 +44,7 @@ class TestOllamaConfiguration:
         
         assert response is not None
     
-    async def test_custom_headers(self):
+    async def test_custom_headers(self, ollama_model):
         """Test using custom HTTP headers."""
         from kagent.adk.models._ollama import OllamaNative
         from google.adk.models.llm_request import LlmRequest
@@ -56,7 +56,7 @@ class TestOllamaConfiguration:
         
         ollama_native = OllamaNative(
             type="ollama",
-            model="llama2",
+            model=ollama_model,
             headers=custom_headers
         )
         
@@ -79,7 +79,7 @@ class TestOllamaConfiguration:
         
         assert response is not None
     
-    async def test_custom_temperature(self):
+    async def test_custom_temperature(self, ollama_model):
         """Test temperature parameter affects generation."""
         from kagent.adk.models._ollama import OllamaNative
         from google.adk.models.llm_request import LlmRequest
@@ -87,14 +87,14 @@ class TestOllamaConfiguration:
         # Test with very low temperature (deterministic)
         ollama_low_temp = OllamaNative(
             type="ollama",
-            model="llama2",
+            model=ollama_model,
             temperature=0.1
         )
         
         # Test with higher temperature (more random)
         ollama_high_temp = OllamaNative(
             type="ollama",
-            model="llama2",
+            model=ollama_model,
             temperature=1.5
         )
         
@@ -119,14 +119,14 @@ class TestOllamaConfiguration:
         assert response1 is not None
         assert response2 is not None
     
-    async def test_custom_max_tokens(self):
+    async def test_custom_max_tokens(self, ollama_model):
         """Test max_tokens parameter limits response length."""
         from kagent.adk.models._ollama import OllamaNative
         from google.adk.models.llm_request import LlmRequest
         
         ollama_native = OllamaNative(
             type="ollama",
-            model="llama2",
+            model=ollama_model,
             max_tokens=10  # Very small limit
         )
         
@@ -147,25 +147,25 @@ class TestOllamaConfiguration:
         # Response should be limited by max_tokens
         # (actual token counting would require deeper inspection)
     
-    async def test_custom_timeout(self):
+    async def test_custom_timeout(self, ollama_model):
         """Test timeout parameter is applied."""
         from kagent.adk.models._ollama import OllamaNative
         
         ollama_native = OllamaNative(
             type="ollama",
-            model="llama2",
+            model=ollama_model,
             timeout=30.0  # 30 second timeout
         )
         
         assert ollama_native.timeout == 30.0
     
-    async def test_client_caching(self):
+    async def test_client_caching(self, ollama_model):
         """Test that AsyncClient is cached via @cached_property."""
         from kagent.adk.models._ollama import OllamaNative
         
         ollama_native = OllamaNative(
             type="ollama",
-            model="llama2"
+            model=ollama_model
         )
         
         # Access _client property twice
@@ -175,39 +175,39 @@ class TestOllamaConfiguration:
         # Should be the same instance (cached)
         assert client1 is client2
     
-    async def test_multiple_instances_independent(self):
+    async def test_multiple_instances_independent(self, ollama_model):
         """Test that multiple OllamaNative instances are independent."""
         from kagent.adk.models._ollama import OllamaNative
         
         ollama1 = OllamaNative(
             type="ollama",
-            model="llama2",
+            model=ollama_model,
             temperature=0.5
         )
         
         ollama2 = OllamaNative(
             type="ollama",
-            model="mistral",
+            model=ollama_model,
             temperature=1.0
         )
         
-        # Should have different configurations
-        assert ollama1.model != ollama2.model
+        # Should have different configurations (different temperature)
         assert ollama1.temperature != ollama2.temperature
+        # Each instance should have its own client
         assert ollama1._client is not ollama2._client
     
-    async def test_default_values(self):
+    async def test_default_values(self, ollama_model, ollama_base_url):
         """Test that default configuration values are applied."""
         from kagent.adk.models._ollama import OllamaNative
         
         # Create with minimal config
         ollama_native = OllamaNative(
             type="ollama",
-            model="llama2"
+            model=ollama_model
         )
         
         # Check defaults
-        assert ollama_native.base_url == "http://localhost:11434"
+        assert ollama_native.base_url == ollama_base_url
         assert ollama_native.timeout == 60.0
         assert ollama_native.temperature is None  # Optional, no default
         assert ollama_native.max_tokens is None  # Optional, no default

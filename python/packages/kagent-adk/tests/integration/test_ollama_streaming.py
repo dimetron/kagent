@@ -8,20 +8,20 @@ Task: T009
 import pytest
 from google.genai import types
 
-pytestmark = pytest.mark.asyncio
+pytestmark = [pytest.mark.asyncio, pytest.mark.integration]
 
 
 class TestOllamaStreaming:
     """Integration tests for streaming responses."""
     
-    async def test_streaming_text_generation(self):
+    async def test_streaming_text_generation(self, ollama_model):
         """Test streaming response with async iteration."""
         from kagent.adk.models._ollama import OllamaNative
         from google.adk.models.llm_request import LlmRequest
         
         ollama_native = OllamaNative(
             type="ollama",
-            model="llama2"
+            model=ollama_model
         )
         
         request = LlmRequest(
@@ -49,14 +49,14 @@ class TestOllamaStreaming:
         if len(chunks) > 1:
             assert chunks[-1].partial is False, "Final chunk should not be partial"
     
-    async def test_streaming_accumulates_content(self):
+    async def test_streaming_accumulates_content(self, ollama_model):
         """Test that streaming chunks accumulate to form complete response."""
         from kagent.adk.models._ollama import OllamaNative
         from google.adk.models.llm_request import LlmRequest
         
         ollama_native = OllamaNative(
             type="ollama",
-            model="llama2"
+            model=ollama_model
         )
         
         request = LlmRequest(
@@ -81,14 +81,14 @@ class TestOllamaStreaming:
         assert chunk_count > 0
         assert len(full_text) > 0, "Accumulated text should not be empty"
     
-    async def test_streaming_with_usage_metadata(self):
+    async def test_streaming_with_usage_metadata(self, ollama_model):
         """Test that final streaming chunk includes usage metadata."""
         from kagent.adk.models._ollama import OllamaNative
         from google.adk.models.llm_request import LlmRequest
         
         ollama_native = OllamaNative(
             type="ollama",
-            model="llama2"
+            model=ollama_model
         )
         
         request = LlmRequest(
@@ -110,14 +110,14 @@ class TestOllamaStreaming:
         assert final_chunk.usage_metadata.prompt_token_count >= 0
         assert final_chunk.usage_metadata.candidates_token_count >= 0
     
-    async def test_streaming_early_termination(self):
+    async def test_streaming_early_termination(self, ollama_model):
         """Test that streaming can be terminated early by breaking iteration."""
         from kagent.adk.models._ollama import OllamaNative
         from google.adk.models.llm_request import LlmRequest
         
         ollama_native = OllamaNative(
             type="ollama",
-            model="llama2"
+            model=ollama_model
         )
         
         request = LlmRequest(
@@ -138,14 +138,14 @@ class TestOllamaStreaming:
         
         assert chunk_count == 3, "Should stop after 3 chunks"
     
-    async def test_streaming_vs_non_streaming_consistency(self):
+    async def test_streaming_vs_non_streaming_consistency(self, ollama_model):
         """Test that streaming and non-streaming produce similar results."""
         from kagent.adk.models._ollama import OllamaNative
         from google.adk.models.llm_request import LlmRequest
         
         ollama_native = OllamaNative(
             type="ollama",
-            model="llama2",
+            model=ollama_model,
             temperature=0.0  # Deterministic
         )
         

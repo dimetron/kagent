@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import base64
 import json
+import os
 from functools import cached_property
 from typing import TYPE_CHECKING, Any, AsyncGenerator, Literal, Optional
 
@@ -24,6 +25,16 @@ from pydantic import Field
 
 if TYPE_CHECKING:
     from google.adk.models.llm_request import LlmRequest
+
+
+def _get_default_base_url() -> str:
+    """Get default Ollama base URL from environment or use fallback.
+
+    Returns:
+        Base URL from OLLAMA_API_BASE environment variable,
+        or "http://localhost:11434" if not set.
+    """
+    return os.environ.get("OLLAMA_API_BASE", "http://localhost:11434")
 
 
 def _convert_role_to_ollama(role: Optional[str]) -> str:
@@ -301,7 +312,7 @@ class OllamaNative(BaseLlm):
     Attributes:
         type: Discriminator for model type (always "ollama")
         model: Ollama model name (e.g., "llama2", "mistral", "llama3.1")
-        base_url: Ollama server URL (default: http://localhost:11434)
+        base_url: Ollama server URL (default: from OLLAMA_API_BASE env var or http://localhost:11434)
         temperature: Sampling temperature (0.0-2.0)
         max_tokens: Maximum tokens to generate
         timeout: HTTP request timeout in seconds
@@ -310,7 +321,7 @@ class OllamaNative(BaseLlm):
 
     type: Literal["ollama"] = "ollama"
     model: str
-    base_url: Optional[str] = "http://localhost:11434"
+    base_url: str = Field(default_factory=_get_default_base_url)
     temperature: Optional[float] = None
     max_tokens: Optional[int] = None
     timeout: Optional[float] = 60.0

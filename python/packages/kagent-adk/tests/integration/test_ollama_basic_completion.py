@@ -10,21 +10,21 @@ import pytest
 from google.genai import types
 
 # Will be implemented when OllamaNative is complete
-pytestmark = pytest.mark.asyncio
+pytestmark = [pytest.mark.asyncio, pytest.mark.integration]
 
 
 class TestOllamaBasicCompletion:
     """Integration tests for basic chat completion without tools."""
     
-    async def test_simple_text_completion(self):
+    async def test_simple_text_completion(self, ollama_model, ollama_base_url):
         """Test basic text completion with single user message."""
         from kagent.adk.models._ollama import OllamaNative
         
         # Create OllamaNative instance
         ollama_native = OllamaNative(
             type="ollama",
-            model="llama2",
-            base_url="http://localhost:11434"
+            model=ollama_model,
+            base_url=ollama_base_url
         )
         
         # Create simple LlmRequest
@@ -50,14 +50,14 @@ class TestOllamaBasicCompletion:
         assert response.content.parts[0].text
         assert isinstance(response.content.parts[0].text, str)
     
-    async def test_completion_with_system_instruction(self):
+    async def test_completion_with_system_instruction(self, ollama_model):
         """Test completion with system instruction."""
         from kagent.adk.models._ollama import OllamaNative
         from google.adk.models.llm_request import LlmRequest
         
         ollama_native = OllamaNative(
             type="ollama",
-            model="llama2"
+            model=ollama_model
         )
         
         request = LlmRequest(
@@ -77,14 +77,14 @@ class TestOllamaBasicCompletion:
         assert response is not None
         assert response.content is not None
     
-    async def test_completion_with_temperature(self):
+    async def test_completion_with_temperature(self, ollama_model):
         """Test completion with custom temperature setting."""
         from kagent.adk.models._ollama import OllamaNative
         from google.adk.models.llm_request import LlmRequest
         
         ollama_native = OllamaNative(
             type="ollama",
-            model="llama2",
+            model=ollama_model,
             temperature=0.5
         )
         
@@ -104,14 +104,14 @@ class TestOllamaBasicCompletion:
         assert response is not None
         assert response.content is not None
     
-    async def test_completion_with_max_tokens(self):
+    async def test_completion_with_max_tokens(self, ollama_model):
         """Test completion with max_tokens limit."""
         from kagent.adk.models._ollama import OllamaNative
         from google.adk.models.llm_request import LlmRequest
         
         ollama_native = OllamaNative(
             type="ollama",
-            model="llama2",
+            model=ollama_model,
             max_tokens=50
         )
         
@@ -131,14 +131,14 @@ class TestOllamaBasicCompletion:
         assert response is not None
         # Response should exist even with token limit
     
-    async def test_multi_turn_conversation(self):
+    async def test_multi_turn_conversation(self, ollama_model):
         """Test multi-turn conversation with history."""
         from kagent.adk.models._ollama import OllamaNative
         from google.adk.models.llm_request import LlmRequest
         
         ollama_native = OllamaNative(
             type="ollama",
-            model="llama2"
+            model=ollama_model
         )
         
         request = LlmRequest(

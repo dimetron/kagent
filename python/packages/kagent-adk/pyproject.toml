@@ -56,3 +56,6 @@ extend = "../../pyproject.toml"
 testpaths = ["tests"]
 asyncio_default_fixture_loop_scope = "function"
 asyncio_mode = "auto"
+markers = [
+    "integration: marks tests as integration tests (require external services like Ollama)",
+]

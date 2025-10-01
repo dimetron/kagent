@@ -5,6 +5,7 @@ This tests the _client property caching and AsyncClient configuration.
 Task: T016
 """
 
+import os
 import pytest
 
 
@@ -198,6 +199,94 @@ class TestOllamaNativeClient:
         assert ollama_native.max_tokens == 1024
         assert ollama_native.timeout == 45.0
         assert ollama_native.headers == {"X-Test": "value"}
+
+
+class TestOllamaAPIBaseEnvVar:
+    """Unit tests for OLLAMA_API_BASE environment variable support (FR-015)."""
+    
+    def test_default_base_url_without_env_var(self, monkeypatch):
+        """Test that default base_url is used when OLLAMA_API_BASE is not set."""
+        from kagent.adk.models._ollama import OllamaNative
+        
+        # Ensure OLLAMA_API_BASE is not set
+        monkeypatch.delenv("OLLAMA_API_BASE", raising=False)
+        
+        ollama_native = OllamaNative(
+            type="ollama",
+            model="llama2"
+        )
+        
+        assert ollama_native.base_url == "http://localhost:11434"
+    
+    def test_base_url_from_env_var(self, monkeypatch):
+        """Test that base_url is read from OLLAMA_API_BASE environment variable."""
+        from kagent.adk.models._ollama import OllamaNative
+        
+        env_base_url = "http://env-ollama-server:9999"
+        monkeypatch.setenv("OLLAMA_API_BASE", env_base_url)
+        
+        ollama_native = OllamaNative(
+            type="ollama",
+            model="llama2"
+        )
+        
+        assert ollama_native.base_url == env_base_url
+    
+    def test_explicit_base_url_overrides_env_var(self, monkeypatch):
+        """Test that explicit base_url parameter overrides OLLAMA_API_BASE."""
+        from kagent.adk.models._ollama import OllamaNative
+        
+        monkeypatch.setenv("OLLAMA_API_BASE", "http://env-ollama:11434")
+        explicit_url = "http://explicit-ollama:8080"
+        
+        ollama_native = OllamaNative(
+            type="ollama",
+            model="llama2",
+            base_url=explicit_url
+        )
+        
+        assert ollama_native.base_url == explicit_url
+    
+    def test_env_var_with_different_protocols(self, monkeypatch):
+        """Test OLLAMA_API_BASE with https protocol."""
+        from kagent.adk.models._ollama import OllamaNative
+        
+        https_url = "https://secure-ollama.example.com"
+        monkeypatch.setenv("OLLAMA_API_BASE", https_url)
+        
+        ollama_native = OllamaNative(
+            type="ollama",
+            model="llama2"
+        )
+        
+        assert ollama_native.base_url == https_url
+    
+    def test_env_var_with_port(self, monkeypatch):
+        """Test OLLAMA_API_BASE with custom port."""
+        from kagent.adk.models._ollama import OllamaNative
+        
+        custom_port_url = "http://ollama:8888"
+        monkeypatch.setenv("OLLAMA_API_BASE", custom_port_url)
+        
+        ollama_native = OllamaNative(
+            type="ollama",
+            model="llama2"
+        )
+        
+        assert ollama_native.base_url == custom_port_url
+    
+    def test_get_default_base_url_helper(self, monkeypatch):
+        """Test _get_default_base_url helper function directly."""
+        from kagent.adk.models._ollama import _get_default_base_url
+        
+        # Without env var
+        monkeypatch.delenv("OLLAMA_API_BASE", raising=False)
+        assert _get_default_base_url() == "http://localhost:11434"
+        
+        # With env var
+        test_url = "http://test-server:7777"
+        monkeypatch.setenv("OLLAMA_API_BASE", test_url)
+        assert _get_default_base_url() == test_url
 
 
 if __name__ == "__main__":
