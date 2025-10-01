@@ -6,10 +6,11 @@ requiring a running Ollama server.
 Task: Additional coverage for T020-T024
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from google.genai import types
+
+import pytest
 from google.adk.models.llm_request import LlmRequest
+from google.genai import types
 from google.genai.types import GenerateContentConfig
 
 
@@ -114,7 +115,9 @@ class TestOllamaNativeGenerateContent:
             mock_client.chat = AsyncMock(return_value=mock_response)
 
             config = GenerateContentConfig(system_instruction="You are helpful")
-            request = LlmRequest(contents=[types.Content(role="user", parts=[types.Part(text="Help me")])], config=config)
+            request = LlmRequest(
+                contents=[types.Content(role="user", parts=[types.Part(text="Help me")])], config=config
+            )
 
             result = None
             async for response in ollama_native.generate_content_async(request, stream=False):
@@ -129,8 +132,9 @@ class TestOllamaNativeGenerateContent:
     @pytest.mark.asyncio
     async def test_generate_content_with_tools(self):
         """Test generation with tools/function calling."""
+        from google.genai.types import FunctionDeclaration, Schema, Tool
+
         from kagent.adk.models._ollama import OllamaNative
-        from google.genai.types import Tool, FunctionDeclaration, Schema
 
         ollama_native = OllamaNative(type="ollama", model="llama3.1")
 
@@ -162,7 +166,9 @@ class TestOllamaNativeGenerateContent:
             )
 
             config = GenerateContentConfig(tools=[tool])
-            request = LlmRequest(contents=[types.Content(role="user", parts=[types.Part(text="Weather?")])], config=config)
+            request = LlmRequest(
+                contents=[types.Content(role="user", parts=[types.Part(text="Weather?")])], config=config
+            )
 
             result = None
             async for response in ollama_native.generate_content_async(request, stream=False):
@@ -201,8 +207,9 @@ class TestOllamaNativeGenerateContent:
     @pytest.mark.asyncio
     async def test_generate_content_error_404(self):
         """Test error handling for model not found (404)."""
-        from kagent.adk.models._ollama import OllamaNative
         import ollama
+
+        from kagent.adk.models._ollama import OllamaNative
 
         ollama_native = OllamaNative(type="ollama", model="nonexistent")
 
@@ -225,8 +232,9 @@ class TestOllamaNativeGenerateContent:
     @pytest.mark.asyncio
     async def test_generate_content_error_500(self):
         """Test error handling for server error (500)."""
-        from kagent.adk.models._ollama import OllamaNative
         import ollama
+
+        from kagent.adk.models._ollama import OllamaNative
 
         ollama_native = OllamaNative(type="ollama", model="llama2")
 
@@ -295,4 +303,3 @@ class TestOllamaNativeGenerateContent:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
-

@@ -12,8 +12,8 @@ from __future__ import annotations
 
 import base64
 import json
-import os
 import logging
+import os
 from functools import cached_property
 from typing import TYPE_CHECKING, Any, AsyncGenerator, Literal, Optional
 
@@ -129,7 +129,7 @@ def _convert_content_to_ollama_messages(
                         elif isinstance(func_response.response, (dict, list)):
                             try:
                                 content = json.dumps(func_response.response)
-                            except (TypeError, ValueError) as e:
+                            except (TypeError, ValueError):
                                 # If serialization fails, convert to string
                                 content = str(func_response.response)
                         else:

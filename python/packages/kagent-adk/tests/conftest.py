@@ -1,5 +1,7 @@
 """Pytest configuration for Ollama integration tests."""
+
 import os
+
 import pytest
 
 
@@ -31,4 +33,3 @@ def ollama_base_url():
     Default: http://localhost:11434
     """
     return os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-

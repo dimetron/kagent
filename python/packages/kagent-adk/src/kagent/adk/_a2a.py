@@ -57,7 +57,7 @@ class KAgentApp:
     def build(self) -> FastAPI:
         # Suppress Google ADK authentication warnings for MCP tools
         logging.getLogger("google_adk.google.adk.tools.base_authenticated_tool").setLevel(logging.ERROR)
-        
+
         token_service = KAgentTokenService(self.app_name)
         http_client = httpx.AsyncClient(  # TODO: add user  and agent headers
             base_url=kagent_url_override or self.kagent_url, event_hooks=token_service.event_hooks()
