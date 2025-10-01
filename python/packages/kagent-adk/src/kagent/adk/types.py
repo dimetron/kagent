@@ -129,12 +129,13 @@ class AgentConfig(BaseModel):
         elif self.model.type == "gemini_anthropic":
             model = ClaudeLLM(model=self.model.model)
         elif self.model.type == "ollama":
-            model = OllamaNative(
-                model=self.model.model,
-                base_url=self.model.base_url if hasattr(self.model, "base_url") else None,
-                headers=extra_headers,
-                type="ollama",
-            )
+            ollama_kwargs = {
+                "model": self.model.model,
+                "base_url": self.model.ollama.host,
+                "headers": extra_headers,
+                "type": "ollama",
+            }
+            model = OllamaNative(**ollama_kwargs)
         elif self.model.type == "azure_openai":
             model = OpenAIAzure(model=self.model.model, type="azure_openai", headers=extra_headers)
         elif self.model.type == "gemini":
