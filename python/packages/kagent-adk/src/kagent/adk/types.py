@@ -130,12 +130,9 @@ class AgentConfig(BaseModel):
         elif self.model.type == "gemini_anthropic":
             model = ClaudeLLM(model=self.model.model)
         elif self.model.type == "ollama":
-            ollama_base_url = self.model.ollama.base_url
-            if ollama_base_url is None:
-                ollama_base_url = os.getenv("OLLAMA_API_BASE", "http://localhost:11434")
             ollama_kwargs = {
                 "model": self.model.model,
-                "base_url": self.model.ollama.base_url,
+                "base_url": os.getenv("OLLAMA_API_BASE", "http://localhost:11434"),
                 "headers": extra_headers,
                 "type": "ollama",
             }
