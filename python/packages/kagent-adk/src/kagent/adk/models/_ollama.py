@@ -103,14 +103,8 @@ def _convert_content_to_ollama_messages(
             for func_call in function_calls:
                 tool_call_id = func_call.id or "call_1"
 
-                # Safely serialize function arguments
-                arguments = "{}"
-                if func_call.args:
-                    try:
-                        arguments = json.dumps(func_call.args)
-                    except (TypeError, ValueError):
-                        # If serialization fails, try str conversion
-                        arguments = str(func_call.args)
+                # Ollama expects arguments as a dict, not a JSON string
+                arguments = func_call.args if func_call.args else {}
 
                 tool_call = {
                     "id": tool_call_id,

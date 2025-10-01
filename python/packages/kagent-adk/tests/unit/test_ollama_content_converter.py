@@ -235,6 +235,115 @@ class TestConvertContentToOllamaMessages:
         
         # Should handle gracefully
         assert isinstance(messages, list)
+    
+    def test_function_call_arguments_as_dict(self):
+        """Test that function call arguments are passed as dict, not JSON string.
+        
+        This is critical for ollama-python library compatibility.
+        The library expects arguments to be Mapping[str, Any], not str.
+        """
+        from kagent.adk.models._ollama import _convert_content_to_ollama_messages
+        
+        contents = [
+            types.Content(
+                role="model",
+                parts=[types.Part(
+                    function_call=FunctionCall(
+                        id="call_456",
+                        name="complex_func",
+                        args={"param1": "value1", "param2": 123, "nested": {"key": "val"}}
+                    )
+                )]
+            )
+        ]
+        
+        messages = _convert_content_to_ollama_messages(contents)
+        
+        assert len(messages) == 1
+        assistant_msg = messages[0]
+        assert "tool_calls" in assistant_msg
+        
+        tool_call = assistant_msg["tool_calls"][0]
+        arguments = tool_call["function"]["arguments"]
+        
+        # Arguments MUST be a dict, not a JSON string
+        assert isinstance(arguments, dict), "Arguments must be a dict, not a string"
+        assert not isinstance(arguments, str), "Arguments should not be a JSON string"
+        
+        # Verify the actual content
+        assert arguments["param1"] == "value1"
+        assert arguments["param2"] == 123
+        assert arguments["nested"]["key"] == "val"
+    
+    def test_function_call_empty_arguments(self):
+        """Test that empty function call arguments default to empty dict."""
+        from kagent.adk.models._ollama import _convert_content_to_ollama_messages
+        
+        contents = [
+            types.Content(
+                role="model",
+                parts=[types.Part(
+                    function_call=FunctionCall(
+                        id="call_789",
+                        name="no_args_func",
+                        args=None  # No arguments
+                    )
+                )]
+            )
+        ]
+        
+        messages = _convert_content_to_ollama_messages(contents)
+        
+        tool_call = messages[0]["tool_calls"][0]
+        arguments = tool_call["function"]["arguments"]
+        
+        # Empty args should be an empty dict, not empty string
+        assert isinstance(arguments, dict)
+        assert arguments == {}
+    
+    def test_function_call_with_complex_nested_args(self):
+        """Test function calls with deeply nested argument structures."""
+        from kagent.adk.models._ollama import _convert_content_to_ollama_messages
+        
+        complex_args = {
+            "user": {
+                "name": "John",
+                "address": {
+                    "street": "123 Main St",
+                    "city": "Paris",
+                    "coordinates": {
+                        "lat": 48.8566,
+                        "lng": 2.3522
+                    }
+                }
+            },
+            "options": ["email", "sms"],
+            "count": 42
+        }
+        
+        contents = [
+            types.Content(
+                role="model",
+                parts=[types.Part(
+                    function_call=FunctionCall(
+                        id="call_complex",
+                        name="send_notification",
+                        args=complex_args
+                    )
+                )]
+            )
+        ]
+        
+        messages = _convert_content_to_ollama_messages(contents)
+        
+        tool_call = messages[0]["tool_calls"][0]
+        arguments = tool_call["function"]["arguments"]
+        
+        # Must be a dict with all nested structures preserved
+        assert isinstance(arguments, dict)
+        assert arguments["user"]["address"]["coordinates"]["lat"] == 48.8566
+        assert arguments["options"] == ["email", "sms"]
+        assert arguments["count"] == 42
 
 
 if __name__ == "__main__":
