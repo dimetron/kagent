@@ -264,10 +264,19 @@ def _convert_ollama_response_to_llm_response(response: dict[str, Any]) -> LlmRes
     for tool_call in tool_calls or []:
         function_info = tool_call.get("function", {})
         function_name = function_info.get("name", "")
-        arguments_str = function_info.get("arguments", "{}")
+        arguments_raw = function_info.get("arguments", "{}")
 
+        # Handle both dict and string formats for arguments
         try:
-            arguments = json.loads(arguments_str) if arguments_str else {}
+            if isinstance(arguments_raw, dict):
+                # Already a dict, use it directly
+                arguments = arguments_raw
+            elif isinstance(arguments_raw, str):
+                # Parse JSON string
+                arguments = json.loads(arguments_raw) if arguments_raw else {}
+            else:
+                # Unknown format, default to empty dict
+                arguments = {}
         except json.JSONDecodeError:
             arguments = {}
 

@@ -208,6 +208,48 @@ class TestConvertOllamaResponseToLlmResponse:
         # Arguments should be parsed from JSON
         assert function_call.args is not None
 
+    def test_tool_call_arguments_as_dict(self):
+        """Test that tool call arguments can be passed as dict (not just JSON string).
+        
+        This handles the case where ollama-python returns arguments as a dict directly
+        instead of a JSON string, which was causing the error:
+        'the JSON object must be str, bytes or bytearray, not dict'
+        """
+        from kagent.adk.models._ollama import _convert_ollama_response_to_llm_response
+
+        ollama_response = {
+            "model": "llama3.1",
+            "message": {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [
+                    {
+                        "id": "call_789",
+                        "type": "function",
+                        "function": {
+                            "name": "get_weather",
+                            # Arguments as dict, not JSON string
+                            "arguments": {"location": "Paris", "units": "metric"},
+                        },
+                    }
+                ],
+            },
+            "done": True,
+        }
+
+        llm_response = _convert_ollama_response_to_llm_response(ollama_response)
+
+        function_call = None
+        for part in llm_response.content.parts:
+            if part.function_call:
+                function_call = part.function_call
+                break
+
+        assert function_call is not None
+        assert function_call.name == "get_weather"
+        # Arguments should be the dict directly
+        assert function_call.args == {"location": "Paris", "units": "metric"}
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
