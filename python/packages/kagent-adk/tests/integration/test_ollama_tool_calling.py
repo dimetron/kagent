@@ -41,9 +41,12 @@ class TestOllamaToolCalling:
             ]
         )
 
+        # Tools must be passed via GenerateContentConfig
+        config = types.GenerateContentConfig(tools=[get_weather_tool])
+        
         request = LlmRequest(
             contents=[types.Content(role="user", parts=[types.Part(text="What's the weather in Paris?")])],
-            tools=[get_weather_tool],
+            config=config,
         )
 
         response = None
@@ -78,9 +81,13 @@ class TestOllamaToolCalling:
             ]
         )
 
+        # Tools must be passed via GenerateContentConfig
+        config = types.GenerateContentConfig(tools=[get_time_tool])
+
         # First request: Model should call the tool
         request1 = LlmRequest(
-            contents=[types.Content(role="user", parts=[types.Part(text="What time is it?")])], tools=[get_time_tool]
+            contents=[types.Content(role="user", parts=[types.Part(text="What time is it?")])],
+            config=config
         )
 
         response1 = None
@@ -116,7 +123,7 @@ class TestOllamaToolCalling:
                         ],
                     ),
                 ],
-                tools=[get_time_tool],
+                config=config,
             )
 
             response2 = None
@@ -136,7 +143,7 @@ class TestOllamaToolCalling:
         ollama_native = OllamaNative(type="ollama", model=ollama_tool_model)
 
         # Define multiple tools
-        tools = [
+        tools_list = [
             Tool(
                 function_declarations=[
                     FunctionDeclaration(
@@ -155,9 +162,12 @@ class TestOllamaToolCalling:
             ),
         ]
 
+        # Tools must be passed via GenerateContentConfig
+        config = types.GenerateContentConfig(tools=tools_list)
+
         request = LlmRequest(
             contents=[types.Content(role="user", parts=[types.Part(text="What's the weather and time in Paris?")])],
-            tools=tools,
+            config=config,
         )
 
         response = None
@@ -185,8 +195,12 @@ class TestOllamaToolCalling:
             ]
         )
 
+        # Tools must be passed via GenerateContentConfig
+        config = types.GenerateContentConfig(tools=[tool])
+
         request = LlmRequest(
-            contents=[types.Content(role="user", parts=[types.Part(text="Calculate 2+2")])], tools=[tool]
+            contents=[types.Content(role="user", parts=[types.Part(text="Calculate 2+2")])],
+            config=config
         )
 
         chunks = []

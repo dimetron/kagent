@@ -59,3 +59,6 @@ asyncio_mode = "auto"
 markers = [
     "integration: marks tests as integration tests (require external services like Ollama)",
 ]
+filterwarnings = [
+    "ignore::UserWarning",
+]

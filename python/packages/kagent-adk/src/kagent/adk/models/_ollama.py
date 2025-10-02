@@ -14,6 +14,7 @@ import base64
 import json
 import logging
 import os
+import time
 from functools import cached_property
 from typing import TYPE_CHECKING, Any, AsyncGenerator, Literal, Optional
 
@@ -22,6 +23,7 @@ from google.adk.models import BaseLlm
 from google.adk.models.llm_response import LlmResponse
 from google.genai import types
 from google.genai.types import FunctionCall, FunctionResponse, Part
+from opentelemetry import trace
 from pydantic import Field
 
 if TYPE_CHECKING:
@@ -238,6 +240,41 @@ def _convert_schema_properties(properties: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
+def _parse_think_tags(content: str) -> tuple[str, str]:
+    """Parse and extract content between <think></think> tags.
+    
+    Args:
+        content: Text content that may contain <think> tags
+        
+    Returns:
+        Tuple of (thought_content, remaining_content)
+        - thought_content: Concatenated content from all <think> tags
+        - remaining_content: Content with <think> tags removed
+    
+    Task: E006
+    """
+    import re
+    
+    if not content or "<think>" not in content:
+        return ("", content)
+    
+    # Find all <think>...</think> pairs
+    think_pattern = r'<think>(.*?)</think>'
+    thoughts = []
+    
+    # Extract all think tag contents
+    for match in re.finditer(think_pattern, content, re.DOTALL):
+        thoughts.append(match.group(1))
+    
+    # Remove all think tags from content
+    remaining = re.sub(think_pattern, '', content, flags=re.DOTALL)
+    
+    # Join all thoughts with newlines if multiple
+    thought_content = "\n".join(thoughts) if thoughts else ""
+    
+    return (thought_content, remaining)
+
+
 def _convert_ollama_response_to_llm_response(response: dict[str, Any]) -> LlmResponse:
     """Convert ollama.ChatResponse to ADK LlmResponse.
 
@@ -246,19 +283,49 @@ def _convert_ollama_response_to_llm_response(response: dict[str, Any]) -> LlmRes
 
     Returns:
         ADK LlmResponse object
+        
+    Enhancements:
+        - E004: Added support for 'thinking' field mapping to thought
+        - E006: Added support for <think> tag parsing in content
     """
     # Extract message
     message = response.get("message", {})
     role = message.get("role", "assistant")
     content_text = message.get("content", "")
     tool_calls = message.get("tool_calls", [])
+    
+    # E004: Extract thinking field for reasoning-capable models
+    thinking_text = message.get("thinking", "")
 
     # Create content parts
     parts: list[Part] = []
+    
+    # E006: Parse <think> tags from content if present
+    thought_from_tags = ""
+    if content_text and "<think>" in content_text:
+        thought_from_tags, content_text = _parse_think_tags(content_text)
+    
+    # E004: Collect thought content from both sources
+    # Note: Part.thought is a boolean flag in ADK, so we store reasoning content in custom_metadata
+    combined_thought = ""
+    if thinking_text:
+        combined_thought = thinking_text
+    if thought_from_tags:
+        # If both sources exist, combine them
+        if combined_thought:
+            combined_thought = f"{combined_thought}\n{thought_from_tags}"
+        else:
+            combined_thought = thought_from_tags
 
-    # Add text content if present
+    # Add text content if present (after removing think tags)
     if content_text:
         parts.append(Part(text=content_text))
+    
+    # If we have thought content but no other parts, add a text part for the thought
+    # This ensures the thought is accessible in the response
+    if combined_thought and not parts:
+        # Add thought as a separate text part with a marker
+        parts.append(Part(text=f"[THOUGHT]\n{combined_thought}\n[/THOUGHT]"))
 
     # Add tool calls if present
     for tool_call in tool_calls or []:
@@ -283,7 +350,7 @@ def _convert_ollama_response_to_llm_response(response: dict[str, Any]) -> LlmRes
         parts.append(Part(function_call=FunctionCall(id=tool_call.get("id", ""), name=function_name, args=arguments)))
 
     # Create content - always create content, even if parts is empty
-    if not parts and content_text == "":
+    if not parts:
         # For empty responses, add an empty text part
         parts.append(Part(text=""))
 
@@ -303,8 +370,13 @@ def _convert_ollama_response_to_llm_response(response: dict[str, Any]) -> LlmRes
 
     # Determine if this is a partial response
     is_partial = not response.get("done", True)
+    
+    # E004: Add reasoning content to custom_metadata if present
+    custom_metadata = None
+    if combined_thought:
+        custom_metadata = {"reasoning_content": combined_thought}
 
-    return LlmResponse(content=content, usage_metadata=usage_metadata, partial=is_partial)
+    return LlmResponse(content=content, usage_metadata=usage_metadata, partial=is_partial, custom_metadata=custom_metadata)
 
 
 class OllamaNative(BaseLlm):
@@ -377,105 +449,235 @@ class OllamaNative(BaseLlm):
         Yields:
             LlmResponse objects (partial if streaming, complete if not)
         """
-        try:
-            # Extract system instruction from config
-            system_instruction = None
-            if llm_request.config and llm_request.config.system_instruction:
-                if isinstance(llm_request.config.system_instruction, str):
-                    system_instruction = llm_request.config.system_instruction
-                elif hasattr(llm_request.config.system_instruction, "parts"):
-                    # Handle Content type system instruction
-                    text_parts = []
-                    parts = getattr(llm_request.config.system_instruction, "parts", [])
-                    if parts:
-                        for part in parts:
-                            if hasattr(part, "text") and part.text:
-                                text_parts.append(part.text)
-                        system_instruction = "\n".join(text_parts)
+        # Check if OpenTelemetry tracing is enabled
+        otel_enabled = os.environ.get("OTEL_TRACING_ENABLED", "false").lower() == "true"
+        
+        # Get tracer for OpenTelemetry (only if enabled)
+        tracer = trace.get_tracer(__name__) if otel_enabled else None
+        
+        # Extract model name early for logging/tracing
+        model_name = llm_request.model or self.model
+        
+        # Start main span for generation (or use dummy context if tracing disabled)
+        if tracer:
+            span_context = tracer.start_as_current_span("ollama.generate_content")
+        else:
+            # Use a dummy context manager that does nothing
+            from contextlib import nullcontext
+            span_context = nullcontext()
+        
+        with span_context as span:
+            try:
+                # Extract system instruction from config
+                system_instruction = None
+                if llm_request.config and llm_request.config.system_instruction:
+                    if isinstance(llm_request.config.system_instruction, str):
+                        system_instruction = llm_request.config.system_instruction
+                    elif hasattr(llm_request.config.system_instruction, "parts"):
+                        # Handle Content type system instruction
+                        text_parts = []
+                        parts = getattr(llm_request.config.system_instruction, "parts", [])
+                        if parts:
+                            for part in parts:
+                                if hasattr(part, "text") and part.text:
+                                    text_parts.append(part.text)
+                            system_instruction = "\n".join(text_parts)
 
-            # Convert ADK format to Ollama format
-            messages = _convert_content_to_ollama_messages(llm_request.contents, system_instruction=system_instruction)
+                # Convert ADK format to Ollama format
+                messages = _convert_content_to_ollama_messages(llm_request.contents, system_instruction=system_instruction)
 
-            # Convert tools if present
-            tools = None
-            if llm_request.config and llm_request.config.tools:
-                # Filter to only google.genai.types.Tool objects
-                genai_tools = []
-                for tool in llm_request.config.tools:
-                    if hasattr(tool, "function_declarations"):
-                        genai_tools.append(tool)
-                if genai_tools:
-                    tools = _convert_tools_to_ollama(genai_tools)
+                # Convert tools if present
+                tools = None
+                tool_count = 0
+                if llm_request.config and llm_request.config.tools:
+                    # Filter to only google.genai.types.Tool objects
+                    genai_tools = []
+                    for tool in llm_request.config.tools:
+                        if hasattr(tool, "function_declarations"):
+                            genai_tools.append(tool)
+                    if genai_tools:
+                        tools = _convert_tools_to_ollama(genai_tools)
+                        tool_count = sum(len(t.function_declarations) for t in genai_tools)
 
-            # Prepare request options
-            options = {}
-            if self.temperature is not None:
-                options["temperature"] = self.temperature
-            if self.max_tokens is not None:
-                options["num_predict"] = self.max_tokens
+                # Prepare request options
+                options = {}
+                if self.temperature is not None:
+                    options["temperature"] = self.temperature
+                if self.max_tokens is not None:
+                    options["num_predict"] = self.max_tokens
 
-            # Make request
-            model_name = llm_request.model or self.model
+                # Set span attributes (only if tracing enabled)
+                if span is not None:
+                    span.set_attribute("model.name", model_name)
+                    span.set_attribute("model.base_url", self.base_url)
+                    span.set_attribute("request.stream", stream)
+                    span.set_attribute("request.tool_count", tool_count)
+                    span.set_attribute("request.message_count", len(messages))
 
-            if stream:
-                # Streaming mode
-                async for chunk in await self._client.chat(
-                    model=model_name,
-                    messages=messages,
-                    tools=tools if tools else None,
-                    stream=True,
-                    options=options if options else None,
-                ):
-                    # Convert chunk to dict if it's an object
-                    if hasattr(chunk, "model_dump"):
-                        chunk_dict = chunk.model_dump()
-                    elif hasattr(chunk, "__dict__"):
-                        chunk_dict = chunk.__dict__
-                    else:
-                        chunk_dict = chunk
-
-                    yield _convert_ollama_response_to_llm_response(chunk_dict)
-            else:
-                # Non-streaming mode
-                response = await self._client.chat(
-                    model=model_name,
-                    messages=messages,
-                    tools=tools if tools else None,
-                    stream=False,
-                    options=options if options else None,
+                # Structured logging: Request
+                logging.info(
+                    "Ollama request",
+                    extra={
+                        "event": "ollama_request",
+                        "model": model_name,
+                        "base_url": self.base_url,
+                        "stream": stream,
+                        "tool_count": tool_count,
+                        "message_count": len(messages),
+                        "temperature": self.temperature,
+                        "max_tokens": self.max_tokens,
+                    },
                 )
 
-                # Convert response to dict if it's an object
-                if hasattr(response, "model_dump"):
-                    response_dict = response.model_dump()
-                elif hasattr(response, "__dict__"):
-                    response_dict = response.__dict__
+                # Track timing for first token
+                first_token_received = False
+                start_time = time.time()
+
+                if stream:
+                    # Streaming mode
+                    async for chunk in await self._client.chat(
+                        model=model_name,
+                        messages=messages,
+                        tools=tools if tools else None,
+                        stream=True,
+                        options=options if options else None,
+                    ):
+                        # Track first token received
+                        if not first_token_received:
+                            first_token_time = time.time()
+                            if span is not None:
+                                span.add_event("first_token_received", {"latency_ms": (first_token_time - start_time) * 1000})
+                            first_token_received = True
+
+                        # Convert chunk to dict if it's an object
+                        if hasattr(chunk, "model_dump"):
+                            chunk_dict = chunk.model_dump()
+                        elif hasattr(chunk, "__dict__"):
+                            chunk_dict = chunk.__dict__
+                        else:
+                            chunk_dict = chunk
+
+                        llm_response = _convert_ollama_response_to_llm_response(chunk_dict)
+                        
+                        # Log completion on final chunk
+                        if chunk_dict.get("done", False):
+                            end_time = time.time()
+                            if span is not None:
+                                span.add_event("generation_complete", {"duration_ms": (end_time - start_time) * 1000})
+                            
+                            # Structured logging: Response
+                            usage = llm_response.usage_metadata
+                            logging.info(
+                                "Ollama response",
+                                extra={
+                                    "event": "ollama_response",
+                                    "model": model_name,
+                                    "finish_reason": "stop",
+                                    "prompt_tokens": usage.prompt_token_count if usage else 0,
+                                    "completion_tokens": usage.candidates_token_count if usage else 0,
+                                    "total_tokens": usage.total_token_count if usage else 0,
+                                },
+                            )
+                        
+                        yield llm_response
                 else:
-                    response_dict = response
+                    # Non-streaming mode
+                    response = await self._client.chat(
+                        model=model_name,
+                        messages=messages,
+                        tools=tools if tools else None,
+                        stream=False,
+                        options=options if options else None,
+                    )
 
-                yield _convert_ollama_response_to_llm_response(response_dict)
+                    end_time = time.time()
+                    if span is not None:
+                        span.add_event("generation_complete", {"duration_ms": (end_time - start_time) * 1000})
 
-        except ollama.ResponseError as e:
-            # Handle Ollama-specific errors
-            error_code = "OLLAMA_API_ERROR"
-            error_message = str(e.error) if hasattr(e, "error") else str(e)
+                    # Convert response to dict if it's an object
+                    if hasattr(response, "model_dump"):
+                        response_dict = response.model_dump()
+                    elif hasattr(response, "__dict__"):
+                        response_dict = response.__dict__
+                    else:
+                        response_dict = response
 
-            if hasattr(e, "status_code"):
-                if e.status_code == 404:
-                    error_code = "OLLAMA_MODEL_NOT_FOUND"
-                    error_message = f"Model '{self.model}' not found. Run: ollama pull {self.model}"
-                elif e.status_code == 503:
-                    error_code = "OLLAMA_SERVICE_UNAVAILABLE"
-                    error_message = "Ollama service is not available. Ensure Ollama is running."
-                elif e.status_code >= 500:
-                    error_code = "OLLAMA_SERVER_ERROR"
-                    error_message = f"Ollama server error: {error_message}"
+                    llm_response = _convert_ollama_response_to_llm_response(response_dict)
 
-            yield LlmResponse(error_code=error_code, error_message=error_message, content=None, usage_metadata=None)
+                    # Structured logging: Response
+                    usage = llm_response.usage_metadata
+                    logging.info(
+                        "Ollama response",
+                        extra={
+                            "event": "ollama_response",
+                            "model": model_name,
+                            "finish_reason": "stop",
+                            "prompt_tokens": usage.prompt_token_count if usage else 0,
+                            "completion_tokens": usage.candidates_token_count if usage else 0,
+                            "total_tokens": usage.total_token_count if usage else 0,
+                        },
+                    )
 
-        except Exception as e:
-            # Handle unexpected errors
-            error_code = "OLLAMA_CONNECTION_ERROR"
-            error_message = f"Failed to connect to Ollama at {self.base_url}: {str(e)}"
+                    yield llm_response
 
-            yield LlmResponse(error_code=error_code, error_message=error_message, content=None, usage_metadata=None)
+            except ollama.ResponseError as e:
+                # Handle Ollama-specific errors
+                error_code = "OLLAMA_API_ERROR"
+                error_message = str(e.error) if hasattr(e, "error") else str(e)
+                status_code = None
+
+                if hasattr(e, "status_code"):
+                    status_code = e.status_code
+                    if e.status_code == 404:
+                        error_code = "OLLAMA_MODEL_NOT_FOUND"
+                        error_message = f"Model '{self.model}' not found. Run: ollama pull {self.model}"
+                    elif e.status_code == 503:
+                        error_code = "OLLAMA_SERVICE_UNAVAILABLE"
+                        error_message = "Ollama service is not available. Ensure Ollama is running."
+                    elif e.status_code >= 500:
+                        error_code = "OLLAMA_SERVER_ERROR"
+                        error_message = f"Ollama server error: {error_message}"
+
+                # Structured logging: Error
+                logging.error(
+                    "Ollama error",
+                    extra={
+                        "event": "ollama_error",
+                        "error.code": error_code,
+                        "error.message": error_message,
+                        "error.type": type(e).__name__,
+                        "model": model_name,
+                        "base_url": self.base_url,
+                        "http.status_code": status_code,
+                    },
+                )
+
+                if span is not None:
+                    span.record_exception(e)
+                    span.set_status(trace.Status(trace.StatusCode.ERROR, error_message))
+
+                yield LlmResponse(error_code=error_code, error_message=error_message, content=None, usage_metadata=None)
+
+            except Exception as e:
+                # Handle unexpected errors
+                error_code = "OLLAMA_CONNECTION_ERROR"
+                error_message = f"Failed to connect to Ollama at {self.base_url}: {str(e)}"
+
+                # Structured logging: Error
+                logging.error(
+                    "Ollama connection error",
+                    extra={
+                        "event": "ollama_error",
+                        "error.code": error_code,
+                        "error.message": error_message,
+                        "error.type": type(e).__name__,
+                        "model": model_name,
+                        "base_url": self.base_url,
+                    },
+                )
+
+                if span is not None:
+                    span.record_exception(e)
+                    span.set_status(trace.Status(trace.StatusCode.ERROR, error_message))
+
+                yield LlmResponse(error_code=error_code, error_message=error_message, content=None, usage_metadata=None)

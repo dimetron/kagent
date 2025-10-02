@@ -151,7 +151,7 @@ providers:
     # apiKey: ""
   ollama:
     provider: Ollama
-    model: "gpt-oss:latest"
+    model: "llama3.2"
     config:
       host: host.docker.internal:11434
   anthropic:

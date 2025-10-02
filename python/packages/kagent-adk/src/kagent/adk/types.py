@@ -70,6 +70,8 @@ class GeminiAnthropic(BaseLLM):
 
 class Ollama(BaseLLM):
     base_url: str | None = None
+    temperature: float | None = None
+    max_tokens: int | None = None
     type: Literal["ollama"]
 
 
@@ -132,10 +134,15 @@ class AgentConfig(BaseModel):
         elif self.model.type == "ollama":
             ollama_kwargs = {
                 "model": self.model.model,
-                "base_url": os.getenv("OLLAMA_API_BASE", "http://localhost:11434"),
+                "base_url": self.model.base_url or os.getenv("OLLAMA_API_BASE", "http://localhost:11434"),
                 "headers": extra_headers,
                 "type": "ollama",
             }
+            # Add temperature and max_tokens if specified
+            if self.model.temperature is not None:
+                ollama_kwargs["temperature"] = self.model.temperature
+            if self.model.max_tokens is not None:
+                ollama_kwargs["max_tokens"] = self.model.max_tokens
             model = OllamaNative(**ollama_kwargs)
         elif self.model.type == "azure_openai":
             model = OpenAIAzure(model=self.model.model, type="azure_openai", headers=extra_headers)
