@@ -606,7 +606,11 @@ class TestAgentConfigToAgent:
     @patch("kagent.adk.types.RemoteA2aAgent")
     @patch("kagent.adk.types.AgentTool")
     def test_remote_agents_without_headers(self, mock_agent_tool, mock_remote_agent, mock_openai, mock_agent):
-        """Test remote agents creation without custom headers."""
+        """Test remote agents creation without custom headers.
+        
+        Note: Even without custom headers, an httpx client is created to register
+        the event hook for automatic user ID propagation.
+        """
         config = AgentConfig(
             model=OpenAI(type="openai", model="gpt-4"),
             description="Test",
@@ -616,10 +620,10 @@ class TestAgentConfigToAgent:
 
         config.to_agent("test_agent")
 
-        # Verify RemoteA2aAgent created with None client
+        # Verify RemoteA2aAgent created with an httpx client (for event hooks)
         mock_remote_agent.assert_called_once()
         call_kwargs = mock_remote_agent.call_args[1]
-        assert call_kwargs["httpx_client"] is None
+        assert call_kwargs["httpx_client"] is not None
 
     @patch("kagent.adk.types.Agent")
     @patch("kagent.adk.types.OpenAINative")

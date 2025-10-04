@@ -328,8 +328,8 @@ helm-test-install: helm-install-provider
 
 .PHONY: helm-uninstall
 helm-uninstall:
-	helm uninstall kagent --namespace kagent --kube-context kind-$(KIND_CLUSTER_NAME) --wait
-	helm uninstall kagent-crds --namespace kagent --kube-context kind-$(KIND_CLUSTER_NAME) --wait
+	helm uninstall kagent --namespace kagent --kube-context kind-$(KIND_CLUSTER_NAME)      --wait || :
+	helm uninstall kagent-crds --namespace kagent --kube-context kind-$(KIND_CLUSTER_NAME) --wait || :
 
 .PHONY: helm-publish
 helm-publish: helm-version

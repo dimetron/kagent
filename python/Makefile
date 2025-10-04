@@ -2,9 +2,13 @@ export GIT_LFS_SKIP_SMUDGE=1
 
 ### Build and Test
 
+.PHONY: init
+init:
+	ls .venv || uv venv --python=python3.13
+
 .PHONY: update
-update:
-	uv python list | grep 3.12
+update: init
+	uv python list | grep 3.13
 	uv sync --all-extras --all-groups
 	uv lock
 

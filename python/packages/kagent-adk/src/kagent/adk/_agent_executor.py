@@ -153,98 +153,117 @@ class A2aAgentExecutor(AgentExecutor):
         event_queue: EventQueue,
         runner: Runner,
     ):
+        from .context import request_user_id_var  # Import context variable
+
         # Convert the a2a request to ADK run args
         run_args = convert_a2a_request_to_adk_run_args(context)
 
-        # ensure the session exists
-        session = await self._prepare_session(context, run_args, runner)
+        # Set user_id in context for duration of this request
+        request_user_id_var.set(run_args["user_id"])
+        logger.debug(f"Set request context user_id: {run_args['user_id']}")
 
-        current_span = trace.get_current_span()
-        if run_args["user_id"]:
-            current_span.set_attribute("kagent.user_id", run_args["user_id"])
-        if context.task_id:
-            current_span.set_attribute("gen_ai.task.id", context.task_id)
-        if run_args["session_id"]:
-            current_span.set_attribute("gen_ai.converstation.id", run_args["session_id"])
+        try:
+            # ensure the session exists
+            session = await self._prepare_session(context, run_args, runner)
 
-        # create invocation context
-        invocation_context = runner._new_invocation_context(
-            session=session,
-            new_message=run_args["new_message"],
-            run_config=run_args["run_config"],
-        )
+            current_span = trace.get_current_span()
+            if run_args["user_id"]:
+                current_span.set_attribute("kagent.user_id", run_args["user_id"])
+            if context.task_id:
+                current_span.set_attribute("gen_ai.task.id", context.task_id)
+            if run_args["session_id"]:
+                current_span.set_attribute("gen_ai.converstation.id", run_args["session_id"])
 
-        # publish the task working event
-        await event_queue.enqueue_event(
-            TaskStatusUpdateEvent(
-                task_id=context.task_id,
-                status=TaskStatus(
-                    state=TaskState.working,
-                    timestamp=datetime.now(timezone.utc).isoformat(),
-                ),
-                context_id=context.context_id,
-                final=False,
-                metadata={
-                    get_kagent_metadata_key("app_name"): runner.app_name,
-                    get_kagent_metadata_key("user_id"): run_args["user_id"],
-                    get_kagent_metadata_key("session_id"): run_args["session_id"],
-                },
+            # create invocation context
+            invocation_context = runner._new_invocation_context(
+                session=session,
+                new_message=run_args["new_message"],
+                run_config=run_args["run_config"],
             )
-        )
 
-        task_result_aggregator = TaskResultAggregator()
-        async with Aclosing(runner.run_async(**run_args)) as agen:
-            async for adk_event in agen:
-                for a2a_event in convert_event_to_a2a_events(
-                    adk_event, invocation_context, context.task_id, context.context_id
-                ):
-                    task_result_aggregator.process_event(a2a_event)
-                    await event_queue.enqueue_event(a2a_event)
-
-        # publish the task result event - this is final
-        if (
-            task_result_aggregator.task_state == TaskState.working
-            and task_result_aggregator.task_status_message is not None
-            and task_result_aggregator.task_status_message.parts
-        ):
-            # if task is still working properly, publish the artifact update event as
-            # the final result according to a2a protocol.
-            await event_queue.enqueue_event(
-                TaskArtifactUpdateEvent(
-                    task_id=context.task_id,
-                    last_chunk=True,
-                    context_id=context.context_id,
-                    artifact=Artifact(
-                        artifact_id=str(uuid.uuid4()),
-                        parts=task_result_aggregator.task_status_message.parts,
-                    ),
-                )
-            )
-            # public the final status update event
+            # publish the task working event
             await event_queue.enqueue_event(
                 TaskStatusUpdateEvent(
                     task_id=context.task_id,
                     status=TaskStatus(
-                        state=TaskState.completed,
+                        state=TaskState.working,
                         timestamp=datetime.now(timezone.utc).isoformat(),
                     ),
                     context_id=context.context_id,
-                    final=True,
+                    final=False,
+                    metadata={
+                        get_kagent_metadata_key("app_name"): runner.app_name,
+                        get_kagent_metadata_key("user_id"): run_args["user_id"],
+                        get_kagent_metadata_key("session_id"): run_args["session_id"],
+                    },
                 )
             )
-        else:
-            await event_queue.enqueue_event(
-                TaskStatusUpdateEvent(
-                    task_id=context.task_id,
-                    status=TaskStatus(
-                        state=task_result_aggregator.task_state,
-                        timestamp=datetime.now(timezone.utc).isoformat(),
-                        message=task_result_aggregator.task_status_message,
-                    ),
-                    context_id=context.context_id,
-                    final=True,
+
+            task_result_aggregator = TaskResultAggregator()
+            async with Aclosing(runner.run_async(**run_args)) as agen:
+                async for adk_event in agen:
+                    for a2a_event in convert_event_to_a2a_events(
+                        adk_event, invocation_context, context.task_id, context.context_id
+                    ):
+                        task_result_aggregator.process_event(a2a_event)
+                        await event_queue.enqueue_event(a2a_event)
+
+            # publish the task result event - this is final
+            if (
+                task_result_aggregator.task_state == TaskState.working
+                and task_result_aggregator.task_status_message is not None
+                and task_result_aggregator.task_status_message.parts
+            ):
+                # if task is still working properly, publish the artifact update event as
+                # the final result according to a2a protocol.
+                await event_queue.enqueue_event(
+                    TaskArtifactUpdateEvent(
+                        task_id=context.task_id,
+                        last_chunk=True,
+                        context_id=context.context_id,
+                        artifact=Artifact(
+                            artifact_id=str(uuid.uuid4()),
+                            parts=task_result_aggregator.task_status_message.parts,
+                        ),
+                    )
                 )
-            )
+                # public the final status update event
+                await event_queue.enqueue_event(
+                    TaskStatusUpdateEvent(
+                        task_id=context.task_id,
+                        status=TaskStatus(
+                            state=TaskState.completed,
+                            timestamp=datetime.now(timezone.utc).isoformat(),
+                        ),
+                        context_id=context.context_id,
+                        final=True,
+                    )
+                )
+            else:
+                await event_queue.enqueue_event(
+                    TaskStatusUpdateEvent(
+                        task_id=context.task_id,
+                        status=TaskStatus(
+                            state=task_result_aggregator.task_state,
+                            timestamp=datetime.now(timezone.utc).isoformat(),
+                            message=task_result_aggregator.task_status_message,
+                        ),
+                        context_id=context.context_id,
+                        final=True,
+                    )
+                )
+        finally:
+            # Always clear context after request completes
+            try:
+                request_user_id_var.set(None)
+                logger.debug("Cleared request context user_id")
+            except Exception as cleanup_error:
+                # Log but don't raise - cleanup errors shouldn't fail requests
+                logger.error(
+                    f"Failed to clear request context: {cleanup_error}",
+                    exc_info=True,
+                    extra={"context_id": context.context_id},
+                )
 
     async def _prepare_session(self, context: RequestContext, run_args: dict[str, Any], runner: Runner):
         session_id = run_args["session_id"]

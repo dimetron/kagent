@@ -109,16 +109,23 @@ def create_remote_agent(
     Args:
         name: Agent name
         url: Agent base URL
-        headers: Optional HTTP headers
+        headers: Optional HTTP headers (from headersFrom config)
         timeout: Request timeout in seconds
         description: Agent description
 
     Returns:
-        Configured RemoteA2aAgent instance
+        Configured RemoteA2aAgent instance with automatic user ID propagation
     """
+    from .context import inject_user_id_header  # Import event hook
+
+    # Register event hook for automatic user ID injection
+    event_hooks = {"request": [inject_user_id_header]}
+
     client = None
     if headers:
-        client = httpx.AsyncClient(headers=headers, timeout=httpx.Timeout(timeout=timeout))
+        client = httpx.AsyncClient(headers=headers, timeout=httpx.Timeout(timeout=timeout), event_hooks=event_hooks)
+    else:
+        client = httpx.AsyncClient(timeout=httpx.Timeout(timeout=timeout), event_hooks=event_hooks)
 
     return RemoteA2aAgent(
         name=name,
