@@ -10,8 +10,8 @@ spec:
     modelConfig: default-model-config
     systemMessage: |-
       - You are simple agent which answers user question using all your context
-      - Use `set-context-var` tool to set context for the agent
-      - Use `get-context-var` tool to get context for the agent
+      - Use `var_set` tool to set context for the agent
+      - Use `var_get` tool to get context for the agent
     tools:
       - type: McpServer
         toolServer: context-mcp-server

@@ -5,15 +5,27 @@ metadata:
   namespace: kagent
 spec:
   type: Workflow
-  description: "Cluster diagnostic Team"
+  description: "Cluster diagnostic Team with automatic outputKey naming"
   workflow:
     parallel:
       maxWorkers: 5
       timeout: "5m"
       subAgents:
+        # Automatic outputKey naming enabled (no explicit outputKey specified)
+        # Auto-generated outputKeys follow pattern: {namespace}_{agent_name}
+        
         - name: istio-agent
+          # Auto-generated outputKey: kagent_istio_agent
+          
         - name: helm-agent
+          # Auto-generated outputKey: kagent_helm_agent
+          
         - name: k8s-agent
+          # Auto-generated outputKey: kagent_k8s_agent
+          
+        # Example with explicit outputKey (overrides automatic naming)
+        # - name: prometheus-agent
+        #   outputKey: custom_prometheus_key
 ---
 apiVersion: kagent.dev/v1alpha2
 kind: Agent
@@ -21,7 +33,7 @@ metadata:
   name: sre-report-agent
   namespace: kagent
 spec:
-  description: SRE Report Agent
+  description: SRE Report Agent (aggregates parallel workflow outputs)
   type: Declarative
   declarative:
     modelConfig: default-model-config
@@ -29,7 +41,11 @@ spec:
       - You are SRE report agent responsible to build kubernetes cluster health report
       
       ## Data collection
-      - Use data prepared by `sre-cluster-diagnostics` 
+      - Use data prepared by `sre-cluster-diagnostics` workflow
+      - Access parallel workflow outputs via auto-generated outputKeys in session.state:
+        * kagent_istio_agent: Istio diagnostics
+        * kagent_helm_agent: Helm diagnostics
+        * kagent_k8s_agent: Kubernetes diagnostics
       
       ## Format
       - Create detailed diagnostic report with separate sections
@@ -44,14 +60,23 @@ metadata:
   namespace: kagent
 spec:
   type: Workflow
-  description: "SRE Team"
+  description: "SRE Team (sequential workflow with automatic outputKey naming)"
   workflow:
     sequential:
       timeout: "5m"
       subAgents:
+        # Automatic outputKey naming also works for sequential workflows
+        
         - name: sre-coordinator
+          # Auto-generated outputKey: kagent_sre_coordinator
+          
         - name: sre-cluster-diagnostics
+          # Auto-generated outputKey: kagent_sre_cluster_diagnostics
+          # This parallel workflow produces kagent_istio_agent, kagent_helm_agent, kagent_k8s_agent
+          
         - name: sre-report-agent
+          # Auto-generated outputKey: kagent_sre_report_agent
+          # This agent aggregates outputs from previous phases
 ---
 apiVersion: kagent.dev/v1alpha2
 kind: Agent

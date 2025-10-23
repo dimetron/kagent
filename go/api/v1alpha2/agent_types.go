@@ -220,6 +220,16 @@ type SubAgentReference struct {
 	// +kubebuilder:default=Agent
 	// +optional
 	Kind string `json:"kind,omitempty"`
+
+	// OutputKey specifies the state key where this sub-agent's output will be stored.
+	// When omitted, automatically generated as: {namespace}_{agent_name} (hyphens converted to underscores).
+	// When set explicitly, overrides automatic naming.
+	// Must contain only alphanumeric characters and underscores.
+	// Max length: 100 characters.
+	// +kubebuilder:validation:Pattern="^[a-zA-Z0-9_]+$"
+	// +kubebuilder:validation:MaxLength=100
+	// +optional
+	OutputKey string `json:"outputKey,omitempty"`
 }
 
 // ToolProviderType represents the tool provider type

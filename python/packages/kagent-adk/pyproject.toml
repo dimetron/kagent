@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "kagent-adk"
-version = "0.3.0"
+version = "0.6.0"
 description = "kagent-adk is an sdk for integrating adk agents with kagent"
 readme = "README.md"
 requires-python = ">=3.12.11"
@@ -57,6 +57,11 @@ extend = "../../pyproject.toml"
 testpaths = ["tests"]
 asyncio_default_fixture_loop_scope = "function"
 asyncio_mode = "auto"
+markers = [
+    "e2e: marks tests as end-to-end tests (deselect with '-m \"not e2e\"')",
+    "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
+    "slow: marks tests as slow-running stress tests (deselect with '-m \"not slow\"')",
+]
 
 [tool.coverage.run]
 omit = [

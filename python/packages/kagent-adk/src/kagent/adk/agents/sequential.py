@@ -1,13 +1,18 @@
 """KAgent SequentialAgent with shared session ID propagation for context continuity."""
 
 import logging
+from datetime import datetime, timezone
 from typing import AsyncGenerator
 
 from google.adk.agents import SequentialAgent
 from google.adk.agents.base_agent import BaseAgent
 from google.adk.agents.invocation_context import InvocationContext
 from google.adk.events import Event
+from google.adk.sessions import Session
 from opentelemetry import trace
+
+from kagent.adk.workflow.injection import inject_state_keys
+from kagent.adk.workflow.state import SubAgentExecution, WorkflowStateManager
 
 logger = logging.getLogger(__name__)
 tracer = trace.get_tracer(__name__)
@@ -95,34 +100,13 @@ class KAgentSequentialAgent(SequentialAgent):
         )
 
     async def run_async(self, parent_context: InvocationContext) -> AsyncGenerator[Event, None]:
-        """Execute sub-agents sequentially with shared session ID propagation.
+        """Execute sub-agents sequentially with outputKey support.
 
-        This method overrides SequentialAgent.run_async() to implement true
-        context propagation. Key behaviors:
+        This method supports two modes:
+        1. **Shared Session Mode** (default): All sub-agents use same session
+        2. **OutputKey Mode**: Sub-agents get separate sessions, outputs stored in workflow state
 
-        1. **Shared Session**: All sub-agents receive the SAME parent_context
-           (not cloned), ensuring they operate on the same session
-        2. **Sequential Execution**: Sub-agents execute in order, each seeing
-           events from previous sub-agents
-        3. **Event Streaming**: Events from each sub-agent are yielded as they
-           are generated
-        4. **Error Handling**: Exceptions from sub-agents are propagated to
-           the caller
-
-        Session ID Propagation Flow:
-        ```
-        parent_context.session.id = "workflow-123"
-            ↓
-        Sub-Agent-1: Receives parent_context → session_id="workflow-123"
-            └─> Generates events, appends to session "workflow-123"
-            ↓
-        Sub-Agent-2: Receives parent_context → session_id="workflow-123"
-            └─> Fetches session "workflow-123", sees Sub-Agent-1's events
-            └─> Generates its own events, appends to session "workflow-123"
-            ↓
-        Sub-Agent-N: Receives parent_context → session_id="workflow-123"
-            └─> Sees ALL accumulated events from previous sub-agents
-        ```
+        OutputKey mode is enabled when ANY sub-agent has an output_key attribute defined.
 
         Args:
             parent_context: Invocation context containing the shared session
@@ -133,6 +117,26 @@ class KAgentSequentialAgent(SequentialAgent):
         Raises:
             Exception: Any exception raised by a sub-agent (halts workflow)
         """
+        # Detect if we should use outputKey mode
+        use_output_key_mode = any(hasattr(agent, "output_key") and agent.output_key for agent in self.sub_agents)
+
+        workflow_state_manager = None
+        workflow_state = None
+
+        if use_output_key_mode:
+            # Initialize workflow state for outputKey mode
+            workflow_state_manager = WorkflowStateManager()
+            workflow_state = workflow_state_manager.create_workflow(
+                workflow_session_id=parent_context.session.id,
+                user_id=parent_context.user_id,
+                agent_name=self.name,
+                namespace=self.namespace,
+            )
+            logger.info(
+                f"OutputKey mode enabled for workflow '{self.name}', "
+                f"created workflow state with session_id='{parent_context.session.id}'"
+            )
+
         with tracer.start_as_current_span(
             f"{self.name}.run_async",
             attributes={
@@ -141,11 +145,13 @@ class KAgentSequentialAgent(SequentialAgent):
                 "kagent.sequential.sub_agent_count": len(self.sub_agents),
                 "kagent.session.id": parent_context.session.id,
                 "kagent.user.id": parent_context.user_id,
+                "kagent.workflow.output_key_mode": use_output_key_mode,
             },
         ) as span:
             logger.info(
                 f"Starting KAgentSequentialAgent '{self.name}' with "
-                f"{len(self.sub_agents)} sub-agents, session_id='{parent_context.session.id}'"
+                f"{len(self.sub_agents)} sub-agents, session_id='{parent_context.session.id}', "
+                f"output_key_mode={use_output_key_mode}"
             )
 
             # Execute sub-agents sequentially
@@ -156,31 +162,124 @@ class KAgentSequentialAgent(SequentialAgent):
                         "kagent.agent.name": sub_agent.name,
                         "kagent.sequential.sub_agent_index": idx,
                         "kagent.session.id": parent_context.session.id,
+                        "kagent.workflow.output_key": getattr(sub_agent, "output_key", None),
                     },
                 ):
+                    output_key = getattr(sub_agent, "output_key", None)
+                    started_at = datetime.now(timezone.utc)
+
                     logger.debug(
-                        f"Executing sub-agent {idx}: {sub_agent.name} with session_id='{parent_context.session.id}'"
+                        f"Executing sub-agent {idx}: {sub_agent.name} "
+                        f"with session_id='{parent_context.session.id}', "
+                        f"output_key='{output_key}'"
                     )
 
-                    # CRITICAL: Pass parent_context directly (NO CLONING)
-                    # This ensures session ID propagates to RemoteA2aAgent calls
+                    # Prepare invocation context for sub-agent
+                    sub_agent_context = parent_context
+
+                    # If using outputKey mode, inject workflow state into session state
+                    if use_output_key_mode and workflow_state:
+                        # Create a new session with workflow state injected
+                        session_with_state = Session(
+                            id=parent_context.session.id,
+                            user_id=parent_context.session.user_id,
+                            app_name=parent_context.session.app_name,
+                            state={**parent_context.session.state, **workflow_state.state_data},
+                        )
+
+                        # Create new context with updated session
+                        # Pass all required fields from parent context to comply with Google ADK InvocationContext API
+                        sub_agent_context = InvocationContext(
+                            session=session_with_state,
+                            session_service=parent_context.session_service,
+                            invocation_id=parent_context.invocation_id,
+                            agent=parent_context.agent,
+                        )
+
+                        logger.debug(
+                            f"Injected workflow state into session for {sub_agent.name}: "
+                            f"{list(workflow_state.state_data.keys())}"
+                        )
+
+                    # Execute sub-agent and collect output if needed
                     try:
                         event_count = 0
-                        async for event in sub_agent.run_async(parent_context):
+                        collected_output = []
+
+                        async for event in sub_agent.run_async(sub_agent_context):
                             event_count += 1
+
+                            # Collect output if this sub-agent has an output_key
+                            if use_output_key_mode and output_key and event.content:
+                                # Extract text from event content
+                                if hasattr(event.content, "parts") and event.content.parts:
+                                    for part in event.content.parts:
+                                        if hasattr(part, "text") and part.text:
+                                            collected_output.append(part.text)
+
                             yield event
+
+                        # Store output in workflow state if output_key is defined
+                        if use_output_key_mode and output_key and collected_output:
+                            output_text = "\n".join(collected_output)
+                            workflow_state.set_output(output_key, output_text)
+
+                            logger.info(
+                                f"Stored output for sub-agent {sub_agent.name} "
+                                f"in workflow state with key '{output_key}' "
+                                f"(size: {len(output_text)} bytes)"
+                            )
+
+                        # Record execution in workflow state
+                        if use_output_key_mode:
+                            execution = SubAgentExecution(
+                                index=idx,
+                                agent_name=sub_agent.name,
+                                agent_namespace=self.namespace,
+                                session_id=parent_context.session.id,  # Will be child session in future
+                                output_key=output_key,
+                                started_at=started_at,
+                                completed_at=datetime.now(timezone.utc),
+                                status="success",
+                                output_size_bytes=len("\n".join(collected_output)) if collected_output else 0,
+                            )
+                            workflow_state.add_execution(execution)
 
                         logger.debug(f"Sub-agent {sub_agent.name} completed, generated {event_count} events")
 
                     except Exception as e:
                         logger.error(
                             f"Sub-agent {sub_agent.name} failed: {e}",
-                            exc_info=e,
+                            exc_info=True,
                         )
+
+                        # Record failure in workflow state
+                        if use_output_key_mode:
+                            execution = SubAgentExecution(
+                                index=idx,
+                                agent_name=sub_agent.name,
+                                agent_namespace=self.namespace,
+                                session_id=parent_context.session.id,
+                                output_key=output_key,
+                                started_at=started_at,
+                                completed_at=datetime.now(timezone.utc),
+                                status="failed",
+                                error=str(e),
+                            )
+                            workflow_state.add_execution(execution)
+                            workflow_state.mark_failed(f"Sub-agent {sub_agent.name} failed: {e}")
+
                         span.set_attribute("error", True)
                         span.record_exception(e)
-                        # Re-raise to halt workflow execution
                         raise
+
+            # Mark workflow as completed if using outputKey mode
+            if use_output_key_mode:
+                workflow_state.mark_completed()
+                logger.info(
+                    f"Workflow '{self.name}' completed successfully, "
+                    f"state contains {len(workflow_state.state_data)} outputs"
+                )
 
             logger.info(
                 f"KAgentSequentialAgent '{self.name}' completed successfully, "

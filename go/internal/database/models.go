@@ -202,6 +202,25 @@ type CrewAIFlowState struct {
 	StateData string `gorm:"type:text;not null" json:"state_data"`
 }
 
+// WorkflowState represents the state of a workflow agent execution
+type WorkflowState struct {
+	WorkflowSessionID string         `gorm:"primaryKey;not null;index:idx_workflow_session" json:"workflow_session_id"`
+	UserID            string         `gorm:"not null;index:idx_workflow_user" json:"user_id"`
+	AgentName         string         `gorm:"not null;index:idx_workflow_agent" json:"agent_name"`
+	Namespace         string         `gorm:"not null" json:"namespace"`
+	CreatedAt         time.Time      `gorm:"autoCreateTime;index:idx_workflow_created" json:"created_at"`
+	UpdatedAt         time.Time      `gorm:"autoUpdateTime" json:"updated_at"`
+	DeletedAt         gorm.DeletedAt `gorm:"index" json:"deleted_at"`
+	// StateData contains JSON serialized key-value pairs of outputKey outputs
+	StateData string `gorm:"type:jsonb;not null;default:'{}'" json:"state_data"`
+	// Status represents the workflow execution status (pending, running, completed, failed)
+	Status string `gorm:"not null;default:'pending';index:idx_workflow_status" json:"status"`
+	// Executions contains JSON serialized array of sub-agent execution records
+	Executions string `gorm:"type:jsonb;not null;default:'[]'" json:"executions"`
+	// ErrorMessage contains error details if status is 'failed'
+	ErrorMessage *string `gorm:"type:text" json:"error_message,omitempty"`
+}
+
 // TableName methods to match Python table names
 func (Agent) TableName() string                    { return "agent" }
 func (Event) TableName() string                    { return "event" }
@@ -215,3 +234,4 @@ func (LangGraphCheckpoint) TableName() string      { return "lg_checkpoint" }
 func (LangGraphCheckpointWrite) TableName() string { return "lg_checkpoint_write" }
 func (CrewAIAgentMemory) TableName() string        { return "crewai_agent_memory" }
 func (CrewAIFlowState) TableName() string          { return "crewai_flow_state" }
+func (WorkflowState) TableName() string            { return "workflow_state" }

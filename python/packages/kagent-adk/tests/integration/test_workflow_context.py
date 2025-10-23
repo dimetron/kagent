@@ -499,7 +499,9 @@ class TestMemoryManagement:
             for sub_agent_idx in range(3):
                 event = Event(
                     author=f"sub-agent-{sub_agent_idx}",
-                    content=Content(role="model", parts=[Part(text=f"Workflow {workflow_id}, sub-agent {sub_agent_idx}")]),
+                    content=Content(
+                        role="model", parts=[Part(text=f"Workflow {workflow_id}, sub-agent {sub_agent_idx}")]
+                    ),
                 )
                 await service.append_event(session, event)
 
@@ -547,9 +549,9 @@ class TestMemoryManagement:
         memory_delta_percent = (memory_delta_mb / baseline_snapshot["rss_mb"]) * 100
 
         # Allow up to 10% memory increase (should be minimal with proper cleanup)
-        assert (
-            memory_delta_percent <= 10.0
-        ), f"Memory not released to baseline: {memory_delta_mb:.2f} MB increase ({memory_delta_percent:.1f}%), threshold is 10%"
+        assert memory_delta_percent <= 10.0, (
+            f"Memory not released to baseline: {memory_delta_mb:.2f} MB increase ({memory_delta_percent:.1f}%), threshold is 10%"
+        )
 
         # Additional validation: Peak memory should be reasonable
         # With 10 workflows, peak should not exceed baseline + 50MB

@@ -12,7 +12,7 @@ from google.adk.models.google_llm import Gemini as GeminiLLM
 from google.adk.models.lite_llm import LiteLlm
 from google.adk.tools.agent_tool import AgentTool
 from google.adk.tools.mcp_tool import MCPToolset, SseConnectionParams, StreamableHTTPConnectionParams
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from .models import AzureOpenAI as OpenAIAzure
 from .models import OpenAI as OpenAINative
@@ -58,14 +58,30 @@ def create_user_propagating_httpx_client(timeout: float = DEFAULT_TIMEOUT) -> ht
     return create_client(timeout=timeout)
 
 
+class KAgentRemoteA2aAgent(RemoteA2aAgent):
+    """Extended RemoteA2aAgent that supports output_key for workflow state management.
+
+    This wrapper extends Google ADK's RemoteA2aAgent to add the output_key attribute,
+    which is used by workflow agents (Parallel, Sequential) to store sub-agent outputs
+    in workflow state.
+
+    Attributes:
+        output_key: Optional key name where this agent's output should be stored in workflow state
+    """
+
+    model_config = ConfigDict(extra="allow")
+
+    output_key: str | None = None
+
+
 def create_remote_agent(
     name: str,
     url: str,
     headers: dict[str, Any] | None,
     timeout: float,
     description: str,
-) -> RemoteA2aAgent:
-    """Create a RemoteA2aAgent with optional HTTP client.
+) -> KAgentRemoteA2aAgent:
+    """Create a KAgentRemoteA2aAgent with optional HTTP client.
 
     Args:
         name: Agent name
@@ -75,7 +91,7 @@ def create_remote_agent(
         description: Agent description
 
     Returns:
-        Configured RemoteA2aAgent instance with automatic user ID propagation
+        Configured KAgentRemoteA2aAgent instance with automatic user ID propagation
     """
 
     # Always create client with user ID propagation
@@ -90,7 +106,7 @@ def create_remote_agent(
         # Create client with user ID propagation only
         client = create_user_propagating_httpx_client(timeout=timeout)
 
-    return RemoteA2aAgent(
+    return KAgentRemoteA2aAgent(
         name=name,
         agent_card=f"{url}{AGENT_CARD_WELL_KNOWN_PATH}",
         description=description,
@@ -169,6 +185,73 @@ class SubAgentReference(BaseModel):
     namespace: str = "default"
     kind: str = "Agent"
     description: str = ""
+    output_key: str | None = None  # OutputKey for storing sub-agent output
+
+
+def generate_output_key(sub_agent_ref: SubAgentReference) -> str:
+    """Generate automatic outputKey from namespace and name.
+
+    If output_key is explicitly set, returns it as-is. Otherwise, generates
+    automatic key as: {namespace}_{name} with hyphens converted to underscores.
+
+    Args:
+        sub_agent_ref: SubAgentReference instance
+
+    Returns:
+        Generated or explicit outputKey
+
+    Raises:
+        ValueError: If auto-generated key exceeds 100 characters or contains invalid chars
+
+    Examples:
+        >>> ref = SubAgentReference(name="east-collector", namespace="production")
+        >>> generate_output_key(ref)
+        'production_east_collector'
+
+        >>> ref = SubAgentReference(name="west-collector", namespace="prod", output_key="west_data")
+        >>> generate_output_key(ref)
+        'west_data'  # Uses explicit value
+    """
+    import re
+
+    # If explicit output_key is provided, return it
+    if sub_agent_ref.output_key:
+        logger.debug(
+            f"Using explicit outputKey '{sub_agent_ref.output_key}' for agent "
+            f"{sub_agent_ref.namespace}/{sub_agent_ref.name}"
+        )
+        return sub_agent_ref.output_key
+
+    # Auto-generate: namespace_agent_name (replace hyphens with underscores)
+    namespace_clean = sub_agent_ref.namespace.replace("-", "_")
+    name_clean = sub_agent_ref.name.replace("-", "_")
+    auto_key = f"{namespace_clean}_{name_clean}"
+
+    # Validate length (max 100 characters)
+    if len(auto_key) > 100:
+        logger.error(
+            f"Auto-generated outputKey '{auto_key}' exceeds 100 characters "
+            f"(length: {len(auto_key)}) for agent {sub_agent_ref.namespace}/{sub_agent_ref.name}"
+        )
+        raise ValueError(
+            f"Auto-generated outputKey '{auto_key}' exceeds 100 characters "
+            f"(length: {len(auto_key)}). Please specify a shorter explicit outputKey."
+        )
+
+    # Validate pattern (alphanumeric + underscore only)
+    if not re.match(r"^[a-zA-Z0-9_]+$", auto_key):
+        logger.error(
+            f"Auto-generated outputKey '{auto_key}' contains invalid characters "
+            f"for agent {sub_agent_ref.namespace}/{sub_agent_ref.name}"
+        )
+        raise ValueError(
+            f"Auto-generated outputKey '{auto_key}' contains invalid characters. "
+            f"Only alphanumeric and underscore allowed."
+        )
+
+    logger.info(f"Auto-generated outputKey for {sub_agent_ref.namespace}/{sub_agent_ref.name}: {auto_key}")
+
+    return auto_key
 
 
 class WorkflowAgentConfig(BaseModel):
@@ -198,7 +281,7 @@ class WorkflowAgentConfig(BaseModel):
         if not self.sub_agents:
             raise ValueError("Workflow agent must have at least one sub-agent")
 
-        # Convert sub-agent references to RemoteA2aAgent instances
+        # Convert sub-agent references to KAgentRemoteA2aAgent instances
         sub_agent_instances = []
         for sub_agent_ref in self.sub_agents:
             # Construct the agent URL (assumes standard KAgent deployment)
@@ -207,14 +290,19 @@ class WorkflowAgentConfig(BaseModel):
             # Create a dedicated HTTP client for this agent with user ID propagation
             agent_client = create_user_propagating_httpx_client()
 
-            # Create RemoteA2aAgent instance
+            # Generate automatic outputKey if not explicitly provided
+            output_key = generate_output_key(sub_agent_ref)
+
+            # Create KAgentRemoteA2aAgent instance with output_key support
             # Note: AGENT_CARD_WELL_KNOWN_PATH already starts with '/', so don't add extra '/'
-            remote_agent = RemoteA2aAgent(
+            remote_agent = KAgentRemoteA2aAgent(
                 name=sub_agent_ref.name.replace("-", "_"),  # Python identifier
                 agent_card=f"{agent_url}{AGENT_CARD_WELL_KNOWN_PATH}",
                 description=sub_agent_ref.description,
                 httpx_client=agent_client,
+                output_key=output_key,  # Auto-generated or explicit
             )
+
             sub_agent_instances.append(remote_agent)
 
         # Create the appropriate workflow agent type

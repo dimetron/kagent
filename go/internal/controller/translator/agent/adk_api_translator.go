@@ -563,6 +563,7 @@ type WorkflowSubAgentRef struct {
 	Namespace   string `json:"namespace"`
 	Kind        string `json:"kind"`
 	Description string `json:"description"`
+	OutputKey   string `json:"output_key,omitempty"` // For outputKey workflow support
 }
 
 // WorkflowAgentConfig represents the configuration for workflow agents
@@ -623,6 +624,7 @@ func (a *adkApiTranslator) translateWorkflowAgent(ctx context.Context, agent *v1
 				Namespace:   namespace,
 				Kind:        "Agent",
 				Description: subAgent.Spec.Description,
+				OutputKey:   ref.OutputKey,
 			})
 		}
 	} else if agent.Spec.Workflow.Sequential != nil {
@@ -650,6 +652,7 @@ func (a *adkApiTranslator) translateWorkflowAgent(ctx context.Context, agent *v1
 				Namespace:   namespace,
 				Kind:        "Agent",
 				Description: subAgent.Spec.Description,
+				OutputKey:   ref.OutputKey,
 			})
 		}
 	} else if agent.Spec.Workflow.Loop != nil {
@@ -680,6 +683,7 @@ func (a *adkApiTranslator) translateWorkflowAgent(ctx context.Context, agent *v1
 				Namespace:   namespace,
 				Kind:        "Agent",
 				Description: subAgent.Spec.Description,
+				OutputKey:   ref.OutputKey,
 			})
 		}
 	} else {

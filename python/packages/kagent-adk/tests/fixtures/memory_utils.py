@@ -4,8 +4,12 @@ import gc
 import sys
 import tracemalloc
 from typing import Any, Dict
+from unittest.mock import Mock
 
 import psutil
+from google.adk.agents.base_agent import BaseAgent
+from google.adk.agents.invocation_context import InvocationContext, Session
+from google.adk.sessions.base_session_service import BaseSessionService
 
 
 class MemoryProfiler:
@@ -102,9 +106,9 @@ class MemoryProfiler:
         delta_mb = (final_rss - self.baseline_rss) / (1024 * 1024)
         delta_percent = (delta_mb / (self.baseline_rss / (1024 * 1024))) * 100
 
-        assert (
-            delta_percent <= threshold_percent
-        ), f"Memory not released: {delta_mb:.2f} MB increase ({delta_percent:.1f}%), threshold is {threshold_percent}%"
+        assert delta_percent <= threshold_percent, (
+            f"Memory not released: {delta_mb:.2f} MB increase ({delta_percent:.1f}%), threshold is {threshold_percent}%"
+        )
 
     def get_memory_summary(self) -> str:
         """Get human-readable memory summary.
@@ -122,7 +126,9 @@ class MemoryProfiler:
         lines.append("Snapshots:")
 
         for snapshot in self.snapshots:
-            lines.append(f"  {snapshot['label']:20s}: {snapshot['rss_mb']:8.2f} MB (Δ {snapshot['rss_delta_mb']:+7.2f} MB)")
+            lines.append(
+                f"  {snapshot['label']:20s}: {snapshot['rss_mb']:8.2f} MB (Δ {snapshot['rss_delta_mb']:+7.2f} MB)"
+            )
 
         return "\n".join(lines)
 
@@ -169,3 +175,47 @@ def check_for_leaked_references(obj: Any) -> int:
     force_garbage_collection()
     return sys.getrefcount(obj) - 1  # Subtract 1 for the argument reference
 
+
+def create_test_invocation_context(
+    session_id: str = "test_session",
+    user_id: str = "test_user",
+    app_name: str = "test_app",
+    state: dict | None = None,
+) -> InvocationContext:
+    """Create an InvocationContext for testing.
+
+    This helper creates a properly configured InvocationContext with all required
+    fields for the Google ADK API, using mock objects where necessary.
+
+    Args:
+        session_id: Session ID
+        user_id: User ID
+        app_name: Application name
+        state: Session state dictionary
+
+    Returns:
+        InvocationContext configured for testing
+    """
+    # Create session
+    session = Session(
+        id=session_id,
+        user_id=user_id,
+        app_name=app_name,
+        state=state or {},
+    )
+
+    # Create mock session_service with proper spec
+    mock_session_service = Mock(spec=BaseSessionService)
+    mock_session_service.get_session = Mock(return_value=session)
+
+    # Create mock agent with proper spec
+    mock_agent = Mock(spec=BaseAgent)
+    mock_agent.name = "test_agent"
+
+    # Create InvocationContext with all required fields
+    return InvocationContext(
+        session=session,
+        session_service=mock_session_service,
+        invocation_id="test_invocation",
+        agent=mock_agent,
+    )

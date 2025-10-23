@@ -7088,6 +7088,16 @@ spec:
                                 Namespace of the referenced Agent
                                 If empty, defaults to the same namespace as the parent workflow agent
                               type: string
+                            outputKey:
+                              description: |-
+                                OutputKey specifies the state key where this sub-agent's output will be stored.
+                                When omitted, automatically generated as: {namespace}_{agent_name} (hyphens converted to underscores).
+                                When set explicitly, overrides automatic naming.
+                                Must contain only alphanumeric characters and underscores.
+                                Max length: 100 characters.
+                              maxLength: 100
+                              pattern: ^[a-zA-Z0-9_]+$
+                              type: string
                           required:
                           - name
                           type: object
@@ -7142,6 +7152,16 @@ spec:
                                 Namespace of the referenced Agent
                                 If empty, defaults to the same namespace as the parent workflow agent
                               type: string
+                            outputKey:
+                              description: |-
+                                OutputKey specifies the state key where this sub-agent's output will be stored.
+                                When omitted, automatically generated as: {namespace}_{agent_name} (hyphens converted to underscores).
+                                When set explicitly, overrides automatic naming.
+                                Must contain only alphanumeric characters and underscores.
+                                Max length: 100 characters.
+                              maxLength: 100
+                              pattern: ^[a-zA-Z0-9_]+$
+                              type: string
                           required:
                           - name
                           type: object
@@ -7185,6 +7205,16 @@ spec:
                               description: |-
                                 Namespace of the referenced Agent
                                 If empty, defaults to the same namespace as the parent workflow agent
+                              type: string
+                            outputKey:
+                              description: |-
+                                OutputKey specifies the state key where this sub-agent's output will be stored.
+                                When omitted, automatically generated as: {namespace}_{agent_name} (hyphens converted to underscores).
+                                When set explicitly, overrides automatic naming.
+                                Must contain only alphanumeric characters and underscores.
+                                Max length: 100 characters.
+                              maxLength: 100
+                              pattern: ^[a-zA-Z0-9_]+$
                               type: string
                           required:
                           - name

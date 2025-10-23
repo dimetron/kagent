@@ -9,9 +9,47 @@ from google.adk.sessions.base_session_service import (
     GetSessionConfig,
     ListSessionsResponse,
 )
+from pydantic import BaseModel, Field
 from typing_extensions import override
 
 logger = logging.getLogger("kagent." + __name__)
+
+
+class KAgentSession(BaseModel):
+    """Extended session model with workflow support.
+
+    This model extends the standard ADK Session with additional fields
+    needed for workflow agents with separate session IDs per sub-agent.
+    """
+
+    # Standard ADK fields
+    id: str = Field(..., description="Unique session ID")
+    user_id: str = Field(..., description="User ID")
+    app_name: str = Field(..., description="Agent/app name")
+    state: dict = Field(default_factory=dict, description="Session state")
+
+    # KAgent extensions for workflows
+    parent_session_id: Optional[str] = Field(None, description="Parent session ID if this is a sub-agent session")
+    workflow_session_id: Optional[str] = Field(
+        None, description="Workflow session ID (same for all sub-agents in workflow)"
+    )
+    sub_agent_index: Optional[int] = Field(None, description="Index of sub-agent in workflow (0-based)")
+
+    def is_workflow_child(self) -> bool:
+        """Check if this is a sub-agent session.
+
+        Returns:
+            True if this session has a parent (is a sub-agent session)
+        """
+        return self.parent_session_id is not None
+
+    def to_adk_session(self) -> Session:
+        """Convert to standard Google ADK Session.
+
+        Returns:
+            Session object compatible with ADK runtime
+        """
+        return Session(id=self.id, user_id=self.user_id, app_name=self.app_name, state=self.state)
 
 
 class KAgentSessionService(BaseSessionService):

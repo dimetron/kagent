@@ -16,6 +16,7 @@ Usage:
     pytest tests/e2e/test_shared_sessions.py -v
 """
 
+import asyncio
 import json
 import os
 import subprocess
@@ -34,21 +35,21 @@ KUBECTL_TIMEOUT = 180  # seconds - increased for agents with tools
 
 def detect_kagent_api_url() -> str:
     """Detect KAGENT_API_URL from MetalLB LoadBalancer service or environment variable.
-    
+
     Priority:
     1. KAGENT_API_URL environment variable (if set)
     2. MetalLB LoadBalancer IP from kagent-controller service
     3. Fallback to localhost:8083
-    
+
     Returns:
         str: The detected or configured API URL
     """
     # Check environment variable first
     env_url = os.getenv("KAGENT_API_URL")
     if env_url:
-        print(f"Using KAGENT_API_URL from environment: {env_url}")
+        print(f"Using KAGENT_API_URL from environment: {env_url}")  # noqa: T201
         return env_url
-    
+
     # Try to detect from MetalLB LoadBalancer
     try:
         # Get LoadBalancer IP
@@ -66,7 +67,7 @@ def detect_kagent_api_url() -> str:
             text=True,
             timeout=5,
         )
-        
+
         if result.returncode == 0 and result.stdout.strip():
             lb_host = result.stdout.strip()
         else:
@@ -86,7 +87,7 @@ def detect_kagent_api_url() -> str:
                 timeout=5,
             )
             lb_host = hostname_result.stdout.strip() if hostname_result.returncode == 0 else None
-        
+
         if lb_host:
             # Get service port
             port_result = subprocess.run(
@@ -103,23 +104,23 @@ def detect_kagent_api_url() -> str:
                 text=True,
                 timeout=5,
             )
-            
+
             port = port_result.stdout.strip() if port_result.returncode == 0 else "8083"
             detected_url = f"http://{lb_host}:{port}"
-            
+
             # Test if LoadBalancer IP is actually reachable (may fail on Docker Desktop/macOS)
             test_result = subprocess.run(
                 ["curl", "-sf", "-m", "2", f"{detected_url}/health"],
                 capture_output=True,
                 timeout=3,
             )
-            
+
             if test_result.returncode == 0:
-                print(f"Detected KAGENT_API_URL from LoadBalancer: {detected_url}")
+                print(f"Detected KAGENT_API_URL from LoadBalancer: {detected_url}")  # noqa: T201
                 return detected_url
             else:
-                print(f"LoadBalancer IP {detected_url} not accessible from host, trying NodePort...")
-        
+                print(f"LoadBalancer IP {detected_url} not accessible from host, trying NodePort...")  # noqa: T201
+
         # Try NodePort as fallback (common on Kind/Docker Desktop)
         nodeport_result = subprocess.run(
             [
@@ -135,29 +136,29 @@ def detect_kagent_api_url() -> str:
             text=True,
             timeout=5,
         )
-        
+
         if nodeport_result.returncode == 0 and nodeport_result.stdout.strip():
             nodeport = nodeport_result.stdout.strip()
             nodeport_url = f"http://localhost:{nodeport}"
-            
+
             # Test NodePort connectivity
             test_result = subprocess.run(
                 ["curl", "-sf", "-m", "2", f"{nodeport_url}/health"],
                 capture_output=True,
                 timeout=3,
             )
-            
+
             if test_result.returncode == 0:
-                print(f"Detected KAGENT_API_URL via NodePort: {nodeport_url}")
+                print(f"Detected KAGENT_API_URL via NodePort: {nodeport_url}")  # noqa: T201
                 return nodeport_url
-            
+
     except (subprocess.TimeoutExpired, Exception) as e:
-        print(f"Could not detect LoadBalancer IP: {e}")
-    
+        print(f"Could not detect LoadBalancer IP: {e}")  # noqa: T201
+
     # Fallback to localhost
     fallback_url = "http://localhost:8083"
-    print(f"Using fallback KAGENT_API_URL: {fallback_url}")
-    print("Tip: Set KAGENT_API_URL environment variable or ensure kubectl port-forward is running")
+    print(f"Using fallback KAGENT_API_URL: {fallback_url}")  # noqa: T201
+    print("Tip: Set KAGENT_API_URL environment variable or ensure kubectl port-forward is running")  # noqa: T201
     return fallback_url
 
 
@@ -178,7 +179,7 @@ class KubernetesHelper:
             text=False,
         )
         if result.returncode != 0:
-            print(f"kubectl apply failed: {result.stderr.decode()}")
+            print(f"kubectl apply failed: {result.stderr.decode()}")  # noqa: T201
         return result
 
     @staticmethod
@@ -195,7 +196,7 @@ class KubernetesHelper:
     @staticmethod
     def wait_for_agent(agent_name: str, namespace: str = KAGENT_NAMESPACE, timeout: int = KUBECTL_TIMEOUT) -> bool:
         """Wait for an agent to be ready."""
-        print(f"Waiting for agent {agent_name} to be ready (timeout: {timeout}s)...")
+        print(f"Waiting for agent {agent_name} to be ready (timeout: {timeout}s)...")  # noqa: T201
         result = subprocess.run(
             [
                 "kubectl",
@@ -209,16 +210,16 @@ class KubernetesHelper:
             text=True,
         )
         if result.returncode == 0:
-            print(f"✓ Agent {agent_name} is ready")
+            print(f"✓ Agent {agent_name} is ready")  # noqa: T201
         else:
-            print(f"✗ Agent {agent_name} failed to become ready")
-            print(f"Error: {result.stderr}")
+            print(f"✗ Agent {agent_name} failed to become ready")  # noqa: T201
+            print(f"Error: {result.stderr}")  # noqa: T201
         return result.returncode == 0
 
     @staticmethod
     def wait_for_pod(label_selector: str, namespace: str = KAGENT_NAMESPACE, timeout: int = KUBECTL_TIMEOUT) -> bool:
         """Wait for a pod to be running and ready."""
-        print(f"Waiting for pod with selector '{label_selector}' to be ready...")
+        print(f"Waiting for pod with selector '{label_selector}' to be ready...")  # noqa: T201
         result = subprocess.run(
             [
                 "kubectl",
@@ -233,11 +234,11 @@ class KubernetesHelper:
             text=True,
         )
         if result.returncode == 0:
-            print(f"✓ Pod is ready")
+            print("✓ Pod is ready")  # noqa: T201
             return True
         else:
-            print(f"✗ Pod failed to become ready")
-            print(f"Error: {result.stderr}")
+            print("✗ Pod failed to become ready")  # noqa: T201
+            print(f"Error: {result.stderr}")  # noqa: T201
             return False
 
     @staticmethod
@@ -251,7 +252,9 @@ class KubernetesHelper:
         return result.stdout if result.returncode == 0 else ""
 
     @staticmethod
-    def port_forward(service: str, local_port: int, remote_port: int, namespace: str = KAGENT_NAMESPACE) -> subprocess.Popen:
+    def port_forward(
+        service: str, local_port: int, remote_port: int, namespace: str = KAGENT_NAMESPACE
+    ) -> subprocess.Popen:
         """Start port forwarding to a service."""
         return subprocess.Popen(
             ["kubectl", "port-forward", f"service/{service}", f"{local_port}:{remote_port}", f"-n={namespace}"],
@@ -281,17 +284,17 @@ class KAgentAPIClient:
 
     async def send_message(self, agent_ref: str, session_id: str, message: str) -> dict[str, Any]:
         """Send a message to an agent via A2A protocol using JSON-RPC 2.0 format.
-        
+
         Args:
             agent_ref: Agent reference in format "namespace/agent-name"
             session_id: Session ID to use for the conversation
             message: Message text to send
-        
+
         Returns:
             dict: Last event from the SSE stream (typically completion event)
         """
         import uuid
-        
+
         # A2A protocol uses JSON-RPC 2.0 format
         request_payload = {
             "jsonrpc": "2.0",
@@ -301,62 +304,51 @@ class KAgentAPIClient:
                     "kind": "message",
                     "messageId": str(uuid.uuid4()),
                     "role": "user",
-                    "parts": [
-                        {
-                            "kind": "text",
-                            "text": message
-                        }
-                    ],
-                    "contextId": session_id
+                    "parts": [{"kind": "text", "text": message}],
+                    "contextId": session_id,
                 },
-                "metadata": {}
+                "metadata": {},
             },
-            "id": str(uuid.uuid4())
+            "id": str(uuid.uuid4()),
         }
-        
+
         response = await self.client.post(
             f"/api/a2a/{agent_ref}/",  # Trailing slash required
-            headers={
-                "X-User-ID": self.user_id,
-                "Content-Type": "application/json"
-            },
+            headers={"X-User-ID": self.user_id, "Content-Type": "application/json"},
             json=request_payload,
         )
         if response.status_code >= 400:
-            print(f"Error response status: {response.status_code}")
-            print(f"Error response body: {response.text}")
+            print(f"Error response status: {response.status_code}")  # noqa: T201
+            print(f"Error response body: {response.text}")  # noqa: T201
         response.raise_for_status()
-        
+
         # Parse SSE response
         # Response format is SSE: "event: <type>\ndata: <json>\n\n"
         response_text = response.text
         last_event = None
-        
+
         # Parse SSE stream - split by empty lines
-        for sse_message in response_text.strip().split('\n\n'):
+        for sse_message in response_text.strip().split("\n\n"):
             if not sse_message.strip():
                 continue
-            
-            lines = sse_message.split('\n')
+
+            lines = sse_message.split("\n")
             event_type = None
             event_data = None
-            
+
             for line in lines:
-                if line.startswith('event:'):
+                if line.startswith("event:"):
                     event_type = line[6:].strip()
-                elif line.startswith('data:'):
+                elif line.startswith("data:"):
                     event_data_str = line[5:].strip()
                     try:
                         event_data = json.loads(event_data_str)
                     except json.JSONDecodeError:
                         pass
-            
+
             if event_data:
-                last_event = {
-                    'event': event_type,
-                    'data': event_data
-                }
-        
+                last_event = {"event": event_type, "data": event_data}
+
         # Return last event or empty dict if no events parsed
         return last_event or {}
 
@@ -482,32 +474,32 @@ async def api_client():
 def deploy_test_workflow(kubernetes_helper):
     """Deploy test workflow agents and clean up after tests."""
     # Deploy agents
-    print("Deploying test workflow agents...")
+    print("Deploying test workflow agents...")  # noqa: T201
     result = kubernetes_helper.apply_manifest(THREE_AGENT_WORKFLOW_MANIFEST)
     assert result.returncode == 0, f"Failed to deploy test workflow: {result.stderr.decode()}"
 
     # Wait for agents to be ready
-    print("Waiting for agents to be ready...")
+    print("Waiting for agents to be ready...")  # noqa: T201
     agents = ["e2e-data-collector", "e2e-analyzer", "e2e-reporter", "e2e-test-sequential-workflow"]
     for agent in agents:
         ready = kubernetes_helper.wait_for_agent(agent)
         assert ready, f"Agent {agent} did not become ready in time"
 
     # Wait for pods to be running and ready
-    print("Waiting for pods to be running...")
+    print("Waiting for pods to be running...")  # noqa: T201
     for agent in agents:
         pod_ready = kubernetes_helper.wait_for_pod(f"kagent={agent}")
         assert pod_ready, f"Pod for agent {agent} did not become ready in time"
 
     # Give pods a few seconds to fully initialize services
-    print("Allowing pods to stabilize...")
+    print("Allowing pods to stabilize...")  # noqa: T201
     time.sleep(5)
 
-    print("Test workflow deployed successfully")
+    print("Test workflow deployed successfully")  # noqa: T201
     yield
 
     # Cleanup
-    print("Cleaning up test workflow agents...")
+    print("Cleaning up test workflow agents...")  # noqa: T201
     kubernetes_helper.delete_manifest(THREE_AGENT_WORKFLOW_MANIFEST)
 
 
@@ -515,13 +507,13 @@ def deploy_test_workflow(kubernetes_helper):
 @pytest.mark.e2e
 class TestThreeAgentSequentialWorkflow:
     """E2E tests for three-agent sequential workflow with shared sessions.
-    
+
     This is T045 from tasks.md.
     """
 
     async def test_three_agent_workflow(self, deploy_test_workflow, api_client):
         """Test three-agent sequential workflow with context propagation.
-        
+
         This test implements T045-T049:
         - T045: Deploy three-agent workflow
         - T046: Send request and capture session ID
@@ -530,29 +522,29 @@ class TestThreeAgentSequentialWorkflow:
         - T049: Assert sub-agent-2 references sub-agent-1 data
         """
         # T046: Send request and capture session ID
-        print("Creating session and sending request...")
+        print("Creating session and sending request...")  # noqa: T201
         session_id = await api_client.create_session("kagent/e2e-test-sequential-workflow")
         assert session_id, "Failed to create session"
-        print(f"Created session: {session_id}")
+        print(f"Created session: {session_id}")  # noqa: T201
 
         # Send test message
         message = "Analyze cluster health: check namespaces and report any issues"
-        print(f"Sending message: {message}")
-        response = await api_client.send_message("kagent/e2e-test-sequential-workflow", session_id, message)
-        print(f"Received response")
+        print(f"Sending message: {message}")  # noqa: T201
+        await api_client.send_message("kagent/e2e-test-sequential-workflow", session_id, message)
+        print("Received response")  # noqa: T201
 
         # Wait for workflow to complete (allow time for all 3 agents to execute)
-        print("Waiting for workflow to complete...")
-        time.sleep(10)  # Give agents time to execute
+        print("Waiting for workflow to complete...")  # noqa: T201
+        await asyncio.sleep(10)  # Give agents time to execute
 
         # T047: Query session after workflow completion
-        print("Querying session...")
+        print("Querying session...")  # noqa: T201
         session_data = await api_client.get_session(session_id)
         assert session_data, "Failed to retrieve session"
         assert "events" in session_data, "Session has no events"
 
         events = session_data["events"]
-        print(f"Retrieved {len(events)} events from session")
+        print(f"Retrieved {len(events)} events from session")  # noqa: T201
 
         # T048: Assert all 3 sub-agents' events present with correct authors
         # Parse event authors from JSON data field
@@ -565,19 +557,20 @@ class TestThreeAgentSequentialWorkflow:
             except (json.JSONDecodeError, KeyError):
                 pass
 
-        print(f"Event authors found: {event_authors}")
+        print(f"Event authors found: {event_authors}")  # noqa: T201
 
         # Verify we have events from all three sub-agents
         # Note: Agent names use hyphens but event authors may use underscores
         expected_authors = ["e2e-data-collector", "e2e-analyzer", "e2e-reporter"]
         for expected_author in expected_authors:
             # Check for both hyphenated and underscored versions
-            author_variants = [expected_author, expected_author.replace('-', '_')]
+            author_variants = [expected_author, expected_author.replace("-", "_")]
             matching_events = [
-                author for author in event_authors 
-                if any(variant in author for variant in author_variants)
+                author for author in event_authors if any(variant in author for variant in author_variants)
             ]
-            assert matching_events, f"No events found from sub-agent: {expected_author} (checked variants: {author_variants})"
+            assert matching_events, (
+                f"No events found from sub-agent: {expected_author} (checked variants: {author_variants})"
+            )
 
         # Verify all events share the same session ID
         session_ids = set(event["session_id"] for event in events)
@@ -608,59 +601,61 @@ class TestThreeAgentSequentialWorkflow:
         )
 
         assert context_aware, "Analyzer does not appear to reference previous agent's data"
-        print("✓ Context-aware decision making verified")
+        print("✓ Context-aware decision making verified")  # noqa: T201
 
         # Verify events have timestamps (order may vary depending on API response)
         timestamps = [event["created_at"] for event in events]
         assert all(timestamps), "Some events are missing timestamps"
         # Events may be in reverse chronological order (newest first) or chronological order
         # Both are acceptable as long as all events are present with timestamps
-        print(f"✓ All {len(timestamps)} events have timestamps")
+        print(f"✓ All {len(timestamps)} events have timestamps")  # noqa: T201
 
-        print("✓ Three-agent sequential workflow test passed")
+        print("✓ Three-agent sequential workflow test passed")  # noqa: T201
 
 
 @pytest.mark.asyncio
 @pytest.mark.e2e
 class TestParallelWorkflowIsolation:
     """E2E test for parallel workflow isolation.
-    
+
     This is T050 from tasks.md.
     """
 
     async def test_parallel_workflow_isolation(self, deploy_test_workflow, api_client):
         """Test that parallel workflows do NOT share sessions.
-        
+
         Verifies that when multiple instances of the workflow run concurrently,
         each has its own isolated session.
         """
         # Create two concurrent sessions
-        print("Creating two concurrent sessions...")
+        print("Creating two concurrent sessions...")  # noqa: T201
         session_id_1 = await api_client.create_session("kagent/e2e-test-sequential-workflow")
         session_id_2 = await api_client.create_session("kagent/e2e-test-sequential-workflow")
 
         assert session_id_1 != session_id_2, "Sessions should have different IDs"
-        print(f"Created sessions: {session_id_1}, {session_id_2}")
+        print(f"Created sessions: {session_id_1}, {session_id_2}")  # noqa: T201
 
         # Send different messages to each session
-        print("Sending different messages to each session...")
+        print("Sending different messages to each session...")  # noqa: T201
         await api_client.send_message("kagent/e2e-test-sequential-workflow", session_id_1, "Check namespace 'default'")
-        await api_client.send_message("kagent/e2e-test-sequential-workflow", session_id_2, "Check namespace 'kube-system'")
+        await api_client.send_message(
+            "kagent/e2e-test-sequential-workflow", session_id_2, "Check namespace 'kube-system'"
+        )
 
         # Wait for workflows to complete
-        print("Waiting for workflows to complete...")
-        time.sleep(10)
+        print("Waiting for workflows to complete...")  # noqa: T201
+        await asyncio.sleep(10)
 
         # Query both sessions
-        print("Querying both sessions...")
+        print("Querying both sessions...")  # noqa: T201
         session_data_1 = await api_client.get_session(session_id_1)
         session_data_2 = await api_client.get_session(session_id_2)
 
         events_1 = session_data_1["events"]
         events_2 = session_data_2["events"]
 
-        print(f"Session 1 has {len(events_1)} events")
-        print(f"Session 2 has {len(events_2)} events")
+        print(f"Session 1 has {len(events_1)} events")  # noqa: T201
+        print(f"Session 2 has {len(events_2)} events")  # noqa: T201
 
         # Verify sessions are isolated - no shared event IDs
         event_ids_1 = set(event["id"] for event in events_1)
@@ -677,48 +672,48 @@ class TestParallelWorkflowIsolation:
         for event in events_2:
             assert event["session_id"] == session_id_2, "Session 2 contains events from another session"
 
-        print("✓ Parallel workflow isolation verified")
+        print("✓ Parallel workflow isolation verified")  # noqa: T201
 
 
 @pytest.mark.asyncio
 @pytest.mark.e2e
 class TestErrorHandling:
     """E2E test for error handling in sequential workflows.
-    
+
     This is T051 from tasks.md.
     """
 
     async def test_error_handling(self, deploy_test_workflow, api_client):
         """Test error handling when a sub-agent fails.
-        
+
         Verifies that errors are captured in the shared session and
         subsequent agents can see the error context.
         """
         # Create session with workflow
-        print("Creating session for error handling test...")
+        print("Creating session for error handling test...")  # noqa: T201
         session_id = await api_client.create_session("kagent/e2e-test-sequential-workflow")
-        print(f"Created session: {session_id}")
+        print(f"Created session: {session_id}")  # noqa: T201
 
         # Send a message that might cause issues (invalid namespace)
         # This may or may not fail depending on error handling, but we can check session
         message = "Analyze the health of namespace 'nonexistent-namespace-xyz-123'"
-        print(f"Sending potentially problematic message: {message}")
-        
+        print(f"Sending potentially problematic message: {message}")  # noqa: T201
+
         try:
             await api_client.send_message("kagent/e2e-test-sequential-workflow", session_id, message)
         except Exception as e:
-            print(f"Request completed (may have errors): {e}")
+            print(f"Request completed (may have errors): {e}")  # noqa: T201
 
         # Wait for processing
-        print("Waiting for workflow to process...")
-        time.sleep(10)
+        print("Waiting for workflow to process...")  # noqa: T201
+        await asyncio.sleep(10)
 
         # Query session to check for error events
-        print("Querying session for error events...")
+        print("Querying session for error events...")  # noqa: T201
         session_data = await api_client.get_session(session_id)
         events = session_data["events"]
 
-        print(f"Retrieved {len(events)} events")
+        print(f"Retrieved {len(events)} events")  # noqa: T201
 
         # Check if any events contain error information
         has_events = len(events) > 0
@@ -729,22 +724,22 @@ class TestErrorHandling:
             try:
                 event_data = json.loads(event["data"])
                 author = event_data.get("author", "unknown")
-                print(f"Event {i+1}: author={author}")
+                print(f"Event {i + 1}: author={author}")  # noqa: T201
             except Exception as e:
-                print(f"Event {i+1}: Could not parse - {e}")
+                print(f"Event {i + 1}: Could not parse - {e}")  # noqa: T201
 
         # Verify all events belong to the same session
         session_ids = set(event["session_id"] for event in events)
         assert len(session_ids) == 1, f"Multiple session IDs found: {session_ids}"
         assert session_id in session_ids, "Events do not belong to the correct session"
 
-        print("✓ Error handling test completed (errors captured in session)")
+        print("✓ Error handling test completed (errors captured in session)")  # noqa: T201
 
 
 @pytest.mark.e2e
 def test_kubernetes_cluster_available(kubernetes_helper):
     """Verify Kubernetes cluster is available and KAgent is deployed.
-    
+
     This is a prerequisite check before running the full E2E test suite.
     """
     # Check if kubectl is available
@@ -762,10 +757,9 @@ def test_kubernetes_cluster_available(kubernetes_helper):
     )
     assert result.returncode == 0, "default-model-config not found (run 'make helm-install')"
 
-    print("✓ Kubernetes cluster and KAgent deployment verified")
+    print("✓ Kubernetes cluster and KAgent deployment verified")  # noqa: T201
 
 
 if __name__ == "__main__":
     # Run tests with pytest
     pytest.main([__file__, "-v", "-s"])
-

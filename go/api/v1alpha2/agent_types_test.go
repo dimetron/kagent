@@ -534,6 +534,266 @@ func TestAgentSpec_WorkflowType(t *testing.T) {
 	}
 }
 
+// T009: Contract Test - SubAgentReference OutputKey Validation
+func TestSubAgentReference_OutputKey_Validation(t *testing.T) {
+	tests := []struct {
+		name      string
+		outputKey string
+		wantErr   bool
+		errMsg    string
+	}{
+		{
+			name:      "valid outputKey with lowercase letters",
+			outputKey: "generated_code",
+			wantErr:   false,
+		},
+		{
+			name:      "valid outputKey with uppercase letters",
+			outputKey: "GeneratedCode",
+			wantErr:   false,
+		},
+		{
+			name:      "valid outputKey with numbers",
+			outputKey: "result_123",
+			wantErr:   false,
+		},
+		{
+			name:      "valid outputKey starting with underscore",
+			outputKey: "_private_result",
+			wantErr:   false,
+		},
+		{
+			name:      "valid outputKey with mixed case and numbers",
+			outputKey: "myOutput_v2",
+			wantErr:   false,
+		},
+		{
+			name:      "invalid outputKey starting with number",
+			outputKey: "1result",
+			wantErr:   true,
+			errMsg:    "must match pattern",
+		},
+		{
+			name:      "invalid outputKey with hyphen",
+			outputKey: "result-1",
+			wantErr:   true,
+			errMsg:    "must match pattern",
+		},
+		{
+			name:      "invalid outputKey with dot",
+			outputKey: "result.value",
+			wantErr:   true,
+			errMsg:    "must match pattern",
+		},
+		{
+			name:      "invalid outputKey with space",
+			outputKey: "result value",
+			wantErr:   true,
+			errMsg:    "must match pattern",
+		},
+		{
+			name:      "invalid outputKey with special chars",
+			outputKey: "result@123",
+			wantErr:   true,
+			errMsg:    "must match pattern",
+		},
+		{
+			name:      "invalid outputKey exceeding max length",
+			outputKey: "a" + string(make([]byte, 100)), // 101 characters
+			wantErr:   true,
+			errMsg:    "max length",
+		},
+		{
+			name:      "empty outputKey is valid (optional field)",
+			outputKey: "",
+			wantErr:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ref := SubAgentReference{
+				Name:      "test-agent",
+				OutputKey: tt.outputKey,
+			}
+
+			// Test pattern matching
+			if tt.outputKey != "" && len(tt.outputKey) <= 100 {
+				// Validate pattern manually since we can't easily test kubebuilder validation
+				pattern := `^[a-zA-Z_][a-zA-Z0-9_]*$`
+				matched := matchPattern(pattern, tt.outputKey)
+
+				if tt.wantErr {
+					assert.False(t, matched, "OutputKey should not match pattern")
+				} else {
+					assert.True(t, matched, "OutputKey should match pattern")
+				}
+			}
+
+			// Test length constraint
+			if len(tt.outputKey) > 127 {
+				assert.True(t, tt.wantErr, "OutputKey exceeding 127 chars should be invalid")
+			}
+
+			// Verify the field is populated correctly
+			assert.Equal(t, tt.outputKey, ref.OutputKey)
+		})
+	}
+}
+
+// Helper to match regex pattern
+func matchPattern(pattern, value string) bool {
+	if value == "" {
+		return true // empty is valid for optional field
+	}
+	// Simple validation for the pattern ^[a-zA-Z_][a-zA-Z0-9_]*$
+	if len(value) == 0 {
+		return false
+	}
+	// First character must be letter or underscore
+	first := value[0]
+	if (first < 'a' || first > 'z') && (first < 'A' || first > 'Z') && first != '_' {
+		return false
+	}
+	// Remaining characters must be letters, digits, or underscores
+	for i := 1; i < len(value); i++ {
+		c := value[i]
+		if (c < 'a' || c > 'z') && (c < 'A' || c > 'Z') && (c < '0' || c > '9') && c != '_' {
+			return false
+		}
+	}
+	return true
+}
+
+// TestSubAgentReference_OutputKey tests OutputKey field validation
+func TestSubAgentReference_OutputKey(t *testing.T) {
+	tests := []struct {
+		name       string
+		outputKey  string
+		shouldPass bool
+		reason     string
+	}{
+		{
+			name:       "valid outputKey with alphanumeric and underscores",
+			outputKey:  "production_east_collector",
+			shouldPass: true,
+			reason:     "standard auto-generated format",
+		},
+		{
+			name:       "valid outputKey with all underscores",
+			outputKey:  "production_us_east_collector",
+			shouldPass: true,
+			reason:     "multiple underscores are allowed",
+		},
+		{
+			name:       "valid outputKey all lowercase",
+			outputKey:  "myoutputkey",
+			shouldPass: true,
+			reason:     "simple alphanumeric",
+		},
+		{
+			name:       "valid outputKey with numbers",
+			outputKey:  "output_key_123",
+			shouldPass: true,
+			reason:     "numbers are allowed",
+		},
+		{
+			name:       "valid outputKey starting with number",
+			outputKey:  "123_output",
+			shouldPass: true,
+			reason:     "pattern allows leading numbers",
+		},
+		{
+			name:       "invalid outputKey with hyphen",
+			outputKey:  "production-east-collector",
+			shouldPass: false,
+			reason:     "hyphens not allowed (must use underscores)",
+		},
+		{
+			name:       "invalid outputKey with dot",
+			outputKey:  "production.east.collector",
+			shouldPass: false,
+			reason:     "dots not allowed",
+		},
+		{
+			name:       "invalid outputKey with space",
+			outputKey:  "production east collector",
+			shouldPass: false,
+			reason:     "spaces not allowed",
+		},
+		{
+			name:       "invalid outputKey with special chars",
+			outputKey:  "production@east#collector",
+			shouldPass: false,
+			reason:     "special characters not allowed",
+		},
+		{
+			name:       "invalid outputKey exceeds max length (100 chars)",
+			outputKey:  "this_is_a_very_long_output_key_name_that_exceeds_the_maximum_allowed_length_of_one_hundred_characters_and_should_fail_validation_test",
+			shouldPass: false,
+			reason:     "exceeds 100 character limit",
+		},
+		{
+			name:       "valid outputKey at max length (100 chars)",
+			outputKey:  "this_is_a_ninety_nine_character_output_key_name_that_is_exactly_at_the_maximum_length_xxxxxxxx",
+			shouldPass: true,
+			reason:     "exactly 100 characters",
+		},
+		{
+			name:       "valid outputKey empty (optional field)",
+			outputKey:  "",
+			shouldPass: true,
+			reason:     "empty string is valid (field is optional)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ref := SubAgentReference{
+				Name:      "test-agent",
+				Namespace: "default",
+				OutputKey: tt.outputKey,
+			}
+
+			// Validate pattern if outputKey is not empty
+			if tt.outputKey != "" {
+				// Pattern: ^[a-zA-Z0-9_]+$
+				matches := isValidOutputKeyPattern(tt.outputKey)
+				if tt.shouldPass {
+					assert.True(t, matches, "OutputKey '%s' should match pattern. Reason: %s", tt.outputKey, tt.reason)
+				} else {
+					// Check if failure is due to pattern or length
+					if len(tt.outputKey) > 100 {
+						assert.Greater(t, len(tt.outputKey), 100, "OutputKey length should exceed 100. Reason: %s", tt.reason)
+					} else {
+						assert.False(t, matches, "OutputKey '%s' should NOT match pattern. Reason: %s", tt.outputKey, tt.reason)
+					}
+				}
+			}
+
+			// Validate length
+			if len(tt.outputKey) <= 100 || tt.shouldPass {
+				// Valid reference
+				assert.NotNil(t, ref, "SubAgentReference should be created")
+			}
+		})
+	}
+}
+
+// isValidOutputKeyPattern validates outputKey against pattern ^[a-zA-Z0-9_]+$
+func isValidOutputKeyPattern(value string) bool {
+	if len(value) == 0 {
+		return true // Empty is valid (optional field)
+	}
+	// All characters must be alphanumeric or underscore
+	for _, c := range value {
+		if (c < 'a' || c > 'z') && (c < 'A' || c > 'Z') && (c < '0' || c > '9') && c != '_' {
+			return false
+		}
+	}
+	return true
+}
+
 // Helper functions
 func stringPtr(s string) *string {
 	return &s

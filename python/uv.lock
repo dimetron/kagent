@@ -1757,7 +1757,7 @@ wheels = [
 
 [[package]]
 name = "kagent-adk"
-version = "0.3.0"
+version = "0.6.0"
 source = { editable = "packages/kagent-adk" }
 dependencies = [
     { name = "a2a-sdk" },
