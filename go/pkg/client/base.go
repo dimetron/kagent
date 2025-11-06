@@ -59,7 +59,7 @@ func NewBaseClient(baseURL string, options ...ClientOption) *BaseClient {
 	}
 
 	if client.HTTPClient == nil {
-		client.HTTPClient = &http.Client{Timeout: 30 * time.Second}
+		client.HTTPClient = &http.Client{Timeout: 900 * time.Second}
 	}
 
 	return client

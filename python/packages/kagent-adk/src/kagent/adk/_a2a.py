@@ -65,7 +65,9 @@ class KAgentApp:
     def build(self) -> FastAPI:
         token_service = KAgentTokenService(self.app_name)
         http_client = httpx.AsyncClient(  # TODO: add user  and agent headers
-            base_url=kagent_url_override or self.kagent_url, event_hooks=token_service.event_hooks()
+            base_url=kagent_url_override or self.kagent_url,
+            event_hooks=token_service.event_hooks(),
+            timeout=httpx.Timeout(900.0),  # 15 minutes timeout matching nginx config
         )
         session_service = KAgentSessionService(http_client)
 

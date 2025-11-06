@@ -95,11 +95,13 @@ func (a *a2aReconciler) ReconcileAgentDeletion(
 func debugOpt() a2aclient.Option {
 	debugAddr := os.Getenv("KAGENT_A2A_DEBUG_ADDR")
 	if debugAddr != "" {
-		client := new(http.Client)
-		client.Transport = &http.Transport{
-			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-				var zeroDialer net.Dialer
-				return zeroDialer.DialContext(ctx, network, debugAddr)
+		client := &http.Client{
+			Timeout: 900 * time.Second,
+			Transport: &http.Transport{
+				DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+					var zeroDialer net.Dialer
+					return zeroDialer.DialContext(ctx, network, debugAddr)
+				},
 			},
 		}
 		return a2aclient.WithHTTPClient(client)

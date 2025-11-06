@@ -45,7 +45,7 @@ func main() {
 	rootCmd.PersistentFlags().StringVarP(&cfg.Namespace, "namespace", "n", "kagent", "Namespace")
 	rootCmd.PersistentFlags().StringVarP(&cfg.OutputFormat, "output-format", "o", "table", "Output format")
 	rootCmd.PersistentFlags().BoolVarP(&cfg.Verbose, "verbose", "v", false, "Verbose output")
-	rootCmd.PersistentFlags().DurationVar(&cfg.Timeout, "timeout", 300*time.Second, "Timeout")
+	rootCmd.PersistentFlags().DurationVar(&cfg.Timeout, "timeout", 900*time.Second, "Timeout")
 	installCfg := &cli.InstallCfg{
 		Config: cfg,
 	}

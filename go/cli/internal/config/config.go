@@ -46,7 +46,7 @@ func Init() error {
 	viper.SetDefault("kagent_url", "http://localhost:8083")
 	viper.SetDefault("output_format", "table")
 	viper.SetDefault("namespace", "kagent")
-	viper.SetDefault("timeout", 300*time.Second)
+	viper.SetDefault("timeout", 900*time.Second)
 	viper.MustBindEnv("USER_ID")
 
 	if err := viper.ReadInConfig(); err != nil {

@@ -50,7 +50,10 @@ class KAgentApp:
         self.tracing = tracing
 
     def build(self) -> FastAPI:
-        http_client = httpx.AsyncClient(base_url=self.config.url)
+        http_client = httpx.AsyncClient(
+            base_url=self.config.url,
+            timeout=httpx.Timeout(900.0),  # 15 minutes timeout matching nginx config
+        )
 
         agent_executor = CrewAIAgentExecutor(
             crew=self._crew,

@@ -234,13 +234,13 @@ export default function ChatInterface({ selectedAgentName, selectedNamespace, se
 
         let timeoutTimer: NodeJS.Timeout | null = null;
         let streamActive = true;
-        const streamTimeout = 600000; // 10 minutes
+        const streamTimeout = 900000; // 30 minutes
         
         // Timeout handler
         const handleTimeout = () => {
           if (streamActive) {
-            console.error("⏰ Stream timeout - no events received for 10 minutes");
-            toast.error("⏰ Stream timed out - no events received for 10 minutes");
+            console.error("⏰ Stream timeout - no events received for 15 minutes");
+            toast.error("⏰ Stream timed out - no events received for 15 minutes");
             streamActive = false;
             if (abortControllerRef.current) abortControllerRef.current.abort();
           }

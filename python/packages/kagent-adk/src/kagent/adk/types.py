@@ -5,7 +5,7 @@ import httpx
 from google.adk.agents import Agent
 from google.adk.agents.base_agent import BaseAgent
 from google.adk.agents.llm_agent import ToolUnion
-from google.adk.agents.remote_a2a_agent import AGENT_CARD_WELL_KNOWN_PATH, DEFAULT_TIMEOUT, RemoteA2aAgent
+from google.adk.agents.remote_a2a_agent import AGENT_CARD_WELL_KNOWN_PATH, RemoteA2aAgent
 from google.adk.models.anthropic_llm import Claude as ClaudeLLM
 from google.adk.models.google_llm import Gemini as GeminiLLM
 from google.adk.models.lite_llm import LiteLlm
@@ -36,7 +36,7 @@ class RemoteAgentConfig(BaseModel):
     name: str
     url: str
     headers: dict[str, Any] | None = None
-    timeout: float = DEFAULT_TIMEOUT
+    timeout: float = 900.0  # 15 minutes timeout matching nginx config
     description: str = ""
 
 

@@ -103,7 +103,7 @@ type Config struct {
 	Streaming struct {
 		MaxBufSize     resource.QuantityValue `default:"1Mi"`
 		InitialBufSize resource.QuantityValue `default:"4Ki"`
-		Timeout        time.Duration          `default:"60s"`
+		Timeout        time.Duration          `default:"900s"`
 	}
 	LeaderElection     bool
 	ProbeAddr          string
@@ -148,7 +148,7 @@ func (cfg *Config) SetFlags(commandLine *flag.FlagSet) {
 
 	commandLine.Var(&cfg.Streaming.MaxBufSize, "streaming-max-buf-size", "The maximum size of the streaming buffer.")
 	commandLine.Var(&cfg.Streaming.InitialBufSize, "streaming-initial-buf-size", "The initial size of the streaming buffer.")
-	commandLine.DurationVar(&cfg.Streaming.Timeout, "streaming-timeout", 60*time.Second, "The timeout for the streaming connection.")
+	commandLine.DurationVar(&cfg.Streaming.Timeout, "streaming-timeout", 900*time.Second, "The timeout for the streaming connection.")
 }
 
 type BootstrapConfig struct {

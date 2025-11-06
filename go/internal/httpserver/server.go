@@ -89,8 +89,11 @@ func (s *HTTPServer) Start(ctx context.Context) error {
 
 	// Create HTTP server
 	s.httpServer = &http.Server{
-		Addr:    s.config.BindAddr,
-		Handler: s.router,
+		Addr:         s.config.BindAddr,
+		Handler:      s.router,
+		ReadTimeout:  900 * time.Second,
+		WriteTimeout: 900 * time.Second,
+		IdleTimeout:  120 * time.Second,
 	}
 
 	// Start the server in a separate goroutine

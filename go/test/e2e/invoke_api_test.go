@@ -702,7 +702,7 @@ func TestE2EInvokeSTSIntegration(t *testing.T) {
 
 	a2aURL := a2aUrl("kagent", "test-sts-agent")
 	a2aClient, err := a2aclient.NewA2AClient(a2aURL,
-		a2aclient.WithTimeout(60*time.Second),
+		a2aclient.WithTimeout(900*time.Second),
 		a2aclient.WithHTTPClient(httpClient))
 	require.NoError(t, err)
 

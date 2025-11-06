@@ -80,7 +80,10 @@ class KAgentApp:
         """
 
         # Create HTTP client for KAgent API
-        http_client = httpx.AsyncClient(base_url=self.config.url)
+        http_client = httpx.AsyncClient(
+            base_url=self.config.url,
+            timeout=httpx.Timeout(900.0),  # 15 minutes timeout matching nginx config
+        )
 
         # Create agent executor
         agent_executor = LangGraphAgentExecutor(
