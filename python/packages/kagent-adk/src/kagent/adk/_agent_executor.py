@@ -5,7 +5,7 @@ import inspect
 import logging
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Awaitable, Callable, Optional
+from typing import Any, Awaitable, Callable
 
 from a2a.server.agent_execution import AgentExecutor
 from a2a.server.agent_execution.context import RequestContext
@@ -25,7 +25,6 @@ from google.adk.events import Event, EventActions
 from google.adk.runners import Runner
 from google.adk.utils.context_utils import Aclosing
 from opentelemetry import trace
-from pydantic import BaseModel
 from typing_extensions import override
 
 from kagent.core.a2a import TaskResultAggregator, get_kagent_metadata_key
@@ -35,53 +34,35 @@ from .converters.request_converter import convert_a2a_request_to_adk_run_args
 
 logger = logging.getLogger("kagent_adk." + __name__)
 
-
-class A2aAgentExecutorConfig(BaseModel):
-    """Configuration for the A2aAgentExecutor."""
-
-    pass
+HEARTBEAT_INTERVAL_SECONDS = 15
 
 
-# This class is a copy of the A2aAgentExecutor class in the ADK sdk,
-# with the following changes:
-# - The runner is ALWAYS a callable that returns a Runner instance
-# - The runner is cleaned up at the end of the execution
 class A2aAgentExecutor(AgentExecutor):
-    """An AgentExecutor that runs an ADK Agent against an A2A request and
-    publishes updates to an event queue.
+    """Executes ADK agents in response to A2A requests.
+    
+    This executor:
+    - Accepts a callable that returns a Runner instance
+    - Converts A2A requests to ADK format
+    - Streams events back to the A2A event queue
+    - Sends periodic heartbeats for long-running operations
     """
 
-    def __init__(
-        self,
-        *,
-        runner: Callable[..., Runner | Awaitable[Runner]],
-        config: Optional[A2aAgentExecutorConfig] = None,
-    ):
+    def __init__(self, *, runner: Callable[..., Runner | Awaitable[Runner]]):
         super().__init__()
         self._runner = runner
-        self._config = config
 
     async def _resolve_runner(self) -> Runner:
-        """Resolve the runner, handling cases where it's a callable that returns a Runner."""
-        if callable(self._runner):
-            # Call the function to get the runner
-            result = self._runner()
+        """Resolve the runner callable to a Runner instance."""
+        if not callable(self._runner):
+            raise TypeError(f"Runner must be callable, got {type(self._runner)}")
 
-            # Handle async callables
-            if inspect.iscoroutine(result):
-                resolved_runner = await result
-            else:
-                resolved_runner = result
+        result = self._runner()
+        runner = await result if inspect.iscoroutine(result) else result
 
-            # Ensure we got a Runner instance
-            if not isinstance(resolved_runner, Runner):
-                raise TypeError(f"Callable must return a Runner instance, got {type(resolved_runner)}")
+        if not isinstance(runner, Runner):
+            raise TypeError(f"Callable must return a Runner instance, got {type(runner)}")
 
-            return resolved_runner
-
-        raise TypeError(
-            f"Runner must be a Runner instance or a callable that returns a Runner, got {type(self._runner)}"
-        )
+        return runner
 
     @override
     async def cancel(self, context: RequestContext, event_queue: EventQueue):
@@ -90,63 +71,22 @@ class A2aAgentExecutor(AgentExecutor):
         raise NotImplementedError("Cancellation is not supported")
 
     @override
-    async def execute(
-        self,
-        context: RequestContext,
-        event_queue: EventQueue,
-    ):
-        """Executes an A2A request and publishes updates to the event queue
-        specified. It runs as following:
-        * Takes the input from the A2A request
-        * Convert the input to ADK input content, and runs the ADK agent
-        * Collects output events of the underlying ADK Agent
-        * Converts the ADK output events into A2A task updates
-        * Publishes the updates back to A2A server via event queue
-        """
+    async def execute(self, context: RequestContext, event_queue: EventQueue):
+        """Execute an A2A request and stream updates to the event queue."""
         if not context.message:
             raise ValueError("A2A request must have a message")
 
-        # for new task, create a task submitted event
         if not context.current_task:
-            await event_queue.enqueue_event(
-                TaskStatusUpdateEvent(
-                    task_id=context.task_id,
-                    status=TaskStatus(
-                        state=TaskState.submitted,
-                        message=context.message,
-                        timestamp=datetime.now(timezone.utc).isoformat(),
-                    ),
-                    context_id=context.context_id,
-                    final=False,
-                )
+            await self._publish_status_update(
+                event_queue, context, TaskState.submitted, message=context.message
             )
 
-        # Handle the request and publish updates to the event queue
         runner = await self._resolve_runner()
         try:
             await self._handle_request(context, event_queue, runner)
         except Exception as e:
             logger.error("Error handling A2A request: %s", e, exc_info=True)
-            # Publish failure event
-            try:
-                await event_queue.enqueue_event(
-                    TaskStatusUpdateEvent(
-                        task_id=context.task_id,
-                        status=TaskStatus(
-                            state=TaskState.failed,
-                            timestamp=datetime.now(timezone.utc).isoformat(),
-                            message=Message(
-                                message_id=str(uuid.uuid4()),
-                                role=Role.agent,
-                                parts=[Part(TextPart(text=str(e)))],
-                            ),
-                        ),
-                        context_id=context.context_id,
-                        final=True,
-                    )
-                )
-            except Exception as enqueue_error:
-                logger.error("Failed to publish failure event: %s", enqueue_error, exc_info=True)
+            await self._publish_failure(event_queue, context, e)
 
     async def _handle_request(
         self,
@@ -154,77 +94,204 @@ class A2aAgentExecutor(AgentExecutor):
         event_queue: EventQueue,
         runner: Runner,
     ):
-        # Convert the a2a request to ADK run args
         run_args = convert_a2a_request_to_adk_run_args(context)
-
-        # ensure the session exists
         session = await self._prepare_session(context, run_args, runner)
 
-        # set request headers to session state
-        headers = context.call_context.state.get("headers", {})
-        state_changes = {
-            "headers": headers,
-        }
+        # Store request headers in session state
+        await self._update_session_headers(runner, session, context)
 
-        actions_with_update = EventActions(state_delta=state_changes)
-        system_event = Event(
-            invocation_id="header_update",
-            author="system",
-            actions=actions_with_update,
-        )
+        # Set telemetry attributes
+        self._set_trace_attributes(context, run_args)
 
-        await runner.session_service.append_event(session, system_event)
-
-        current_span = trace.get_current_span()
-        if run_args["user_id"]:
-            current_span.set_attribute("kagent.user_id", run_args["user_id"])
-        if context.task_id:
-            current_span.set_attribute("gen_ai.task.id", context.task_id)
-        if run_args["session_id"]:
-            current_span.set_attribute("gen_ai.converstation.id", run_args["session_id"])
-
-        # create invocation context
         invocation_context = runner._new_invocation_context(
             session=session,
             new_message=run_args["new_message"],
             run_config=run_args["run_config"],
         )
 
-        # publish the task working event
+        # Publish initial working status
+        await self._publish_status_update(
+            event_queue,
+            context,
+            TaskState.working,
+            metadata=self._create_metadata(runner, run_args),
+        )
+
+        task_result_aggregator = TaskResultAggregator()
+        heartbeat_task = asyncio.create_task(
+            self._send_heartbeat_updates(event_queue, context, runner, run_args)
+        )
+
+        try:
+            async with Aclosing(runner.run_async(**run_args)) as agen:
+                async for adk_event in agen:
+                    for a2a_event in convert_event_to_a2a_events(
+                        adk_event, invocation_context, context.task_id, context.context_id
+                    ):
+                        task_result_aggregator.process_event(a2a_event)
+                        await event_queue.enqueue_event(a2a_event)
+        finally:
+            heartbeat_task.cancel()
+            try:
+                await heartbeat_task
+            except asyncio.CancelledError:
+                pass
+
+        await self._publish_final_result(event_queue, context, task_result_aggregator)
+
+    async def _prepare_session(self, context: RequestContext, run_args: dict[str, Any], runner: Runner):
+        """Get or create a session for the request."""
+        session = await runner.session_service.get_session(
+            app_name=runner.app_name,
+            user_id=run_args["user_id"],
+            session_id=run_args["session_id"],
+        )
+
+        if session is None:
+            session_name = self._extract_session_name(context.message)
+            session = await runner.session_service.create_session(
+                app_name=runner.app_name,
+                user_id=run_args["user_id"],
+                state={"session_name": session_name},
+                session_id=run_args["session_id"],
+            )
+            run_args["session_id"] = session.id
+
+        return session
+
+    def _extract_session_name(self, message: Message | None) -> str | None:
+        """Extract session name from the first text part of a message."""
+        if not message or not message.parts:
+            return None
+
+        for part in message.parts:
+            if isinstance(part, Part):
+                root_part = part.root
+                if isinstance(root_part, TextPart) and root_part.text:
+                    text = root_part.text.strip()
+                    return text[:20] + ("..." if len(text) > 20 else "")
+
+        return None
+
+    async def _send_heartbeat_updates(
+        self,
+        event_queue: EventQueue,
+        context: RequestContext,
+        runner: Runner,
+        run_args: dict[str, Any],
+    ):
+        """Send periodic heartbeat updates for long-running operations."""
+        heartbeat_count = 0
+
+        try:
+            while True:
+                await asyncio.sleep(HEARTBEAT_INTERVAL_SECONDS)
+                heartbeat_count += 1
+
+                metadata = self._create_metadata(runner, run_args)
+                metadata.update({
+                    get_kagent_metadata_key("heartbeat"): "true",
+                    get_kagent_metadata_key("heartbeat_count"): str(heartbeat_count),
+                    get_kagent_metadata_key("heartbeat_message"): "Agent is working on your request...",
+                })
+
+                await self._publish_status_update(
+                    event_queue, context, TaskState.working, metadata=metadata
+                )
+
+                logger.debug(
+                    "Sent heartbeat #%d for task %s (session: %s)",
+                    heartbeat_count,
+                    context.task_id,
+                    run_args["session_id"],
+                )
+
+        except asyncio.CancelledError:
+            logger.debug(
+                "Heartbeat stopped after %d updates for task %s", heartbeat_count, context.task_id
+            )
+            raise
+
+    async def _update_session_headers(self, runner: Runner, session: Any, context: RequestContext):
+        """Store request headers in session state."""
+        headers = context.call_context.state.get("headers", {})
+        system_event = Event(
+            invocation_id="header_update",
+            author="system",
+            actions=EventActions(state_delta={"headers": headers}),
+        )
+        await runner.session_service.append_event(session, system_event)
+
+    def _set_trace_attributes(self, context: RequestContext, run_args: dict[str, Any]):
+        """Set OpenTelemetry trace attributes."""
+        current_span = trace.get_current_span()
+        if run_args["user_id"]:
+            current_span.set_attribute("kagent.user_id", run_args["user_id"])
+        if context.task_id:
+            current_span.set_attribute("gen_ai.task.id", context.task_id)
+        if run_args["session_id"]:
+            current_span.set_attribute("gen_ai.conversation.id", run_args["session_id"])
+
+    def _create_metadata(self, runner: Runner, run_args: dict[str, Any]) -> dict[str, str]:
+        """Create metadata dictionary for status updates."""
+        return {
+            get_kagent_metadata_key("app_name"): runner.app_name,
+            get_kagent_metadata_key("user_id"): run_args["user_id"],
+            get_kagent_metadata_key("session_id"): run_args["session_id"],
+        }
+
+    async def _publish_status_update(
+        self,
+        event_queue: EventQueue,
+        context: RequestContext,
+        state: TaskState,
+        *,
+        message: Message | None = None,
+        metadata: dict[str, str] | None = None,
+        final: bool = False,
+    ):
+        """Publish a task status update event."""
         await event_queue.enqueue_event(
             TaskStatusUpdateEvent(
                 task_id=context.task_id,
                 status=TaskStatus(
-                    state=TaskState.working,
+                    state=state,
+                    message=message,
                     timestamp=datetime.now(timezone.utc).isoformat(),
                 ),
                 context_id=context.context_id,
-                final=False,
-                metadata={
-                    get_kagent_metadata_key("app_name"): runner.app_name,
-                    get_kagent_metadata_key("user_id"): run_args["user_id"],
-                    get_kagent_metadata_key("session_id"): run_args["session_id"],
-                },
+                final=final,
+                metadata=metadata,
             )
         )
 
-        task_result_aggregator = TaskResultAggregator()
-        async with Aclosing(runner.run_async(**run_args)) as agen:
-            async for adk_event in agen:
-                for a2a_event in convert_event_to_a2a_events(
-                    adk_event, invocation_context, context.task_id, context.context_id
-                ):
-                    task_result_aggregator.process_event(a2a_event)
-                    await event_queue.enqueue_event(a2a_event)
+    async def _publish_failure(self, event_queue: EventQueue, context: RequestContext, error: Exception):
+        """Publish a task failure event."""
+        try:
+            await self._publish_status_update(
+                event_queue,
+                context,
+                TaskState.failed,
+                message=Message(
+                    message_id=str(uuid.uuid4()),
+                    role=Role.agent,
+                    parts=[Part(TextPart(text=str(error)))],
+                ),
+                final=True,
+            )
+        except Exception as e:
+            logger.error("Failed to publish failure event: %s", e, exc_info=True)
 
-        # publish the task result event - this is final
+    async def _publish_final_result(
+        self, event_queue: EventQueue, context: RequestContext, aggregator: TaskResultAggregator
+    ):
+        """Publish the final task result."""
         if (
-            task_result_aggregator.task_state == TaskState.working
-            and task_result_aggregator.task_status_message is not None
-            and task_result_aggregator.task_status_message.parts
+            aggregator.task_state == TaskState.working
+            and aggregator.task_status_message is not None
+            and aggregator.task_status_message.parts
         ):
-            # if task is still working properly, publish the artifact update event as
-            # the final result according to a2a protocol.
+            # Task completed successfully, publish artifact
             await event_queue.enqueue_event(
                 TaskArtifactUpdateEvent(
                     task_id=context.task_id,
@@ -232,68 +299,17 @@ class A2aAgentExecutor(AgentExecutor):
                     context_id=context.context_id,
                     artifact=Artifact(
                         artifact_id=str(uuid.uuid4()),
-                        parts=task_result_aggregator.task_status_message.parts,
+                        parts=aggregator.task_status_message.parts,
                     ),
                 )
             )
-            # public the final status update event
-            await event_queue.enqueue_event(
-                TaskStatusUpdateEvent(
-                    task_id=context.task_id,
-                    status=TaskStatus(
-                        state=TaskState.completed,
-                        timestamp=datetime.now(timezone.utc).isoformat(),
-                    ),
-                    context_id=context.context_id,
-                    final=True,
-                )
-            )
+            await self._publish_status_update(event_queue, context, TaskState.completed, final=True)
         else:
-            await event_queue.enqueue_event(
-                TaskStatusUpdateEvent(
-                    task_id=context.task_id,
-                    status=TaskStatus(
-                        state=task_result_aggregator.task_state,
-                        timestamp=datetime.now(timezone.utc).isoformat(),
-                        message=task_result_aggregator.task_status_message,
-                    ),
-                    context_id=context.context_id,
-                    final=True,
-                )
+            # Task failed or has no result
+            await self._publish_status_update(
+                event_queue,
+                context,
+                aggregator.task_state,
+                message=aggregator.task_status_message,
+                final=True,
             )
-
-    async def _prepare_session(self, context: RequestContext, run_args: dict[str, Any], runner: Runner):
-        session_id = run_args["session_id"]
-        # create a new session if not exists
-        user_id = run_args["user_id"]
-        session = await runner.session_service.get_session(
-            app_name=runner.app_name,
-            user_id=user_id,
-            session_id=session_id,
-        )
-
-        if session is None:
-            # Extract session name from the first TextPart (like the UI does)
-            session_name = None
-            if context.message and context.message.parts:
-                for part in context.message.parts:
-                    # A2A parts have a .root property that contains the actual part (TextPart, FilePart, etc.)
-                    if isinstance(part, Part):
-                        root_part = part.root
-                        if isinstance(root_part, TextPart) and root_part.text:
-                            # Take first 20 chars + "..." if longer (matching UI behavior)
-                            text = root_part.text.strip()
-                            session_name = text[:20] + ("..." if len(text) > 20 else "")
-                            break
-
-            session = await runner.session_service.create_session(
-                app_name=runner.app_name,
-                user_id=user_id,
-                state={"session_name": session_name},
-                session_id=session_id,
-            )
-
-            # Update run_args with the new session_id
-            run_args["session_id"] = session.id
-
-        return session
