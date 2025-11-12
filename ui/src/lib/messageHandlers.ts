@@ -209,6 +209,12 @@ export type MessageHandlers = {
   setStreamingContent: (updater: (prev: string) => string) => void;
   setTokenStats: (updater: (prev: TokenStats) => TokenStats) => void;
   setChatStatus?: (status: ChatStatus) => void;
+  setCurrentProgress?: (progress: {
+    message: string;
+    progress?: number;
+    total?: number;
+    percentage?: number;
+  } | null) => void;
   agentContext?: {
     namespace: string;
     agentName: string;
@@ -326,6 +332,13 @@ export const createMessageHandlers = (handlers: MessageHandlers) => {
 
       updateTokenStatsFromMetadata(adkMetadata);
 
+      // Check if this is a progress update
+      const isProgressUpdate = statusUpdate.metadata?.mcp_progress === true;
+      
+      if (isProgressUpdate) {
+        console.log('[MCP Progress] Status update marked as progress:', statusUpdate.metadata);
+      }
+
       // If the status update has a message, process it
       if (statusUpdate.status.message) {
         const message = statusUpdate.status.message;
@@ -337,11 +350,41 @@ export const createMessageHandlers = (handlers: MessageHandlers) => {
 
         for (const part of message.parts) {
 
-          if (isTextPart(part)) {
+          if (isDataPart(part) && part.metadata?.mcp_progress_update === true) {
+            // This is a progress update - extract progress data
+            const progressData = part.data as {
+              message: string;
+              progress?: number;
+              total?: number;
+              percentage?: number;
+            };
+
+            console.log('[MCP Progress] Detected progress update:', progressData);
+
+            if (handlers.setCurrentProgress) {
+              handlers.setCurrentProgress({
+                message: progressData.message,
+                progress: progressData.progress,
+                total: progressData.total,
+                percentage: progressData.percentage,
+              });
+              console.log('[MCP Progress] Progress state updated');
+            } else {
+              console.warn('[MCP Progress] setCurrentProgress handler not available');
+            }
+            
+            // Skip adding progress updates to message history
+            continue;
+          } else if (isTextPart(part)) {
             const textContent = part.text || "";
             const source = getSourceFromMetadata(adkMetadata, defaultAgentSource);
 
             if (statusUpdate.final) {
+              // Clear progress when task is final
+              if (handlers.setCurrentProgress) {
+                handlers.setCurrentProgress(null);
+              }
+              
               const displayMessage = createMessage(
                 textContent,
                 source,
@@ -356,8 +399,11 @@ export const createMessageHandlers = (handlers: MessageHandlers) => {
                 handlers.setChatStatus("ready");
               }
             } else {
-              handlers.setIsStreaming(true);
-              handlers.setStreamingContent(prevContent => prevContent + textContent);
+              // Don't stream if this is a progress update
+              if (!isProgressUpdate) {
+                handlers.setIsStreaming(true);
+                handlers.setStreamingContent(prevContent => prevContent + textContent);
+              }
               if (handlers.setChatStatus) {
                 handlers.setChatStatus("generating_response");
               }

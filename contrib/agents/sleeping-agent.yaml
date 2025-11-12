@@ -1,0 +1,29 @@
+apiVersion: kagent.dev/v1alpha2
+kind: Agent
+metadata:
+  name: sleeping-agent
+  namespace: kagent
+spec:
+  declarative:
+    modelConfig: default-model-config
+    stream: true
+    systemMessage: |-
+      You're a helpful agent, made by the kagent team.
+
+      # Instructions
+         call sleep_tool with latest user value
+
+      # Response format:
+          - ALWAYS format your response as Markdown
+          - Your response will include a summary of actions you took and an explanation of the result
+          - If you created any artifacts such as files or resources, you will include those in your response as well
+    tools:
+    - mcpServer:
+        apiGroup: kagent.dev
+        kind: RemoteMCPServer
+        name: kagent-tool-server
+        toolNames:
+        - sleep_tool
+      type: McpServer
+  description: calls sleep_tool with latest user value
+  type: Declarative

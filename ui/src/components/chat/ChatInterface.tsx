@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import ChatMessage from "@/components/chat/ChatMessage";
 import StreamingMessage from "./StreamingMessage";
+import ProgressDisplay from "./ProgressDisplay";
 import TokenStatsDisplay from "./TokenStats";
 import { ConnectionStatus, type ConnectionHealth } from "./ConnectionStatus";
 import type { TokenStats, Session, ChatStatus } from "@/types";
@@ -46,6 +47,12 @@ export default function ChatInterface({ selectedAgentName, selectedNamespace, se
   const [streamingMessages, setStreamingMessages] = useState<Message[]>([]);
   const [streamingContent, setStreamingContent] = useState<string>("");
   const [isStreaming, setIsStreaming] = useState<boolean>(false);
+  const [currentProgress, setCurrentProgress] = useState<{
+    message: string;
+    progress?: number;
+    total?: number;
+    percentage?: number;
+  } | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const isFirstAssistantChunkRef = useRef(true);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -64,6 +71,7 @@ export default function ChatInterface({ selectedAgentName, selectedNamespace, se
     setStreamingContent,
     setTokenStats,
     setChatStatus,
+    setCurrentProgress,
     agentContext: {
       namespace: selectedNamespace,
       agentName: selectedAgentName
@@ -297,13 +305,13 @@ export default function ChatInterface({ selectedAgentName, selectedNamespace, se
 
         let timeoutTimer: NodeJS.Timeout | null = null;
         let streamActive = true;
-        const streamTimeout = 1800000; // 30 minutes
+        const streamTimeout = 600000; // 10 minutes (with keepalive)
         
         // Timeout handler
         const handleTimeout = () => {
           if (streamActive) {
-            console.error("⏰ Stream timeout - no events received for 30 minutes");
-            toast.error("⏰ Stream timed out - no events received for 30 minutes");
+            console.error("⏰ Stream timeout - no events received for 10 minutes");
+            toast.error("⏰ Stream timed out - no events received for 10 minutes");
             streamActive = false;
             if (abortControllerRef.current) abortControllerRef.current.abort();
           }
@@ -455,6 +463,15 @@ export default function ChatInterface({ selectedAgentName, selectedNamespace, se
                 {isStreaming && (
                   <StreamingMessage
                     content={streamingContent}
+                  />
+                )}
+
+                {currentProgress && (
+                  <ProgressDisplay
+                    message={currentProgress.message}
+                    progress={currentProgress.progress}
+                    total={currentProgress.total}
+                    percentage={currentProgress.percentage}
                   />
                 )}
               </>

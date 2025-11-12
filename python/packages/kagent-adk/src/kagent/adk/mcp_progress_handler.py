@@ -15,7 +15,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from a2a.server.events.event_queue import EventQueue
-from a2a.types import Message, Part, Role, TaskState, TaskStatus, TaskStatusUpdateEvent, TextPart
+from a2a.types import DataPart, Message, Part, Role, TaskState, TaskStatus, TaskStatusUpdateEvent, TextPart
 
 logger = logging.getLogger(__name__)
 
@@ -76,17 +76,28 @@ async def send_mcp_progress_event(
 
     event_queue, task_id, context_id = context
 
-    # Build progress message text
+    # Build progress message text (without emoji - UI will add it)
     progress_text = message
-    if progress is not None and total is not None:
-        percentage = (progress / total * 100) if total > 0 else 0
-        progress_text = f"{message} ({percentage:.1f}%)"
 
-    # Create A2A message
+    # Create A2A message with DataPart for structured progress
     a2a_message = Message(
         message_id=str(uuid.uuid4()),
         role=Role.agent,
-        parts=[Part(TextPart(text=f"🔄 {progress_text}"))],
+        parts=[
+            Part(
+                DataPart(
+                    data={
+                        "message": message,
+                        "progress": progress,
+                        "total": total,
+                        "percentage": (progress / total * 100)
+                        if (progress is not None and total is not None and total > 0)
+                        else None,
+                    },
+                    metadata={"mcp_progress_update": True},
+                )
+            )
+        ],
     )
 
     # Build event metadata
@@ -118,7 +129,12 @@ async def send_mcp_progress_event(
         await event_queue.enqueue_event(event)
         logger.debug(f"Sent MCP progress event: {progress_text}")
     except Exception as e:
-        logger.warning(f"Failed to send MCP progress event: {e}")
+        # Queue might be closed if tool execution outlives the agent execution
+        # This is expected for long-running async tools
+        if "closed" in str(e).lower():
+            logger.debug(f"Event queue closed, skipping progress event: {progress_text}")
+        else:
+            logger.warning(f"Failed to send MCP progress event: {e}")
 
 
 def send_mcp_progress_event_sync(
