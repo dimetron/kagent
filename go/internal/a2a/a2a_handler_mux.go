@@ -48,7 +48,8 @@ func (a *handlerMux) SetAgentHandler(
 	client *client.A2AClient,
 	card server.AgentCard,
 ) error {
-	srv, err := server.NewA2AServer(card, NewPassthroughManager(client), server.WithMiddleWare(authimpl.NewA2AAuthenticator(a.authenticator)))
+	// Use KeepAliveManager to inject keep-alive events during long-running tasks
+	srv, err := server.NewA2AServer(card, NewKeepAliveManager(client), server.WithMiddleWare(authimpl.NewA2AAuthenticator(a.authenticator)))
 	if err != nil {
 		return fmt.Errorf("failed to create A2A server: %w", err)
 	}

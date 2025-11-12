@@ -9,6 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import ChatMessage from "@/components/chat/ChatMessage";
 import StreamingMessage from "./StreamingMessage";
 import TokenStatsDisplay from "./TokenStats";
+import { ConnectionStatus, type ConnectionHealth } from "./ConnectionStatus";
 import type { TokenStats, Session, ChatStatus } from "@/types";
 import StatusDisplay from "./StatusDisplay";
 import { createSession, getSessionTasks, checkSessionExists } from "@/app/actions/sessions";
@@ -51,6 +52,11 @@ export default function ChatInterface({ selectedAgentName, selectedNamespace, se
   const [sessionNotFound, setSessionNotFound] = useState<boolean>(false);
   const isCreatingSessionRef = useRef<boolean>(false);
   const [isFirstMessage, setIsFirstMessage] = useState<boolean>(!sessionId);
+
+  // Connection health monitoring
+  const [connectionHealth, setConnectionHealth] = useState<ConnectionHealth>('healthy');
+  const [isOnline, setIsOnline] = useState<boolean>(true);
+  const lastEventTimeRef = useRef<number>(Date.now());
 
   const { handleMessageEvent } = createMessageHandlers({
     setMessages: setStreamingMessages,
@@ -128,7 +134,64 @@ export default function ChatInterface({ selectedAgentName, selectedNamespace, se
     }
   }, [storedMessages, streamingMessages, streamingContent]);
 
+  // Network status monitoring
+  useEffect(() => {
+    const handleOnline = () => {
+      console.log("🌐 Network connection restored");
+      setIsOnline(true);
+      setConnectionHealth('healthy');
+      toast.success("Network connection restored");
+    };
 
+    const handleOffline = () => {
+      console.log("📡 Network connection lost");
+      setIsOnline(false);
+      setConnectionHealth('disconnected');
+      toast.warning("Network connection lost");
+    };
+
+    // Set initial state
+    setIsOnline(navigator.onLine);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Connection health monitoring based on last event time
+  useEffect(() => {
+    if (!isStreaming) {
+      setConnectionHealth('healthy');
+      return;
+    }
+
+    const healthCheckInterval = setInterval(() => {
+      if (!isOnline) {
+        setConnectionHealth('disconnected');
+        return;
+      }
+
+      const timeSinceLastEvent = Date.now() - lastEventTimeRef.current;
+      
+      // No events for 2 minutes = degraded connection
+      if (timeSinceLastEvent > 120000) {
+        setConnectionHealth('degraded');
+      }
+      // No events for 60 seconds = healthy but long-running
+      else if (timeSinceLastEvent > 60000) {
+        setConnectionHealth('healthy'); // Still healthy, just slow
+      }
+      else {
+        setConnectionHealth('healthy');
+      }
+    }, 15000); // Check every 5 seconds
+
+    return () => clearInterval(healthCheckInterval);
+  }, [isStreaming, isOnline]);
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -234,13 +297,13 @@ export default function ChatInterface({ selectedAgentName, selectedNamespace, se
 
         let timeoutTimer: NodeJS.Timeout | null = null;
         let streamActive = true;
-        const streamTimeout = 600000; // 10 minutes
+        const streamTimeout = 1800000; // 30 minutes
         
         // Timeout handler
         const handleTimeout = () => {
           if (streamActive) {
-            console.error("⏰ Stream timeout - no events received for 10 minutes");
-            toast.error("⏰ Stream timed out - no events received for 10 minutes");
+            console.error("⏰ Stream timeout - no events received for 30 minutes");
+            toast.error("⏰ Stream timed out - no events received for 30 minutes");
             streamActive = false;
             if (abortControllerRef.current) abortControllerRef.current.abort();
           }
@@ -253,9 +316,14 @@ export default function ChatInterface({ selectedAgentName, selectedNamespace, se
         };
         startTimeout();
 
+        // Reset connection health when stream starts
+        setConnectionHealth('healthy');
+        lastEventTimeRef.current = Date.now();
+
         try {
           for await (const event of stream) {
             startTimeout(); // Reset timeout after every event
+            lastEventTimeRef.current = Date.now(); // Update last event time for health monitoring
 
             try {
               handleMessageEvent(event);
@@ -278,9 +346,11 @@ export default function ChatInterface({ selectedAgentName, selectedNamespace, se
         if (error instanceof Error && error.name === "AbortError") {
           toast.info("Request cancelled");
           setChatStatus("ready");
+          setConnectionHealth('healthy');
         } else {
           toast.error(`Streaming failed: ${error instanceof Error ? error.message : "Unknown error"}`);
           setChatStatus("error");
+          setConnectionHealth('disconnected');
           setCurrentInputMessage(userMessageText);
         }
 
@@ -395,7 +465,10 @@ export default function ChatInterface({ selectedAgentName, selectedNamespace, se
 
       <div className="w-full sticky bg-secondary bottom-0 md:bottom-2 rounded-none md:rounded-lg p-4 border  overflow-hidden transition-all duration-300 ease-in-out">
         <div className="flex items-center justify-between mb-4">
-          <StatusDisplay chatStatus={chatStatus} />
+          <div className="flex items-center gap-3">
+            <StatusDisplay chatStatus={chatStatus} />
+            <ConnectionStatus health={connectionHealth} />
+          </div>
           <TokenStatsDisplay stats={tokenStats} />
         </div>
 

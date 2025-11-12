@@ -87,10 +87,15 @@ func (s *HTTPServer) Start(ctx context.Context) error {
 	// Setup routes
 	s.setupRoutes()
 
-	// Create HTTP server
+	// Create HTTP server with appropriate timeouts
+	// WriteTimeout is set to 30 minutes to support long-running streaming agent tasks
+	// A2A streaming endpoints may take extended time as agents process complex tasks
 	s.httpServer = &http.Server{
-		Addr:    s.config.BindAddr,
-		Handler: s.router,
+		Addr:         s.config.BindAddr,
+		Handler:      s.router,
+		ReadTimeout:  60 * time.Second,   // Time to read request headers and body
+		WriteTimeout: 1800 * time.Second, // 30 minutes - supports long-running A2A streams
+		IdleTimeout:  120 * time.Second,  // Time to keep idle connections open
 	}
 
 	// Start the server in a separate goroutine

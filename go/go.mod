@@ -1,6 +1,6 @@
 module github.com/kagent-dev/kagent/go
 
-go 1.25.1
+go 1.25.4
 
 require (
 	github.com/abiosoft/ishell/v2 v2.0.2
@@ -34,7 +34,7 @@ require (
 	k8s.io/utils v0.0.0-20250820121507-0af2bda4dd1d
 	sigs.k8s.io/controller-runtime v0.22.1
 	sigs.k8s.io/yaml v1.6.0
-	trpc.group/trpc-go/trpc-a2a-go v0.2.4
+	trpc.group/trpc-go/trpc-a2a-go v0.2.5
 )
 
 require (

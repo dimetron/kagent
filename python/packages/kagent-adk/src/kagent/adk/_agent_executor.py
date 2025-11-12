@@ -209,13 +209,18 @@ class A2aAgentExecutor(AgentExecutor):
         )
 
         task_result_aggregator = TaskResultAggregator()
-        async with Aclosing(runner.run_async(**run_args)) as agen:
-            async for adk_event in agen:
-                for a2a_event in convert_event_to_a2a_events(
-                    adk_event, invocation_context, context.task_id, context.context_id
-                ):
-                    task_result_aggregator.process_event(a2a_event)
-                    await event_queue.enqueue_event(a2a_event)
+
+        # Enable MCP progress forwarding
+        from .mcp_progress_handler import mcp_progress_context
+
+        async with mcp_progress_context(event_queue, context.task_id, context.context_id):
+            async with Aclosing(runner.run_async(**run_args)) as agen:
+                async for adk_event in agen:
+                    for a2a_event in convert_event_to_a2a_events(
+                        adk_event, invocation_context, context.task_id, context.context_id
+                    ):
+                        task_result_aggregator.process_event(a2a_event)
+                        await event_queue.enqueue_event(a2a_event)
 
         # publish the task result event - this is final
         if (
