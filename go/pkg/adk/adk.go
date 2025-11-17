@@ -17,6 +17,7 @@ import (
 	"github.com/kagent-dev/kagent/go/pkg/adk/converters"
 	apperrors "github.com/kagent-dev/kagent/go/pkg/adk/errors"
 	"github.com/kagent-dev/kagent/go/pkg/adk/executor"
+	"github.com/kagent-dev/kagent/go/pkg/adk/llm"
 	"github.com/kagent-dev/kagent/go/pkg/adk/session"
 	"github.com/kagent-dev/kagent/go/pkg/adk/tools"
 	"trpc.group/trpc-go/trpc-a2a-go/protocol"
@@ -31,8 +32,11 @@ type App struct {
 	TokenService    *auth.TokenService
 	Tools           []tools.Tool
 	Executor        *executor.A2AExecutor
+	ExecutorV2      *executor.A2AExecutorV2
+	LLMClient       llm.Client
 	EventConverter  *converters.EventConverter
 	router          *mux.Router
+	useLLM          bool
 }
 
 // Config represents the ADK application configuration
@@ -68,7 +72,21 @@ func NewApp(cfg *Config, agentCfg *config.AgentConfig) (*App, error) {
 	// Initialize tools
 	app.initializeTools()
 
-	// Initialize executor
+	// Try to initialize LLM client
+	llmClient, err := llm.NewClientFromConfig(agentCfg.Model)
+	if err == nil {
+		app.LLMClient = llmClient
+		app.ExecutorV2 = executor.NewA2AExecutorV2(app.SessionService, app.PathManager, app.Tools, llmClient)
+		app.useLLM = true
+		fmt.Printf("✓ LLM client initialized: %s\n", llmClient.ModelName())
+	} else {
+		// Fall back to echo executor
+		fmt.Fprintf(os.Stderr, "⚠ LLM client initialization failed: %v\n", err)
+		fmt.Fprintf(os.Stderr, "→ Using echo executor instead\n")
+		app.useLLM = false
+	}
+
+	// Initialize fallback executor
 	app.Executor = executor.NewA2AExecutor(app.SessionService, app.PathManager, app.Tools)
 
 	// Initialize event converter
@@ -170,6 +188,10 @@ func (a *App) handleInfo(w http.ResponseWriter, r *http.Request) {
 		"description": a.AgentConfig.Description,
 		"tools":       len(a.Tools),
 		"model_type":  a.AgentConfig.Model.Type(),
+		"llm_enabled": a.useLLM,
+	}
+	if a.LLMClient != nil {
+		info["model_name"] = a.LLMClient.ModelName()
 	}
 	json.NewEncoder(w).Encode(info)
 }
@@ -195,9 +217,15 @@ func (a *App) handleA2AMessage(w http.ResponseWriter, r *http.Request) {
 	eventQueue := make(chan *converters.Event, 100)
 	done := make(chan error, 1)
 
-	// Execute in background
+	// Execute in background using appropriate executor
 	go func() {
-		done <- a.Executor.Execute(r.Context(), requestCtx, eventQueue)
+		var err error
+		if a.useLLM && a.ExecutorV2 != nil {
+			err = a.ExecutorV2.Execute(r.Context(), requestCtx, eventQueue)
+		} else {
+			err = a.Executor.Execute(r.Context(), requestCtx, eventQueue)
+		}
+		done <- err
 		close(eventQueue)
 	}()
 
@@ -280,9 +308,15 @@ func (a *App) handleA2AStream(w http.ResponseWriter, r *http.Request) {
 	eventQueue := make(chan *converters.Event, 100)
 	done := make(chan error, 1)
 
-	// Execute in background
+	// Execute in background using appropriate executor
 	go func() {
-		done <- a.Executor.Execute(r.Context(), requestCtx, eventQueue)
+		var err error
+		if a.useLLM && a.ExecutorV2 != nil {
+			err = a.ExecutorV2.Execute(r.Context(), requestCtx, eventQueue)
+		} else {
+			err = a.Executor.Execute(r.Context(), requestCtx, eventQueue)
+		}
+		done <- err
 		close(eventQueue)
 	}()
 
