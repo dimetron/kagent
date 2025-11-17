@@ -1,0 +1,64 @@
+# Temporal Executor Configuration
+
+temporal:
+  # Temporal server address
+  host_port: "localhost:7233"
+
+  # Temporal namespace
+  namespace: "default"
+
+  # Task queue name for agent execution workflows
+  task_queue: "agent-execution-queue"
+
+executor:
+  # Maximum number of concurrent workflows
+  max_concurrent_workflows: 100
+
+  # Maximum number of concurrent activities
+  max_concurrent_activities: 100
+
+  # Default timeout for agent execution
+  default_timeout: 5m
+
+  # Maximum iterations for agent loop
+  max_iterations: 10
+
+  # Require approval for tool execution (HITL)
+  require_approval: false
+
+llm:
+  providers:
+    # Anthropic Claude
+    - name: anthropic
+      # API key can be set directly (not recommended for production)
+      # api_key: "sk-ant-..."
+      # Or via environment variable (recommended)
+      api_key_env: "ANTHROPIC_API_KEY"
+
+    # OpenAI GPT
+    - name: openai
+      api_key_env: "OPENAI_API_KEY"
+
+    # Add more providers as needed
+    # - name: vertexai
+    #   endpoint: "https://..."
+    #   config:
+    #     project_id: "my-project"
+    #     location: "us-central1"
+
+server:
+  # HTTP server host
+  host: "0.0.0.0"
+
+  # HTTP server port
+  port: 8080
+
+a2a:
+  # Enable A2A protocol support
+  enabled: true
+
+  # Optional webhook URL for event notifications
+  # webhook_url: "https://example.com/webhook"
+
+  # Optional authentication token
+  # auth_token_env: "A2A_AUTH_TOKEN"

@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  # Temporal server
+  temporal:
+    image: temporalio/auto-setup:1.24.2
+    container_name: temporal
+    environment:
+      - DB=postgresql
+      - DB_PORT=5432
+      - POSTGRES_USER=temporal
+      - POSTGRES_PWD=temporal
+      - POSTGRES_SEEDS=postgres
+    ports:
+      - "7233:7233"
+      - "8233:8233"  # UI
+    depends_on:
+      - postgres
+    networks:
+      - temporal-network
+
+  # Temporal UI
+  temporal-ui:
+    image: temporalio/ui:2.26.2
+    container_name: temporal-ui
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+      - TEMPORAL_CORS_ORIGINS=http://localhost:3000
+    ports:
+      - "8080:8080"
+    depends_on:
+      - temporal
+    networks:
+      - temporal-network
+
+  # PostgreSQL for Temporal
+  postgres:
+    image: postgres:16-alpine
+    container_name: temporal-postgres
+    environment:
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: temporal
+      POSTGRES_DB: temporal
+    ports:
+      - "5432:5432"
+    volumes:
+      - temporal-postgres-data:/var/lib/postgresql/data
+    networks:
+      - temporal-network
+
+  # Temporal Executor Service
+  temporal-executor:
+    build:
+      context: ../..
+      dockerfile: deployments/temporal-executor/Dockerfile
+    container_name: temporal-executor
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    ports:
+      - "8081:8080"
+    volumes:
+      - ../../config/temporal-executor.yaml:/app/config/temporal-executor.yaml:ro
+    depends_on:
+      - temporal
+    networks:
+      - temporal-network
+    restart: unless-stopped
+
+volumes:
+  temporal-postgres-data:
+
+networks:
+  temporal-network:
+    driver: bridge

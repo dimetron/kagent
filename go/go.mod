@@ -24,6 +24,7 @@ require (
 	github.com/spf13/viper v1.21.0
 	github.com/stoewer/go-strcase v1.3.1
 	github.com/stretchr/testify v1.11.1
+	go.temporal.io/sdk v1.28.1
 	go.uber.org/automaxprocs v1.6.0
 	golang.org/x/text v0.29.0
 	gorm.io/driver/postgres v1.6.0
