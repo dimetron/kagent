@@ -5,8 +5,9 @@ This package provides a Go implementation of the KAgent ADK, equivalent to the `
 - **Session Management**: HTTP-based session service integration with KAgent
 - **Tool Execution**: File operations, bash commands, skills, and artifacts
 - **Multiple Model Providers**: OpenAI, Anthropic, Google Gemini
-- **A2A Protocol Support**: Agent-to-Agent communication protocol
+- **A2A Protocol Support**: Full Agent-to-Agent communication protocol with converters
 - **Local & Production Modes**: Run agents locally or with KAgent orchestration
+- **Event Streaming**: SSE-based event streaming for real-time updates
 
 ## Architecture
 

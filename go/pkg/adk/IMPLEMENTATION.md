@@ -18,8 +18,18 @@ go/pkg/adk/                          # Core ADK package
 │   └── token.go                     # Token service for KAgent auth
 ├── config/
 │   └── types.go                     # Agent and model configurations
+├── converters/                      # **NEW** Protocol converters
+│   ├── types.go                     # Converter data types
+│   ├── part_converter.go            # A2A ↔ ADK part conversion
+│   ├── request_converter.go         # A2A → ADK request conversion
+│   ├── event_converter.go           # ADK → A2A event conversion
+│   └── README.md                    # Converter documentation
 ├── errors/
 │   └── errors.go                    # Error types and codes
+├── executor/                        # **NEW** Agent executor
+│   └── executor.go                  # A2A executor with protocol conversion
+├── examples/                        # **NEW** Example configurations
+│   └── config.json                  # Example agent config
 ├── session/
 │   ├── service.go                   # Session service interface
 │   ├── kagent_service.go            # KAgent HTTP client implementation
@@ -229,13 +239,59 @@ go/cli/internal/cli/adk/             # CLI commands
 | `PORT` | `8080` | Server bind port |
 | `LOG_LEVEL` | `INFO` | Logging level |
 
+## Converters Implementation
+
+### Overview
+The converter layer handles bidirectional translation between the A2A protocol and ADK internal representation.
+
+**Implemented Components:**
+
+1. **Part Converter** (`converters/part_converter.go`)
+   - A2A ↔ ADK part conversion
+   - Supports text, files, function calls/responses, code execution
+   - Handles base64 encoding/decoding for binary data
+
+2. **Request Converter** (`converters/request_converter.go`)
+   - Converts A2A SendMessageParams to ADK RunArgs
+   - Extracts user ID, session ID from context
+   - Converts message history
+
+3. **Event Converter** (`converters/event_converter.go`)
+   - Converts ADK events to A2A StreamingMessageEvent
+   - State machine for task states (WORKING, COMPLETED, FAILED, etc.)
+   - Streaming event conversion with buffered channels
+
+4. **A2A Executor** (`executor/executor.go`)
+   - Orchestrates agent execution with protocol conversion
+   - Session management integration
+   - Tool execution coordination
+   - Event queue management
+
+### A2A Endpoints
+
+The ADK app now exposes A2A-compatible endpoints:
+
+- **POST /a2a/message** - Send message and get response
+- **POST /a2a/stream** - Send message and stream events (SSE)
+
+### Event Flow
+
+```
+A2A Request → RequestConverter → RunArgs → Agent Execution
+                                                ↓
+                                          ADK Events
+                                                ↓
+                                        EventConverter
+                                                ↓
+                                      A2A StreamingEvents
+```
+
 ## Not Yet Implemented
 
 ### High Priority
-1. **Converters**: A2A ↔ ADK protocol conversion
-2. **Agent Executor**: A2aAgentExecutor implementation
-3. **Artifact Tools**: Stage and return artifacts
-4. **In-Memory Session Service**: For local mode
+1. **Artifact Tools**: Stage and return artifacts
+2. **In-Memory Session Service**: For local mode
+3. **LLM Integration**: Actual model calling (currently echo response)
 
 ### Medium Priority
 1. **Code Executor**: Sandboxed code execution

@@ -1,0 +1,14 @@
+{
+  "model": {
+    "type": "OpenAI",
+    "model": "gpt-4",
+    "temperature": 0.7,
+    "max_tokens": 2000
+  },
+  "description": "Example ADK agent with A2A protocol support",
+  "instruction": "You are a helpful AI assistant. You can read and write files, execute bash commands, and use various skills to help users.",
+  "execute_code": true,
+  "http_tools": [],
+  "sse_tools": [],
+  "remote_agents": []
+}

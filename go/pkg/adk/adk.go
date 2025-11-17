@@ -14,9 +14,12 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/kagent-dev/kagent/go/pkg/adk/auth"
 	"github.com/kagent-dev/kagent/go/pkg/adk/config"
+	"github.com/kagent-dev/kagent/go/pkg/adk/converters"
 	apperrors "github.com/kagent-dev/kagent/go/pkg/adk/errors"
+	"github.com/kagent-dev/kagent/go/pkg/adk/executor"
 	"github.com/kagent-dev/kagent/go/pkg/adk/session"
 	"github.com/kagent-dev/kagent/go/pkg/adk/tools"
+	"trpc.group/trpc-go/trpc-a2a-go/protocol"
 )
 
 // App represents the main KAgent ADK application
@@ -27,6 +30,8 @@ type App struct {
 	PathManager     *session.PathManager
 	TokenService    *auth.TokenService
 	Tools           []tools.Tool
+	Executor        *executor.A2AExecutor
+	EventConverter  *converters.EventConverter
 	router          *mux.Router
 }
 
@@ -62,6 +67,12 @@ func NewApp(cfg *Config, agentCfg *config.AgentConfig) (*App, error) {
 
 	// Initialize tools
 	app.initializeTools()
+
+	// Initialize executor
+	app.Executor = executor.NewA2AExecutor(app.SessionService, app.PathManager, app.Tools)
+
+	// Initialize event converter
+	app.EventConverter = converters.NewEventConverter()
 
 	return app, nil
 }
@@ -133,8 +144,9 @@ func (a *App) setupRoutes() {
 	// Agent info endpoint
 	a.router.HandleFunc("/info", a.handleInfo).Methods("GET")
 
-	// TODO: Add A2A protocol endpoints
-	// a.router.HandleFunc("/a2a/execute", a.handleA2AExecute).Methods("POST")
+	// A2A protocol endpoints
+	a.router.HandleFunc("/a2a/message", a.handleA2AMessage).Methods("POST")
+	a.router.HandleFunc("/a2a/stream", a.handleA2AStream).Methods("POST")
 }
 
 func (a *App) handleHealth(w http.ResponseWriter, r *http.Request) {
@@ -160,6 +172,154 @@ func (a *App) handleInfo(w http.ResponseWriter, r *http.Request) {
 		"model_type":  a.AgentConfig.Model.Type(),
 	}
 	json.NewEncoder(w).Encode(info)
+}
+
+func (a *App) handleA2AMessage(w http.ResponseWriter, r *http.Request) {
+	// Decode A2A message request
+	var params protocol.SendMessageParams
+	if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
+		http.Error(w, fmt.Sprintf("invalid request: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	// Create request context
+	requestCtx := &converters.RequestContext{
+		SessionID: params.SessionID,
+		UserID:    params.UserID,
+		TaskID:    params.TaskID,
+		ContextID: params.ContextID,
+		Message:   &params.Message,
+	}
+
+	// Create event queue
+	eventQueue := make(chan *converters.Event, 100)
+	done := make(chan error, 1)
+
+	// Execute in background
+	go func() {
+		done <- a.Executor.Execute(r.Context(), requestCtx, eventQueue)
+		close(eventQueue)
+	}()
+
+	// Collect all events
+	var allEvents []*converters.Event
+	for event := range eventQueue {
+		allEvents = append(allEvents, event)
+	}
+
+	// Wait for completion
+	if err := <-done; err != nil {
+		http.Error(w, fmt.Sprintf("execution failed: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Convert last content event to response
+	var responseMessage *protocol.Message
+	for i := len(allEvents) - 1; i >= 0; i-- {
+		if allEvents[i].Type == converters.EventTypeContent && allEvents[i].Content != nil {
+			partConverter := converters.NewPartConverter()
+			parts, err := partConverter.ConvertContentToA2A(allEvents[i].Content.Parts)
+			if err == nil {
+				responseMessage = &protocol.Message{
+					MessageID: protocol.GenerateMessageID(),
+					Kind:      protocol.KindMessage,
+					Parts:     parts,
+				}
+				break
+			}
+		}
+	}
+
+	if responseMessage == nil {
+		responseMessage = &protocol.Message{
+			MessageID: protocol.GenerateMessageID(),
+			Kind:      protocol.KindMessage,
+			Parts: []protocol.Part{
+				&protocol.TextPart{Text: "No response generated"},
+			},
+		}
+	}
+
+	result := &protocol.MessageResult{
+		Message: *responseMessage,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(result)
+}
+
+func (a *App) handleA2AStream(w http.ResponseWriter, r *http.Request) {
+	// Decode A2A message request
+	var params protocol.SendMessageParams
+	if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
+		http.Error(w, fmt.Sprintf("invalid request: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	// Set up SSE streaming
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "streaming not supported", http.StatusInternalServerError)
+		return
+	}
+
+	// Create request context
+	requestCtx := &converters.RequestContext{
+		SessionID: params.SessionID,
+		UserID:    params.UserID,
+		TaskID:    params.TaskID,
+		ContextID: params.ContextID,
+		Message:   &params.Message,
+	}
+
+	// Create event queue
+	eventQueue := make(chan *converters.Event, 100)
+	done := make(chan error, 1)
+
+	// Execute in background
+	go func() {
+		done <- a.Executor.Execute(r.Context(), requestCtx, eventQueue)
+		close(eventQueue)
+	}()
+
+	// Create invocation context for event conversion
+	invCtx := &converters.InvocationContext{
+		SessionID: params.SessionID,
+		UserID:    params.UserID,
+		TaskID:    params.TaskID,
+		ContextID: params.ContextID,
+	}
+
+	// Stream events
+	for event := range eventQueue {
+		// Convert to A2A events
+		a2aEvents, err := a.EventConverter.Convert(event, invCtx, params.TaskID, params.ContextID)
+		if err != nil {
+			fmt.Fprintf(w, "event: error\ndata: %s\n\n", err.Error())
+			flusher.Flush()
+			continue
+		}
+
+		// Send each A2A event
+		for _, a2aEvent := range a2aEvents {
+			data, err := json.Marshal(a2aEvent)
+			if err != nil {
+				continue
+			}
+			fmt.Fprintf(w, "event: message\ndata: %s\n\n", string(data))
+			flusher.Flush()
+		}
+	}
+
+	// Wait for completion
+	if err := <-done; err != nil {
+		fmt.Fprintf(w, "event: error\ndata: %s\n\n", err.Error())
+		flusher.Flush()
+	}
 }
 
 // DefaultConfig returns the default configuration from environment variables
