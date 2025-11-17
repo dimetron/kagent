@@ -24,7 +24,9 @@ This package provides a unified interface for interacting with various Large Lan
 
 ### Gemini
 - Models: Gemini 2.0 Flash, Gemini 1.5 Pro, etc.
-- Status: Planned for future implementation
+- Features: Tool calling (function declarations), streaming, multimodal capabilities
+- Configuration: API key, base URL, temperature, max tokens, top-p, top-k
+- SDK: Uses official google.golang.org/genai package
 
 ## Client Interface
 
@@ -88,6 +90,14 @@ anthropicConfig := &config.AnthropicConfig{
     APIKey:         &apiKey,
 }
 client, err := llm.NewAnthropicClient(anthropicConfig)
+
+// Gemini
+geminiConfig := &config.GeminiConfig{
+    BaseModelConfig: config.BaseModelConfig{ModelType: "Gemini"},
+    Model:          "gemini-2.0-flash",
+    APIKey:         &apiKey,
+}
+client, err := llm.NewGeminiClient(geminiConfig)
 ```
 
 ### Generating Responses
@@ -306,9 +316,11 @@ type ToolCall struct {
 - Streaming with message deltas
 
 ### Gemini
-- Native Google AI integration
+- Native Google AI integration via google.golang.org/genai
+- Function declarations for tool calling
+- Streaming with delta updates
 - Multimodal capabilities
-- Status: Implementation pending
+- Supports both Gemini API and Vertex AI
 
 ## Error Handling
 
@@ -375,8 +387,8 @@ func (m *MockClient) ModelName() string { return "mock-model" }
 
 ## Future Enhancements
 
-- [ ] Gemini implementation
-- [ ] Vision/multimodal support
+- [x] Gemini implementation (completed)
+- [ ] Vision/multimodal support (partially available in Gemini)
 - [ ] Batch API support
 - [ ] Fine-tuned model support
 - [ ] Cost tracking and optimization

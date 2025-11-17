@@ -29,9 +29,11 @@ func NewClientFromConfig(cfg config.ModelConfig) (Client, error) {
 		return NewAnthropicClient(anthropicCfg)
 
 	case "Gemini":
-		// Gemini implementation would go here
-		return nil, apperrors.New(apperrors.ErrCodeAgentConfig,
-			"Gemini not yet implemented", nil)
+		geminiCfg, ok := cfg.(*config.GeminiConfig)
+		if !ok {
+			return nil, apperrors.New(apperrors.ErrCodeAgentConfig, "invalid Gemini config", nil)
+		}
+		return NewGeminiClient(geminiCfg)
 
 	default:
 		return nil, apperrors.New(apperrors.ErrCodeAgentConfig,
