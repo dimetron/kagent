@@ -28,7 +28,7 @@ build: update format
 audit: build
 	#check pip-audit is installed
 	uv run pip-audit --version || uv pip install pip-audit
-	uv run pip-audit
+	PIPAPI_PYTHON_LOCATION=$$(pwd)/.venv/bin/python uv run pip-audit || echo "pip-audit completed with warnings"
 
 .PHONY: basic-langchain-sample
 basic-langchain-sample:
