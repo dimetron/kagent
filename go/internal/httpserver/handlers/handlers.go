@@ -25,6 +25,7 @@ type Handlers struct {
 	Tasks           *TasksHandler
 	Checkpoints     *CheckpointsHandler
 	CrewAI          *CrewAIHandler
+	Kanban          *KanbanHandler
 }
 
 // Base holds common dependencies for all handlers
@@ -60,5 +61,6 @@ func NewHandlers(kubeClient client.Client, defaultModelConfig types.NamespacedNa
 		Tasks:           NewTasksHandler(base),
 		Checkpoints:     NewCheckpointsHandler(base),
 		CrewAI:          NewCrewAIHandler(base),
+		Kanban:          NewKanbanHandler(base),
 	}
 }

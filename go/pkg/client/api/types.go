@@ -193,3 +193,28 @@ type SessionRunsResponse struct {
 type SessionRunsData struct {
 	Runs []interface{} `json:"runs"`
 }
+
+// Kanban types
+
+// KanbanStage represents the stage of a kanban card
+type KanbanStage string
+
+const (
+	KanbanStageInbox      KanbanStage = "Inbox"
+	KanbanStageAssigned   KanbanStage = "Assigned"
+	KanbanStageInProgress KanbanStage = "InProgress"
+	KanbanStageReview     KanbanStage = "Review"
+	KanbanStageDone       KanbanStage = "Done"
+)
+
+// KanbanCard represents a card on the kanban board
+type KanbanCard struct {
+	ID        string      `json:"id"`
+	Title     string      `json:"title"`
+	Stage     KanbanStage `json:"stage"`
+	AgentName string      `json:"agentName,omitempty"`
+	Namespace string      `json:"namespace"`
+	Priority  string      `json:"priority"`
+	CreatedAt string      `json:"createdAt"`
+	UpdatedAt string      `json:"updatedAt"`
+}
