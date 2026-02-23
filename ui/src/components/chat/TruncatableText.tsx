@@ -68,9 +68,8 @@ export const TruncatableText = memo(({ content, isJson = false, className = "", 
     }
 
     return (
-      <div className="relative">
+      <div className={`relative prose-md prose max-w-none dark:prose-invert dark:text-primary-foreground ${isStreaming ? "streaming-content" : ""}`}>
         <ReactMarkdown
-          className={`prose-md prose max-w-none dark:prose-invert dark:text-primary-foreground ${isStreaming ? "streaming-content" : ""}`}
           components={components}
           remarkPlugins={[gfm]}
           rehypePlugins={[[rehypeExternalLinks, {target: '_blank'}]]}>

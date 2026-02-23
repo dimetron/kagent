@@ -23,14 +23,10 @@ async function getData(agentName: string, namespace: string) {
       return { error: serversResponse.error || "Failed to fetch servers" };
     }
 
-    const currentAgent = agentResponse.data;
-    const allAgents = agentsResponse.data || [];
-    const allTools = serversResponse.data || [];
-
     return {
-      currentAgent,
-      allAgents,
-      allTools,
+      currentAgent: agentResponse.data,
+      allAgents: agentsResponse.data || [],
+      allTools: serversResponse.data || [],
       error: null
     };
   } catch (error) {
@@ -40,20 +36,23 @@ async function getData(agentName: string, namespace: string) {
   }
 }
 
-export default async function ChatLayout({ children, params }: { children: React.ReactNode, params: { name: string, namespace: string } }) {
+export default async function ChatLayout({ children, params }: { children: React.ReactNode, params: Promise<{ name: string, namespace: string }> }) {
   const resolvedParams = await params;
   const { name, namespace } = resolvedParams;
   const { currentAgent, allAgents, allTools, error } = await getData(name, namespace);
 
   if (error || !currentAgent) {
     return (
-      <main className="w-full max-w-6xl mx-auto px-4 flex items-center justify-center h-screen">
+      <div className="w-full max-w-6xl mx-auto px-4 flex items-center justify-center h-full">
         <ErrorState message={error || "Agent data could not be loaded."} />
-      </main>
+      </div>
     );
   }
 
   return (
+    // Scoped SidebarProvider for chat-specific sidebars (SessionsSidebar + AgentDetailsSidebar).
+    // The root SidebarProvider controls AppSidebar; this one is nested inside SidebarInset
+    // and manages the chat panels independently.
     <SidebarProvider style={{
       "--sidebar-width": "350px",
       "--sidebar-width-mobile": "150px",
@@ -69,4 +68,4 @@ export default async function ChatLayout({ children, params }: { children: React
       </ChatLayoutUI>
     </SidebarProvider>
   );
-} 
+}

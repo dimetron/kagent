@@ -3,11 +3,12 @@ import { Geist } from "next/font/google";
 import "./globals.css";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AgentsProvider } from "@/components/AgentsProvider";
-import { Header } from "@/components/Header";
-import { Footer } from "@/components/Footer";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { Toaster } from "@/components/ui/sonner";
 import { AppInitializer } from "@/components/AppInitializer";
+import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
+import { AppSidebar } from "@/components/sidebars/AppSidebar";
+import { NamespaceProvider } from "@/contexts/NamespaceContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -22,15 +23,20 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <TooltipProvider>
       <AgentsProvider>
-        <html lang="en" className="">
-          <body className={`${geistSans.className} flex flex-col h-screen overflow-hidden`}>
+        <html lang="en" suppressHydrationWarning>
+          <body className={`${geistSans.className} h-screen overflow-hidden`}>
             <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-              <AppInitializer>
-                <Header />
-                <main className="flex-1 overflow-y-scroll w-full mx-auto">{children}</main>
-                <Footer />
-              </AppInitializer>
-              <Toaster richColors/>
+              <NamespaceProvider>
+                <SidebarProvider>
+                  <AppSidebar />
+                  <SidebarInset>
+                    <AppInitializer>
+                      <main className="flex-1 overflow-y-auto h-full">{children}</main>
+                    </AppInitializer>
+                  </SidebarInset>
+                </SidebarProvider>
+              </NamespaceProvider>
+              <Toaster richColors />
             </ThemeProvider>
           </body>
         </html>
