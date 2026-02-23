@@ -1,2 +1,5 @@
 {"ts":"2026-02-23T01:05:22.566170Z","type":{"kind":"loop_started","prompt":"Add Controller API for Kanban UI"}}
 {"ts":"2026-02-23T01:10:06.385499Z","type":{"kind":"loop_completed","reason":"completion_promise"}}
+{"ts":"2026-02-23T22:57:45.523273Z","type":{"kind":"loop_started","prompt":"Create MCP SServer for Kanban API"}}
+{"ts":"2026-02-23T23:00:08.075233Z","type":{"kind":"loop_started","prompt":"Create MCP Server for Kanban API using https://github.com/modelcontextprotocol/go-sdk"}}
+{"ts":"2026-02-23T23:05:21.506463Z","type":{"kind":"loop_completed","reason":"completion_promise"}}
