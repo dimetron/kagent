@@ -16,6 +16,7 @@ type ClientSet struct {
 	Model       Model
 	Namespace   Namespace
 	Feedback    Feedback
+	Kanban      Kanban
 }
 
 // New creates a new KAgent client set
@@ -36,5 +37,6 @@ func New(baseURL string, options ...ClientOption) *ClientSet {
 		Model:       NewModelClient(baseClient),
 		Namespace:   NewNamespaceClient(baseClient),
 		Feedback:    NewFeedbackClient(baseClient),
+		Kanban:      NewKanbanClient(baseClient),
 	}
 }
