@@ -1,5 +1,7 @@
 import { Message, TextPart } from "@a2a-js/sdk";
 import { TruncatableText } from "@/components/chat/TruncatableText";
+import FileAttachment from "@/components/chat/FileAttachment";
+import { extractFileParts } from "@/lib/messageHandlers";
 import ToolCallDisplay from "@/components/chat/ToolCallDisplay";
 import AskUserDisplay, { AskUserQuestion } from "@/components/chat/AskUserDisplay";
 import KagentLogo from "../kagent-logo";
@@ -12,6 +14,7 @@ import { toast } from "sonner";
 import { convertToUserFriendlyName } from "@/lib/utils";
 import { ADKMetadata, getMetadataValue } from "@/lib/messageHandlers";
 import { ToolDecision } from "@/types";
+import type { ChatMcpAppTool, McpAppVisibleToolCall } from "@/components/chat/ChatMcpAppsContext";
 
 interface ChatMessageProps {
   message: Message;
@@ -24,9 +27,12 @@ interface ChatMessageProps {
   onReject?: (toolCallId: string, reason?: string) => void;
   onAskUserSubmit?: (answers: Array<{ answer: string[] }>) => void;
   pendingDecisions?: Record<string, ToolDecision>;
+  getMcpAppForTool?: (toolName: string) => ChatMcpAppTool | undefined;
+  onMcpAppSendMessage?: (text: string) => Promise<void>;
+  onMcpAppVisibleToolCall?: (call: McpAppVisibleToolCall) => Promise<void>;
 }
 
-export default function ChatMessage({ message, allMessages, agentContext, onApprove, onReject, onAskUserSubmit, pendingDecisions }: ChatMessageProps) {
+export default function ChatMessage({ message, allMessages, agentContext, onApprove, onReject, onAskUserSubmit, pendingDecisions, getMcpAppForTool, onMcpAppSendMessage, onMcpAppVisibleToolCall }: ChatMessageProps) {
   const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
   const [isPositiveFeedback, setIsPositiveFeedback] = useState(true);
 
@@ -34,6 +40,7 @@ export default function ChatMessage({ message, allMessages, agentContext, onAppr
 
   const textParts = message.parts?.filter(part => part.kind === "text") || [];
   const content = textParts.map(part => (part as TextPart).text).join("");
+  const fileParts = extractFileParts(message.parts);
 
   const source = message.role === "user" ? "user" : "assistant";
   const tokenStats = (message.metadata as Record<string, unknown> | undefined)?.tokenStats as TokenStats | undefined;
@@ -114,6 +121,9 @@ export default function ChatMessage({ message, allMessages, agentContext, onAppr
       onApprove={onApprove}
       onReject={onReject}
       pendingDecisions={pendingDecisions}
+      getMcpAppForTool={getMcpAppForTool}
+      onMcpAppSendMessage={onMcpAppSendMessage}
+      onMcpAppVisibleToolCall={onMcpAppVisibleToolCall}
     />;
   }
 
@@ -124,6 +134,9 @@ export default function ChatMessage({ message, allMessages, agentContext, onAppr
       onApprove={onApprove}
       onReject={onReject}
       pendingDecisions={pendingDecisions}
+      getMcpAppForTool={getMcpAppForTool}
+      onMcpAppSendMessage={onMcpAppSendMessage}
+      onMcpAppVisibleToolCall={onMcpAppVisibleToolCall}
     />;
   }
 
@@ -139,13 +152,13 @@ export default function ChatMessage({ message, allMessages, agentContext, onAppr
     });
 
     if (hasToolCalls) {
-      return <ToolCallDisplay currentMessage={message} allMessages={allMessages} />;
+      return <ToolCallDisplay currentMessage={message} allMessages={allMessages} getMcpAppForTool={getMcpAppForTool} onMcpAppSendMessage={onMcpAppSendMessage} onMcpAppVisibleToolCall={onMcpAppVisibleToolCall} />;
     }
     return null;
   }
 
-  // Skip empty messages
-  if (!content) {
+  // Skip empty messages (unless they carry file attachments).
+  if (!content && fileParts.length === 0) {
     return null;
   }
 
@@ -168,7 +181,14 @@ export default function ChatMessage({ message, allMessages, agentContext, onAppr
         <KagentLogo className="w-4 h-4" />
         <div className="text-xs font-bold">{displayName}</div>
       </div> : <div className="text-xs font-bold">{displayName}</div>}
-      <TruncatableText content={String(content)} className="break-all text-primary-foreground" />
+      {content && <TruncatableText content={String(content)} className="break-all text-primary-foreground" />}
+      {fileParts.length > 0 && (
+        <div className="flex flex-wrap gap-2 mt-1">
+          {fileParts.map((part, idx) => (
+            <FileAttachment key={`file-${idx}`} part={part} />
+          ))}
+        </div>
+      )}
       {source !== "user" && (
         <div className="flex mt-2 justify-end items-center gap-2">
           {tokenStats && <TokenStatsTooltip stats={tokenStats} />}
