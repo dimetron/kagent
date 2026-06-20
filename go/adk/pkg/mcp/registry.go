@@ -78,9 +78,18 @@ type mcpServerParams struct {
 	TLSDisableSystemCAs   *bool
 }
 
+// MCPAppToolNames is the set of MCP tool names whose results render as
+// interactive MCP App (UI) widgets in the chat (the tool declares a
+// ui.resourceUri and is visible to the agent). It is used as a set, so the bool
+// value is always true and only key presence is meaningful. The agent attaches
+// the model-result compaction callback (see agent.MakeMCPAppModelResultCallback)
+// only to these tools.
+type MCPAppToolNames map[string]bool
+
 // CreateToolsets creates toolsets from all configured HTTP and SSE MCP servers,
-// returning the accumulated toolsets. Errors on individual servers are logged
-// and skipped.
+// returning the accumulated toolsets and the set of agent-visible tools that
+// render as MCP App widgets (see MCPAppToolNames). Errors on individual servers
+// are logged and skipped.
 //
 // When propagateToken is true, Authorization is forwarded to every MCP server
 // independently of AllowedHeaders, mirroring the Python ADKTokenPropagationPlugin
@@ -94,9 +103,10 @@ func CreateToolsets(
 	sseTools []adk.SseMcpServerConfig,
 	propagateToken bool,
 	headerProvider DynamicHeaderProvider,
-) []tool.Toolset {
+) ([]tool.Toolset, MCPAppToolNames) {
 	log := logr.FromContextOrDiscard(ctx)
 	var toolsets []tool.Toolset
+	appToolNames := make(MCPAppToolNames)
 
 	log.Info("Processing HTTP MCP tools", "httpToolsCount", len(httpTools))
 	for i, httpTool := range httpTools {
@@ -113,11 +123,14 @@ func CreateToolsets(
 			TLSCACertPath:         httpTool.Params.TLSCACertPath,
 			TLSDisableSystemCAs:   httpTool.Params.TLSDisableSystemCAs,
 		}
-		ts, err := addToolset(ctx, log, params, httpTool.Tools, "HTTP", i+1)
+		ts, appTools, err := addToolset(ctx, log, params, httpTool.Tools, "HTTP", i+1)
 		if err != nil {
 			continue
 		}
 		toolsets = append(toolsets, ts)
+		for name := range appTools {
+			appToolNames[name] = true
+		}
 	}
 
 	log.Info("Processing SSE MCP tools", "sseToolsCount", len(sseTools))
@@ -135,18 +148,21 @@ func CreateToolsets(
 			TLSCACertPath:         sseTool.Params.TLSCACertPath,
 			TLSDisableSystemCAs:   sseTool.Params.TLSDisableSystemCAs,
 		}
-		ts, err := addToolset(ctx, log, params, sseTool.Tools, "SSE", i+1)
+		ts, appTools, err := addToolset(ctx, log, params, sseTool.Tools, "SSE", i+1)
 		if err != nil {
 			continue
 		}
 		toolsets = append(toolsets, ts)
+		for name := range appTools {
+			appToolNames[name] = true
+		}
 	}
 
-	return toolsets
+	return toolsets, appToolNames
 }
 
 // addToolset logs, initializes, and returns a single MCP toolset.
-func addToolset(ctx context.Context, log logr.Logger, params mcpServerParams, tools []string, label string, index int) (tool.Toolset, error) {
+func addToolset(ctx context.Context, log logr.Logger, params mcpServerParams, tools []string, label string, index int) (tool.Toolset, MCPAppToolNames, error) {
 	if params.Headers == nil {
 		params.Headers = make(map[string]string)
 	}
@@ -162,13 +178,13 @@ func addToolset(ctx context.Context, log logr.Logger, params mcpServerParams, to
 		log.Info(fmt.Sprintf("Adding %s MCP tool", label), "index", index, "url", params.URL, "toolFilterCount", "all")
 	}
 
-	ts, err := initializeToolSet(ctx, params, toolFilter)
+	ts, appToolNames, err := initializeToolSet(ctx, params, toolFilter)
 	if err != nil {
 		log.Error(err, fmt.Sprintf("Failed to fetch tools from %s MCP server", label), "url", params.URL)
-		return nil, err
+		return nil, nil, err
 	}
 	log.Info(fmt.Sprintf("Successfully added %s MCP toolset", label), "url", params.URL)
-	return ts, nil
+	return ts, appToolNames, nil
 }
 
 // createTransport creates an MCP transport based on server type and configuration.
@@ -256,6 +272,146 @@ func createTransport(ctx context.Context, params mcpServerParams) (mcpsdk.Transp
 	return mcpTransport, nil
 }
 
+// mcpToolKind classifies how an MCP tool is surfaced to the agent and the UI,
+// derived from the tool's MCP-UI metadata (the "ui" block). Modeling this as a
+// single kind rather than a set of overlapping booleans keeps the call sites
+// readable and leaves room for additional kinds (e.g. new tool surfaces) without
+// reworking signatures.
+type mcpToolKind int
+
+const (
+	// mcpToolKindAgent is a regular tool exposed to the agent/model with no
+	// interactive UI rendering.
+	mcpToolKindAgent mcpToolKind = iota
+	// mcpToolKindApp is an agent-visible tool whose result renders as an
+	// interactive MCP App (UI) widget in the chat (declares a ui.resourceUri).
+	mcpToolKindApp
+	// mcpToolKindAppOnly is hidden from the agent and only callable from within
+	// the rendered MCP App (visibility declares "app" but not "model").
+	mcpToolKindAppOnly
+)
+
+func (k mcpToolKind) String() string {
+	switch k {
+	case mcpToolKindApp:
+		return "app"
+	case mcpToolKindAppOnly:
+		return "app_only"
+	default:
+		return "agent"
+	}
+}
+
+// mcpToolKindOf classifies a tool from its MCP metadata. App-only takes
+// precedence: a tool hidden from the model is never surfaced to the agent even
+// if it also declares a UI resource.
+func mcpToolKindOf(meta map[string]any) mcpToolKind {
+	if isAppOnlyVisibility(meta) {
+		return mcpToolKindAppOnly
+	}
+	if hasUIResource(meta) {
+		return mcpToolKindApp
+	}
+	return mcpToolKindAgent
+}
+
+// isAppOnlyVisibility reports whether a tool's visibility hides it from the
+// agent: it declares "app" but not "model". Absent visibility defaults to
+// agent-visible.
+func isAppOnlyVisibility(meta map[string]any) bool {
+	ui, _ := meta["ui"].(map[string]any)
+	if ui == nil {
+		return false
+	}
+	hasApp := false
+	for _, v := range normalizeVisibility(ui["visibility"]) {
+		if v == "model" {
+			return false
+		}
+		if v == "app" {
+			hasApp = true
+		}
+	}
+	return hasApp
+}
+
+// hasUIResource reports whether a tool declares an MCP-UI resourceUri, meaning
+// its result should be rendered as an interactive app in the chat UI.
+func hasUIResource(meta map[string]any) bool {
+	if ui, ok := meta["ui"].(map[string]any); ok {
+		if uri, _ := ui["resourceUri"].(string); uri != "" {
+			return true
+		}
+	}
+	uri, _ := meta["ui/resourceUri"].(string)
+	return uri != ""
+}
+
+// normalizeVisibility coerces the visibility field, which the MCP spec allows
+// as either a single string or a list of strings, into a uniform []string.
+func normalizeVisibility(value any) []string {
+	switch v := value.(type) {
+	case string:
+		return []string{v}
+	case []string:
+		return v
+	case []any:
+		out := make([]string, 0, len(v))
+		for _, item := range v {
+			if s, ok := item.(string); ok {
+				out = append(out, s)
+			}
+		}
+		return out
+	}
+	return nil
+}
+
+// agentVisibleToolFilter lists tools from the MCP server, filters out app-only
+// tools and any not in the configured allow-list, and returns a predicate the
+// toolset can apply plus the set of remaining tools that render as MCP apps.
+func agentVisibleToolFilter(ctx context.Context, params mcpServerParams, configuredFilter map[string]bool) (tool.Predicate, MCPAppToolNames, error) {
+	mcpTransport, err := createTransport(ctx, params)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create transport for %s: %w", params.URL, err)
+	}
+
+	client := mcpsdk.NewClient(&mcpsdk.Implementation{Name: "kagent-adk"}, nil)
+	session, err := client.Connect(ctx, mcpTransport, nil)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to connect MCP client for %s: %w", params.URL, err)
+	}
+	defer session.Close()
+
+	result, err := session.ListTools(ctx, &mcpsdk.ListToolsParams{})
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to list MCP tools for %s: %w", params.URL, err)
+	}
+
+	allowedTools := make([]string, 0, len(result.Tools))
+	appToolNames := make(MCPAppToolNames)
+	for _, t := range result.Tools {
+		if t == nil || t.Name == "" {
+			continue
+		}
+		if len(configuredFilter) > 0 && !configuredFilter[t.Name] {
+			continue
+		}
+		switch mcpToolKindOf(t.Meta) {
+		case mcpToolKindAppOnly:
+			// Hidden from the agent; only the rendered MCP App calls it.
+			continue
+		case mcpToolKindApp:
+			allowedTools = append(allowedTools, t.Name)
+			appToolNames[t.Name] = true
+		default: // mcpToolKindAgent
+			allowedTools = append(allowedTools, t.Name)
+		}
+	}
+
+	return tool.StringPredicate(allowedTools), appToolNames, nil
+}
+
 // headerRoundTripper wraps an http.RoundTripper to add custom headers to all
 // requests. It supports four sources of headers, applied in this order so that
 // higher-priority sources win on collision:
@@ -310,19 +466,15 @@ func (rt *headerRoundTripper) RoundTrip(req *http.Request) (*http.Response, erro
 
 // initializeToolSet fetches tools from an MCP server using Google ADK's mcptoolset.
 // Returns the created toolset on success.
-func initializeToolSet(ctx context.Context, params mcpServerParams, toolFilter map[string]bool) (tool.Toolset, error) {
+func initializeToolSet(ctx context.Context, params mcpServerParams, toolFilter map[string]bool) (tool.Toolset, MCPAppToolNames, error) {
 	mcpTransport, err := createTransport(ctx, params)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create transport for %s: %w", params.URL, err)
+		return nil, nil, fmt.Errorf("failed to create transport for %s: %w", params.URL, err)
 	}
 
-	var toolPredicate tool.Predicate
-	if len(toolFilter) > 0 {
-		allowedTools := make([]string, 0, len(toolFilter))
-		for toolName := range toolFilter {
-			allowedTools = append(allowedTools, toolName)
-		}
-		toolPredicate = tool.StringPredicate(allowedTools)
+	toolPredicate, appToolNames, err := agentVisibleToolFilter(ctx, params, toolFilter)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	cfg := mcptoolset.Config{
@@ -332,8 +484,8 @@ func initializeToolSet(ctx context.Context, params mcpServerParams, toolFilter m
 
 	toolset, err := mcptoolset.New(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create MCP toolset for %s: %w", params.URL, err)
+		return nil, nil, fmt.Errorf("failed to create MCP toolset for %s: %w", params.URL, err)
 	}
 
-	return toolset, nil
+	return toolset, appToolNames, nil
 }

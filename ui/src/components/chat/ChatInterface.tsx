@@ -2,7 +2,7 @@
 
 import type React from "react";
 import { useState, useRef, useEffect, useMemo } from "react";
-import { ArrowBigUp, X, Loader2, Mic, Square } from "lucide-react";
+import { ArrowBigUp, X, Loader2, Mic, Square, Paperclip } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -14,6 +14,7 @@ import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import ChatMessage from "@/components/chat/ChatMessage";
+import ChatMinimap from "@/components/chat/ChatMinimap";
 import StreamingMessage from "./StreamingMessage";
 import SessionTokenStatsDisplay from "@/components/chat/TokenStats";
 import type { TokenStats, Session, ChatStatus, ToolDecision } from "@/types";
@@ -30,12 +31,23 @@ import { formatA2AClientError } from "@/lib/a2aErrors";
 import { useChatRunInSandbox, useChatSubstrateSandbox } from "@/components/chat/ChatAgentContext";
 import { v4 as uuidv4 } from "uuid";
 import { getStatusPlaceholder, mapA2AStateToStatus } from "@/lib/statusUtils";
-import { Message, DataPart, Task, TaskState } from "@a2a-js/sdk";
+import { Message, DataPart, FilePart, Task, TaskState } from "@a2a-js/sdk";
+import { useChatMcpApps, type McpAppVisibleToolCall } from "@/components/chat/ChatMcpAppsContext";
+import { FILE_ACCEPT, MAX_FILE_BYTES, fileToFilePart, isAllowedFile } from "@/lib/fileUpload";
 
 // Task states where the agent is actively processing — resubscribe to live stream.
 const RESUBSCRIBE_TASK_STATES: TaskState[] = ["submitted", "working"];
 // Task states that mean the session is busy (used by the cross-tab send guard).
 const ACTIVE_TASK_STATES: TaskState[] = ["submitted", "working", "input-required"];
+
+// Server-authoritative high-water mark for cross-tab staleness detection.
+// Counts persisted history messages across all tasks — a value the DB assigns
+// and every tab reads identically, independent of how each tab rendered them
+// (synthetic tool/artifact/summary cards never land here). Comparing this against
+// the count a tab last synced reliably detects when another tab advanced the
+// conversation, without depending on fragile rendered-message-count parity.
+const countServerMessages = (tasks: Task[]): number =>
+  tasks.reduce((sum, task) => sum + (task.history?.length ?? 0), 0);
 
 interface ChatInterfaceProps {
   selectedAgentName: string;
@@ -46,9 +58,12 @@ interface ChatInterfaceProps {
 
 export default function ChatInterface({ selectedAgentName, selectedNamespace, selectedSession, sessionId }: ChatInterfaceProps) {
   const runInSandbox = useChatRunInSandbox();
+  const { getMcpAppForTool } = useChatMcpApps();
   const substrateSandbox = useChatSubstrateSandbox();
   const router = useRouter();
   const containerRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [currentInputMessage, setCurrentInputMessage] = useState("");
 
   const [chatStatus, setChatStatus] = useState<ChatStatus>("ready");
@@ -71,6 +86,28 @@ export default function ChatInterface({ selectedAgentName, selectedNamespace, se
   const pendingDecisionsRef = useRef<Record<string, ToolDecision>>({});
   /** Per-tool rejection reasons collected as the user rejects individual tools. */
   const pendingRejectionReasonsRef = useRef<Record<string, string>>({});
+  // Count of server history messages this tab has incorporated. Updated wherever
+  // the tab consumes server state (DB load/reload, end of a stream); the send
+  // guard blocks when the server has advanced past it (another tab acted).
+  const syncedServerMsgCountRef = useRef<number>(0);
+
+  // Single place that computes the high-water mark, so every update site stays
+  // consistent. Accepts the raw server Task[] (artifacts/synthetic cards are
+  // intentionally ignored — only persisted history counts).
+  const setServerMark = (tasks: Task[] | undefined) => {
+    syncedServerMsgCountRef.current = countServerMessages(tasks ?? []);
+  };
+
+  // Re-read the server's current count and advance the mark. Best-effort: a
+  // failed/stale read only risks a benign reload on the next send.
+  const refreshServerMark = async (markSessionId: string) => {
+    try {
+      const res = await getSessionTasks(markSessionId);
+      if (res.data) setServerMark(res.data);
+    } catch {
+      // Leave the mark as-is.
+    }
+  };
 
   const {
     isListening,
@@ -115,6 +152,7 @@ export default function ChatInterface({ selectedAgentName, selectedNamespace, se
       pendingDecisionsRef.current = {};
       pendingRejectionReasonsRef.current = {};
       pendingTurnStatsRef.current = undefined;
+      syncedServerMsgCountRef.current = 0;
 
       // Skip completely if this is a first message session creation flow
       if (isFirstMessage || isCreatingSessionRef.current) {
@@ -175,6 +213,7 @@ export default function ChatInterface({ selectedAgentName, selectedNamespace, se
             );
           }
         }
+        setServerMark(messagesResponse.data);
       } catch (error) {
         console.error("Error loading messages:", error);
         toast.error("Error loading messages");
@@ -204,35 +243,40 @@ export default function ChatInterface({ selectedAgentName, selectedNamespace, se
     }
   }, [storedMessages, streamingMessages, streamingContent]);
 
-
-
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!currentInputMessage.trim() || !selectedAgentName || !selectedNamespace) {
+  const sendChatMessageText = async (
+    userMessageText: string,
+    options: {
+      clearInput?: boolean;
+      restoreInputOnError?: boolean;
+      errorLabel?: string;
+      rethrowOnError?: boolean;
+      fileParts?: FilePart[];
+    } = {},
+  ) => {
+    const fileParts = options.fileParts ?? [];
+    if ((!userMessageText.trim() && fileParts.length === 0) || !selectedAgentName || !selectedNamespace) {
+      return;
+    }
+    if (chatStatus !== "ready") {
+      const error = new Error("Agent is busy. Try again after the current response finishes.");
+      toast.error(error.message);
+      if (options.rethrowOnError) {
+        throw error;
+      }
       return;
     }
 
-    // Stop voice recording if active before sending
-    if (isListening) {
-      stopListening();
+    if (options.clearInput ?? true) {
+      setCurrentInputMessage("");
     }
-
-    const userMessageText = currentInputMessage;
-
+    
     // Cross-tab guard: fetch the latest session state before mutating anything.
     // Two cases: (1) another tab is still streaming — reconnect instead of sending;
     // (2) another tab completed a turn we haven't loaded — reload so the user sees
     // the full context before their next message goes out.
     const guardSessionId = session?.id || sessionId;
     if (guardSessionId) {
-      // Compare only non-approval messages to avoid false negatives when
-      // storedMessages includes appended ToolApprovalRequest / AskUserRequest entries.
-      const localMessageCount = storedMessages.filter(m => {
-        const meta = m.metadata as ADKMetadata | undefined;
-        return meta?.originalType !== "ToolApprovalRequest" && meta?.originalType !== "AskUserRequest";
-      }).length;
       const guardResult = await checkAndSyncSessionBeforeAction(guardSessionId, {
-        localMessageCount,
         messages: {
           inFlight: "This session is already being processed — reconnecting to live updates",
           inputRequired: "Session is awaiting your input — please review before sending",
@@ -257,10 +301,10 @@ export default function ChatInterface({ selectedAgentName, selectedNamespace, se
       kind: "message",
       messageId: uuidv4(),
       role: "user",
-      parts: [{
-        kind: "text",
-        text: userMessageText
-      }],
+      parts: [
+        { kind: "text", text: userMessageText },
+        ...fileParts,
+      ],
       metadata: {
         timestamp: Date.now()
       }
@@ -288,9 +332,12 @@ export default function ChatInterface({ selectedAgentName, selectedNamespace, se
           isCreatingSessionRef.current = true;
           setIsFirstMessage(true);
 
+          const sessionName = userMessageText.trim()
+            ? deriveSessionTitle(userMessageText)
+            : (fileParts[0]?.file.name ?? "File upload");
           const newSessionResponse = await createSession({
             agent_ref: `${selectedNamespace}/${selectedAgentName}`,
-            name: deriveSessionTitle(userMessageText),
+            name: sessionName,
           });
 
           if (newSessionResponse.error || !newSessionResponse.data) {
@@ -364,6 +411,7 @@ export default function ChatInterface({ selectedAgentName, selectedNamespace, se
       const a2aMessage = createMessage(userMessageText, "user", {
         messageId,
         contextId: currentSessionId,
+        fileParts,
       });
 
       await streamA2AMessage(a2aMessage, {
@@ -373,10 +421,101 @@ export default function ChatInterface({ selectedAgentName, selectedNamespace, se
       });
     } catch (error) {
       console.error("Error sending message or creating session:", error);
-      toast.error("Error sending message or creating session");
+      toast.error(options.errorLabel || "Error sending message or creating session");
       setChatStatus("error");
-      setCurrentInputMessage(userMessageText);
+      if (options.restoreInputOnError ?? true) {
+        setCurrentInputMessage(userMessageText);
+      }
+      if (options.rethrowOnError) {
+        throw error;
+      }
     }
+  };
+
+  const handleFilesSelected = (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const accepted: File[] = [];
+    for (const file of Array.from(files)) {
+      if (!isAllowedFile(file)) {
+        toast.error(`"${file.name}" is not an allowed file type`);
+        continue;
+      }
+      if (file.size > MAX_FILE_BYTES) {
+        toast.error(`"${file.name}" exceeds the 10 MB limit`);
+        continue;
+      }
+      accepted.push(file);
+    }
+    if (accepted.length > 0) {
+      setPendingFiles(prev => [...prev, ...accepted]);
+    }
+  };
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    handleFilesSelected(e.target.files);
+    // Reset so selecting the same file again re-triggers onChange.
+    e.target.value = "";
+  };
+
+  const removePendingFile = (index: number) => {
+    setPendingFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isListening) {
+      stopListening();
+    }
+    if (!currentInputMessage.trim() && pendingFiles.length === 0) {
+      return;
+    }
+
+    let fileParts: FilePart[] = [];
+    if (pendingFiles.length > 0) {
+      try {
+        fileParts = await Promise.all(pendingFiles.map(fileToFilePart));
+      } catch (err) {
+        toast.error(`Failed to read file: ${err instanceof Error ? err.message : "unknown error"}`);
+        return;
+      }
+    }
+
+    const textToSend = currentInputMessage;
+    setPendingFiles([]);
+    await sendChatMessageText(textToSend, { fileParts });
+  };
+
+  // An MCP App pushed a message into the conversation via the ui/message
+  // channel (e.g. "Build #N triggered, monitor it"). Inject it as a normal user
+  // turn so the agent can act on it.
+  const handleMcpAppSendMessage = async (text: string) => {
+    await sendChatMessageText(text, {
+      clearInput: false,
+      restoreInputOnError: false,
+      errorLabel: "MCP app message failed",
+      rethrowOnError: true,
+    });
+  };
+
+  const handleMcpAppVisibleToolCall = async (call: McpAppVisibleToolCall) => {
+    const argsJson = JSON.stringify(call.arguments ?? {}, null, 2);
+    await sendChatMessageText(
+      [
+        "An MCP App requested a model-visible tool call from inside the chat.",
+        `Call exactly the MCP tool "${call.toolName}" with the JSON arguments below, then explain the result to the user.`,
+        `Source app tool: "${call.sourceToolName}".`,
+        "",
+        "```json",
+        argsJson,
+        "```",
+      ].join("\n"),
+      {
+        clearInput: false,
+        restoreInputOnError: false,
+        errorLabel: "MCP app tool request failed",
+        rethrowOnError: true,
+      },
+    );
   };
 
   const consumeStream = async (stream: AsyncIterable<unknown>) => {
@@ -422,6 +561,7 @@ export default function ChatInterface({ selectedAgentName, selectedNamespace, se
       if (!currentSessionId) return;
       const latest = await getSessionTasks(currentSessionId);
       if (latest.data && latest.data.length > 0) {
+        setServerMark(latest.data);
         const extractedMessages = extractMessagesFromTasks(latest.data);
         const { messages: pendingApprovalMessages, hasPendingApproval } = extractApprovalMessagesFromTasks(latest.data);
         setStoredMessages(
@@ -502,6 +642,13 @@ export default function ChatInterface({ selectedAgentName, selectedNamespace, se
       );
 
       await consumeStream(stream);
+
+      // The turn this tab just sent is now persisted; advance our high-water mark
+      // to the server's post-turn count so the next send's guard doesn't mistake
+      // our own new messages for another tab's changes. Best-effort, no reload.
+      if (sid) {
+        await refreshServerMark(sid);
+      }
     } catch (error: unknown) {
       if (error instanceof Error && error.name === "AbortError") {
         setChatStatus("ready");
@@ -566,14 +713,14 @@ export default function ChatInterface({ selectedAgentName, selectedNamespace, se
    * HITL mode (expectedTaskId provided): verifies the specific task is still
    * input-required; resubscribes or reloads if another tab already responded.
    *
-   * Send-guard mode (no expectedTaskId): checks for any active task and for
-   * stale local messages; blocks and syncs if either is detected.
+   * Send-guard mode (no expectedTaskId): checks for any active task and compares
+   * the server's message high-water mark against what this tab has synced; blocks
+   * and reloads if another tab advanced the conversation.
    */
   const checkAndSyncSessionBeforeAction = async (
     guardSessionId: string,
     opts: {
       expectedTaskId?: string;
-      localMessageCount?: number;
       messages: {
         inFlight: string;
         inputRequired?: string;
@@ -624,13 +771,13 @@ export default function ChatInterface({ selectedAgentName, selectedNamespace, se
       return "blocked";
     }
 
-    if (opts.localMessageCount !== undefined) {
-      const dbMessages = extractMessagesFromTasks(tasksCheck.data);
-      if (dbMessages.length > opts.localMessageCount) {
-        await reloadSessionFromDB();
-        toast.info(opts.messages.staleOrChanged);
-        return "blocked";
-      }
+    // Send-guard mode: no specific task to verify. If the server holds more
+    // persisted messages than this tab has synced, another tab advanced the
+    // conversation — reload and block so the user sees the latest context first.
+    if (countServerMessages(tasksCheck.data) > syncedServerMsgCountRef.current) {
+      await reloadSessionFromDB();
+      toast.info(opts.messages.staleOrChanged);
+      return "blocked";
     }
 
     return "proceed";
@@ -919,10 +1066,10 @@ export default function ChatInterface({ selectedAgentName, selectedNamespace, se
     );
   }
   return (
-    <div className="flex h-screen w-full min-w-0 flex-col items-center justify-center transition-all duration-300 ease-in-out">
+    <div className="w-full h-full flex flex-col justify-center min-w-full items-center transition-all duration-300 ease-in-out">
       <div className="flex-1 w-full overflow-hidden relative">
         <ScrollArea ref={containerRef} className="w-full h-full py-12">
-          <div className="flex flex-col space-y-5 px-4">
+          <div className="flex w-full min-w-0 max-w-full flex-col space-y-5 overflow-x-hidden px-4">
             {/* Never show loading for first message/new session */}
             {isLoading && sessionId && !isFirstMessage && !isCreatingSessionRef.current ? (
               <div
@@ -949,41 +1096,52 @@ export default function ChatInterface({ selectedAgentName, selectedNamespace, se
               <>
                 {/* Display stored messages from session */}
                 {storedMessages.map((message, index) => {
-                  return <ChatMessage
-                    key={`stored-${index}`}
-                    message={message}
-                    allMessages={allMessages}
-                    agentContext={agentContext}
-                    onApprove={handleApprove}
-                    onReject={handleReject}
-                    onAskUserSubmit={handleAskUserSubmit}
-                    pendingDecisions={pendingDecisions}
-                  />
+                  return <div key={`stored-${index}`} data-mm-item data-mm-role={message.role === "user" ? "user" : "assistant"}>
+                    <ChatMessage
+                      message={message}
+                      allMessages={allMessages}
+                      agentContext={agentContext}
+                      onApprove={handleApprove}
+                      onReject={handleReject}
+                      onAskUserSubmit={handleAskUserSubmit}
+                      pendingDecisions={pendingDecisions}
+                      getMcpAppForTool={getMcpAppForTool}
+                      onMcpAppSendMessage={handleMcpAppSendMessage}
+                      onMcpAppVisibleToolCall={handleMcpAppVisibleToolCall}
+                    />
+                  </div>
                 })}
 
                 {/* Display streaming messages */}
                 {streamingMessages.map((message, index) => {
-                  return <ChatMessage
-                    key={`stream-${index}`}
-                    message={message}
-                    allMessages={allMessages}
-                    agentContext={agentContext}
-                    onApprove={handleApprove}
-                    onReject={handleReject}
-                    onAskUserSubmit={handleAskUserSubmit}
-                    pendingDecisions={pendingDecisions}
-                  />
+                  return <div key={`stream-${index}`} data-mm-item data-mm-role={message.role === "user" ? "user" : "assistant"}>
+                    <ChatMessage
+                      message={message}
+                      allMessages={allMessages}
+                      agentContext={agentContext}
+                      onApprove={handleApprove}
+                      onReject={handleReject}
+                      onAskUserSubmit={handleAskUserSubmit}
+                      pendingDecisions={pendingDecisions}
+                      getMcpAppForTool={getMcpAppForTool}
+                      onMcpAppSendMessage={handleMcpAppSendMessage}
+                      onMcpAppVisibleToolCall={handleMcpAppVisibleToolCall}
+                    />
+                  </div>
                 })}
 
                 {isStreaming && (
-                  <StreamingMessage
-                    content={streamingContent}
-                  />
+                  <div data-mm-item data-mm-role="assistant">
+                    <StreamingMessage
+                      content={streamingContent}
+                    />
+                  </div>
                 )}
               </>
             )}
           </div>
         </ScrollArea>
+        <ChatMinimap containerRef={containerRef} revision={allMessages.length} />
       </div>
 
       <div className="w-full sticky bg-secondary bottom-0 md:bottom-2 rounded-none md:rounded-lg p-4 border  overflow-hidden transition-all duration-300 ease-in-out">
@@ -992,17 +1150,64 @@ export default function ChatInterface({ selectedAgentName, selectedNamespace, se
           {sessionStats.total > 0 && <SessionTokenStatsDisplay stats={sessionStats} />}
         </div>
 
-        <form onSubmit={handleSendMessage}>
+        {pendingFiles.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-2">
+            {pendingFiles.map((file, index) => (
+              <div
+                key={`pending-${index}-${file.name}`}
+                className="inline-flex items-center gap-2 rounded-md border bg-background px-2 py-1 text-xs"
+              >
+                <Paperclip className="h-3 w-3 shrink-0" aria-hidden />
+                <span className="truncate max-w-[12rem]">{file.name}</span>
+                <button
+                  type="button"
+                  onClick={() => removePendingFile(index)}
+                  className="rounded p-0.5 hover:bg-accent"
+                  aria-label={`Remove ${file.name}`}
+                >
+                  <X className="h-3 w-3" aria-hidden />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <form onSubmit={handleSendMessage} className="relative">
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept={FILE_ACCEPT}
+            className="hidden"
+            onChange={handleFileInputChange}
+          />
           <Textarea
             value={currentInputMessage}
             onChange={(e) => setCurrentInputMessage(e.target.value)}
             placeholder={getStatusPlaceholder(chatStatus)}
             onKeyDown={handleKeyDown}
-            className={`min-h-[100px] border-0 shadow-none p-0 focus-visible:ring-0 resize-none ${chatStatus !== "ready" ? "opacity-50 cursor-not-allowed" : ""}`}
+            className={`min-h-[50px] border-0 shadow-none p-0 pr-32 focus-visible:ring-0 resize-none ${chatStatus !== "ready" ? "opacity-50 cursor-not-allowed" : ""}`}
             disabled={chatStatus !== "ready"}
           />
 
-          <div className="flex items-center justify-end gap-2 mt-4">
+          <div className="absolute bottom-0 right-0 flex items-center justify-end gap-2">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="default"
+                    size="icon"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={chatStatus !== "ready"}
+                    aria-label="Attach files"
+                  >
+                    <Paperclip className="h-4 w-4" aria-hidden />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Attach files (images, PDF, text, CSV, JSON — max 10 MB)</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
             {isVoiceSupported && (
               <TooltipProvider>
                 <Tooltip>
@@ -1033,7 +1238,7 @@ export default function ChatInterface({ selectedAgentName, selectedNamespace, se
                 </Tooltip>
               </TooltipProvider>
             )}
-            <Button type="submit" className={""} disabled={!currentInputMessage.trim() || chatStatus !== "ready"}>
+            <Button type="submit" className={""} disabled={(!currentInputMessage.trim() && pendingFiles.length === 0) || chatStatus !== "ready"}>
               Send
               <ArrowBigUp className="h-4 w-4 ml-2" />
             </Button>

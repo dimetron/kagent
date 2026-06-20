@@ -177,6 +177,71 @@ func TestAllowedRequestHeaders_EmptyAllowedList(t *testing.T) {
 	}
 }
 
+func TestMCPToolKindOf(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		meta map[string]any
+		want mcpToolKind
+	}{
+		{
+			name: "app visibility list is app-only",
+			meta: map[string]any{"ui": map[string]any{"visibility": []any{"app"}}},
+			want: mcpToolKindAppOnly,
+		},
+		{
+			name: "app visibility string is app-only",
+			meta: map[string]any{"ui": map[string]any{"visibility": "app"}},
+			want: mcpToolKindAppOnly,
+		},
+		{
+			name: "app-only wins over a declared resource uri",
+			meta: map[string]any{"ui": map[string]any{"visibility": []any{"app"}, "resourceUri": "ui://forms/form.html"}},
+			want: mcpToolKindAppOnly,
+		},
+		{
+			name: "model and app visibility without resource is a plain agent tool",
+			meta: map[string]any{"ui": map[string]any{"visibility": []any{"model", "app"}}},
+			want: mcpToolKindAgent,
+		},
+		{
+			name: "model and app visibility with resource renders as app",
+			meta: map[string]any{"ui": map[string]any{"visibility": []any{"app", "model"}, "resourceUri": "ui://forms/form.html"}},
+			want: mcpToolKindApp,
+		},
+		{
+			name: "model only visibility is a plain agent tool",
+			meta: map[string]any{"ui": map[string]any{"visibility": []any{"model"}}},
+			want: mcpToolKindAgent,
+		},
+		{
+			name: "resource uri in ui object renders as app",
+			meta: map[string]any{"ui": map[string]any{"resourceUri": "ui://forms/form.html"}},
+			want: mcpToolKindApp,
+		},
+		{
+			name: "legacy resource uri key renders as app",
+			meta: map[string]any{"ui/resourceUri": "ui://forms/form.html"},
+			want: mcpToolKindApp,
+		},
+		{
+			name: "plain tool",
+			meta: map[string]any{},
+			want: mcpToolKindAgent,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := mcpToolKindOf(tt.meta); got != tt.want {
+				t.Fatalf("mcpToolKindOf() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 // TestAllowedRequestHeaders_CaseInsensitiveLookup verifies that matching between
 // the configured allowedHeaders and the incoming request headers is case-insensitive
 // regardless of which side is lowercased or uppercased.
