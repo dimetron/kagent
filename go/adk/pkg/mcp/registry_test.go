@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/a2aproject/a2a-go/a2asrv"
+	adkagent "google.golang.org/adk/agent"
+	"google.golang.org/adk/tool"
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -176,6 +178,33 @@ func TestAllowedRequestHeaders_EmptyAllowedList(t *testing.T) {
 	if got != nil {
 		t.Errorf("expected nil for empty allowed list, got %v", got)
 	}
+}
+
+func TestMCPAppToolNamesFromToolsets(t *testing.T) {
+	t.Parallel()
+
+	inner := &stubToolset{name: "mcp-server"}
+	toolsets := []tool.Toolset{
+		&mcpAppToolset{inner: inner, appToolNames: MCPAppToolNames{"show_board": true}},
+		&mcpAppToolset{inner: inner, appToolNames: MCPAppToolNames{"refresh": true}},
+		inner,
+	}
+
+	got := MCPAppToolNamesFromToolsets(toolsets)
+	if len(got) != 2 || !got["show_board"] || !got["refresh"] {
+		t.Fatalf("MCPAppToolNamesFromToolsets() = %#v, want show_board and refresh", got)
+	}
+}
+
+type stubToolset struct {
+	name string
+}
+
+func (s *stubToolset) Name() string { return s.name }
+
+func (s *stubToolset) Tools(ctx adkagent.ReadonlyContext) ([]tool.Tool, error) {
+	_ = ctx
+	return nil, nil
 }
 
 func TestMCPToolKindOf(t *testing.T) {

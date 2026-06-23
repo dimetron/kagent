@@ -55,7 +55,8 @@ func CreateGoogleADKAgentWithSubagentSessionIDs(ctx context.Context, agentConfig
 	if stsPlugin != nil {
 		dynamicHeaderProvider = stsPlugin.HeaderProvider
 	}
-	toolsets, mcpAppToolNames := mcp.CreateToolsets(ctx, agentConfig.HttpTools, agentConfig.SseTools, propagateToken, dynamicHeaderProvider)
+	toolsets := mcp.CreateToolsets(ctx, agentConfig.HttpTools, agentConfig.SseTools, propagateToken, dynamicHeaderProvider)
+	mcpAppToolNames := mcp.MCPAppToolNamesFromToolsets(toolsets)
 	subagentSessionIDs := make(map[string]string)
 
 	var remoteAgentTools []tool.Tool
