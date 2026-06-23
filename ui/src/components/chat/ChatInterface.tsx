@@ -269,7 +269,7 @@ export default function ChatInterface({ selectedAgentName, selectedNamespace, se
     if (options.clearInput ?? true) {
       setCurrentInputMessage("");
     }
-    
+
     // Cross-tab guard: fetch the latest session state before mutating anything.
     // Two cases: (1) another tab is still streaming — reconnect instead of sending;
     // (2) another tab completed a turn we haven't loaded — reload so the user sees
@@ -463,7 +463,6 @@ export default function ChatInterface({ selectedAgentName, selectedNamespace, se
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Stop voice recording if active before sending
     if (isListening) {
       stopListening();
     }

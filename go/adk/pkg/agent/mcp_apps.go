@@ -35,44 +35,42 @@ func MakeMCPAppModelResultCallback(appToolNames map[string]bool) llmagent.Before
 				if part == nil || part.FunctionResponse == nil || !appToolNames[part.FunctionResponse.Name] {
 					continue
 				}
-				// genai.FunctionResponse.Response is a generic map[string]any,
-				// but the payload is really an MCP CallToolResult. Decode it to
-				// the typed result, compact it with typed logic, and re-encode.
-				// If it isn't a recognizable MCP result, leave it untouched.
-				result, err := decodeCallToolResult(part.FunctionResponse.Response)
-				if err != nil {
-					continue
-				}
-				part.FunctionResponse.Response = encodeCallToolResult(
-					compactMCPAppModelResult(result),
-					part.FunctionResponse.Response,
-				)
+				part.FunctionResponse.Response = compactMCPAppModelResponse(part.FunctionResponse.Response)
 			}
 		}
 		return nil, nil
 	}
 }
 
-// compactMCPAppModelResult rewrites an MCP App tool result for the model. It
-// operates entirely on the typed [mcpsdk.CallToolResult] (IsError, Content,
-// Meta, StructuredContent) rather than poking at string keys; the generic
-// map[string]any only exists at the genai boundary in the callback above and in
-// the decode/encode helpers below.
-func compactMCPAppModelResult(result *mcpsdk.CallToolResult) *mcpsdk.CallToolResult {
+// compactMCPAppModelResponse rewrites an MCP App tool result for the model.
+//
+// The model exchanges tool results as a generic map (genai
+// FunctionResponse.Response), but the payload is really an MCP
+// [mcpsdk.CallToolResult]. We decode it into that typed result so the logic
+// works against real fields (IsError, Content, Meta, StructuredContent) rather
+// than poking at string keys. If the payload isn't a recognizable MCP result we
+// leave it untouched.
+func compactMCPAppModelResponse(response map[string]any) map[string]any {
+	result, err := decodeCallToolResult(response)
+	if err != nil {
+		return response
+	}
+
 	if result.IsError {
 		// On error, keep the original content/meta so the model can
 		// diagnose and recover; only drop the heavy structured payload.
 		result.StructuredContent = nil
-		return result
+		return encodeCallToolResult(result, response)
 	}
 
 	// On success, collapse the render payload into a terminal directive so the
 	// model stops re-invoking the rendering tool. Preserve _meta (e.g.
 	// resourceUri) in case downstream tooling relies on it.
-	return &mcpsdk.CallToolResult{
+	compact := &mcpsdk.CallToolResult{
 		Meta:    result.Meta,
 		Content: []mcpsdk.Content{&mcpsdk.TextContent{Text: mcpAppRenderedNotice}},
 	}
+	return encodeCallToolResult(compact, response)
 }
 
 // decodeCallToolResult interprets a generic model-facing response map as a typed
