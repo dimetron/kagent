@@ -1,4 +1,4 @@
-import { Message, Task, TaskStatusUpdateEvent, TaskArtifactUpdateEvent, TextPart, Part, DataPart, FilePart, FileWithBytes } from "@a2a-js/sdk";
+import { Message, Task, TaskStatusUpdateEvent, TaskArtifactUpdateEvent, TextPart, Part, DataPart } from "@a2a-js/sdk";
 import { v4 as uuidv4 } from "uuid";
 import { convertToUserFriendlyName, isAgentToolName, messageUtils } from "@/lib/utils";
 import { ApprovalDecision, AdkRequestConfirmationData, HitlPartInfo, ToolDecision, TokenStats, ChatStatus } from "@/types";
@@ -8,12 +8,9 @@ import { mapA2AStateToStatus } from "@/lib/statusUtils";
 export function extractMessagesFromTasks(tasks: Task[]): Message[] {
   const messages: Message[] = [];
   const seenMessageIds = new Set<string>();
-  // Agent-produced file artifacts already surfaced, deduped so the same saved
-  // file isn't rendered once per task that carries it.
-  const seenArtifactFiles = new Set<string>();
 
   for (const task of tasks) {
-    if (task.history) {
+    if (!task.history) continue;
 
     // Track the most recent LLM usage seen so far within this task so we can
     // attach it to HITL confirmation cards (which share the same invocation as
@@ -160,28 +157,6 @@ export function extractMessagesFromTasks(tasks: Task[]): Message[] {
           : historyItem
         );
       }
-    }
-    }
-
-    // Surface agent-produced file artifacts (e.g. save_artifact output). These
-    // live in task.artifacts, not task.history, so the history loop above misses
-    // them; without this they vanish (and become un-downloadable) on reload.
-    for (const artifact of task.artifacts ?? []) {
-      const fileParts = extractFileParts(artifact.parts).filter((fp) => {
-        const key = `${fp.file.name ?? ""}|${isFileWithBytes(fp.file) ? fp.file.bytes.length : (fp.file as { uri?: string }).uri ?? ""}`;
-        if (seenArtifactFiles.has(key)) return false;
-        seenArtifactFiles.add(key);
-        return true;
-      });
-      if (fileParts.length === 0) continue;
-
-      const source = getSourceFromMetadata(artifact.metadata as ADKMetadata | undefined, "assistant");
-      messages.push(createMessage("", source, {
-        originalType: "TextMessage",
-        contextId: task.contextId,
-        taskId: task.id,
-        fileParts,
-      }));
     }
   }
 
@@ -576,22 +551,6 @@ function isDataPart(part: Part): part is DataPart {
   return part.kind === "data";
 }
 
-/** Type guard for inline-bytes file parts (the only kind kagent transports). */
-export function isFilePart(part: Part): part is FilePart {
-  return part.kind === "file";
-}
-
-/** Returns true if a file part carries inline base64 bytes (vs. a URI). */
-export function isFileWithBytes(file: FilePart["file"]): file is FileWithBytes {
-  return typeof (file as FileWithBytes).bytes === "string";
-}
-
-/** Collect file parts from a list of parts, preserving them for rendering. */
-export function extractFileParts(parts: Part[] | undefined): FilePart[] {
-  if (!parts) return [];
-  return parts.filter(isFilePart);
-}
-
 function  getSourceFromMetadata(metadata: ADKMetadata | undefined, fallback: string = "assistant"): string {
   const appName = getMetadataValue<string>(metadata as Record<string, unknown>, "app_name");
   if (appName) {
@@ -614,8 +573,6 @@ export function createMessage(
     contextId?: string;
     taskId?: string;
     additionalMetadata?: Record<string, unknown>;
-    /** File parts to render alongside the text content (uploads/artifacts). */
-    fileParts?: FilePart[];
   } = {}
 ): Message {
   const {
@@ -624,16 +581,16 @@ export function createMessage(
     contextId,
     taskId,
     additionalMetadata = {},
-    fileParts = [],
   } = options;
-
-  const parts: Part[] = [{ kind: "text", text: content }, ...fileParts];
 
   const message: Message = {
     kind: "message",
     messageId,
     role: source === "user" ? "user" : "agent",
-    parts,
+    parts: [{
+      kind: "text",
+      text: content
+    }],
     contextId,
     taskId,
     metadata: {
@@ -698,9 +655,8 @@ export const createMessageHandlers = (handlers: MessageHandlers) => {
         } catch {
           return String(part.data);
         }
-      } else if (isFilePart(part)) {
-        // File parts are rendered separately as attachments, not as text.
-        return "";
+      } else if (part.kind === "file") {
+        return `[File: ${(part as { file?: { name?: string } }).file?.name || "unknown"}]`;
       }
       return String(part);
     }).join("");
@@ -999,16 +955,10 @@ export const createMessageHandlers = (handlers: MessageHandlers) => {
 
     // Add artifact content and convert tool parts to messages
     let artifactText = "";
-    const artifactFileParts: FilePart[] = [];
     const convertedMessages: Message[] = [];
     for (const part of artifactUpdate.artifact.parts) {
       if (isTextPart(part)) {
         artifactText += part.text || "";
-        continue;
-      }
-      if (isFilePart(part)) {
-        // Preserve produced file artifacts so they render as thumbnails/chips.
-        artifactFileParts.push(part);
         continue;
       }
       if (isDataPart(part)) {
@@ -1070,6 +1020,10 @@ export const createMessageHandlers = (handlers: MessageHandlers) => {
         }
         continue;
       }
+      if (part.kind === "file") {
+        artifactText += `[File: ${(part as { file?: { name?: string } }).file?.name || "unknown"}]`;
+        continue;
+      }
       artifactText += String(part);
     }
 
@@ -1082,7 +1036,7 @@ export const createMessageHandlers = (handlers: MessageHandlers) => {
       // would double-count the last turn's stats.
 
       const source = getSourceFromMetadata(adkMetadata, defaultAgentSource);
-      if (artifactText || artifactFileParts.length > 0) {
+      if (artifactText) {
         const displayMessage = createMessage(
           artifactText,
           source,
@@ -1090,8 +1044,7 @@ export const createMessageHandlers = (handlers: MessageHandlers) => {
             originalType: "TextMessage",
             contextId: artifactUpdate.contextId,
             taskId: artifactUpdate.taskId,
-            additionalMetadata: { ...(turnStats && { tokenStats: turnStats }) },
-            fileParts: artifactFileParts,
+            additionalMetadata: { ...(turnStats && { tokenStats: turnStats }) }
           }
         );
         handlers.setMessages(prevMessages => [...prevMessages, displayMessage]);
@@ -1176,8 +1129,7 @@ export const createMessageHandlers = (handlers: MessageHandlers) => {
         {
           originalType: "TextMessage",
           contextId: message.contextId,
-          taskId: message.taskId,
-          fileParts: extractFileParts(message.parts),
+          taskId: message.taskId
         }
       );
       handlers.setMessages(prevMessages => [...prevMessages, displayMessage]);

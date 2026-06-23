@@ -1,7 +1,5 @@
 import { Message, TextPart } from "@a2a-js/sdk";
 import { TruncatableText } from "@/components/chat/TruncatableText";
-import FileAttachment from "@/components/chat/FileAttachment";
-import { extractFileParts } from "@/lib/messageHandlers";
 import ToolCallDisplay from "@/components/chat/ToolCallDisplay";
 import AskUserDisplay, { AskUserQuestion } from "@/components/chat/AskUserDisplay";
 import KagentLogo from "../kagent-logo";
@@ -40,7 +38,6 @@ export default function ChatMessage({ message, allMessages, agentContext, onAppr
 
   const textParts = message.parts?.filter(part => part.kind === "text") || [];
   const content = textParts.map(part => (part as TextPart).text).join("");
-  const fileParts = extractFileParts(message.parts);
 
   const source = message.role === "user" ? "user" : "assistant";
   const tokenStats = (message.metadata as Record<string, unknown> | undefined)?.tokenStats as TokenStats | undefined;
@@ -157,8 +154,8 @@ export default function ChatMessage({ message, allMessages, agentContext, onAppr
     return null;
   }
 
-  // Skip empty messages (unless they carry file attachments).
-  if (!content && fileParts.length === 0) {
+  // Skip empty messages
+  if (!content) {
     return null;
   }
 
@@ -181,14 +178,7 @@ export default function ChatMessage({ message, allMessages, agentContext, onAppr
         <KagentLogo className="w-4 h-4" />
         <div className="text-xs font-bold">{displayName}</div>
       </div> : <div className="text-xs font-bold">{displayName}</div>}
-      {content && <TruncatableText content={String(content)} className="break-all text-primary-foreground" />}
-      {fileParts.length > 0 && (
-        <div className="flex flex-wrap gap-2 mt-1">
-          {fileParts.map((part, idx) => (
-            <FileAttachment key={`file-${idx}`} part={part} />
-          ))}
-        </div>
-      )}
+      <TruncatableText content={String(content)} className="break-all text-primary-foreground" />
       {source !== "user" && (
         <div className="flex mt-2 justify-end items-center gap-2">
           {tokenStats && <TokenStatsTooltip stats={tokenStats} />}
