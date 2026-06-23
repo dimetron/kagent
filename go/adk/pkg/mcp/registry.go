@@ -299,29 +299,50 @@ func (k mcpToolKind) String() string {
 	}
 }
 
+// mcpUIMetadata holds the MCP-UI extension fields read from a tool's _meta.
+type mcpUIMetadata struct {
+	ResourceURI string
+	Visibility  []string
+}
+
+func parseMCPUIMetadata(meta mcpsdk.Meta) mcpUIMetadata {
+	var ui mcpUIMetadata
+	if len(meta) == 0 {
+		return ui
+	}
+	if raw, ok := meta["ui"].(map[string]any); ok {
+		if uri, _ := raw["resourceUri"].(string); uri != "" {
+			ui.ResourceURI = uri
+		}
+		ui.Visibility = normalizeVisibility(raw["visibility"])
+	}
+	if ui.ResourceURI == "" {
+		if uri, _ := meta["ui/resourceUri"].(string); uri != "" {
+			ui.ResourceURI = uri
+		}
+	}
+	return ui
+}
+
 // mcpToolKindOf classifies a tool from its MCP metadata. App-only takes
 // precedence: a tool hidden from the model is never surfaced to the agent even
 // if it also declares a UI resource.
-func mcpToolKindOf(meta map[string]any) mcpToolKind {
-	if isAppOnlyVisibility(meta) {
+func mcpToolKindOf(meta mcpsdk.Meta) mcpToolKind {
+	ui := parseMCPUIMetadata(meta)
+	if isAppOnlyVisibility(ui.Visibility) {
 		return mcpToolKindAppOnly
 	}
-	if hasUIResource(meta) {
+	if ui.ResourceURI != "" {
 		return mcpToolKindApp
 	}
 	return mcpToolKindAgent
 }
 
-// isAppOnlyVisibility reports whether a tool's visibility hides it from the
-// agent: it declares "app" but not "model". Absent visibility defaults to
-// agent-visible.
-func isAppOnlyVisibility(meta map[string]any) bool {
-	ui, _ := meta["ui"].(map[string]any)
-	if ui == nil {
-		return false
-	}
+// isAppOnlyVisibility reports whether visibility hides a tool from the agent:
+// it declares "app" but not "model". Absent visibility defaults to agent-visible.
+func isAppOnlyVisibility(visibility []string) bool {
 	hasApp := false
-	for _, v := range normalizeVisibility(ui["visibility"]) {
+	for _, v := range visibility {
 		if v == "model" {
 			return false
 		}
@@ -330,18 +351,6 @@ func isAppOnlyVisibility(meta map[string]any) bool {
 		}
 	}
 	return hasApp
-}
-
-// hasUIResource reports whether a tool declares an MCP-UI resourceUri, meaning
-// its result should be rendered as an interactive app in the chat UI.
-func hasUIResource(meta map[string]any) bool {
-	if ui, ok := meta["ui"].(map[string]any); ok {
-		if uri, _ := ui["resourceUri"].(string); uri != "" {
-			return true
-		}
-	}
-	uri, _ := meta["ui/resourceUri"].(string)
-	return uri != ""
 }
 
 // normalizeVisibility coerces the visibility field, which the MCP spec allows

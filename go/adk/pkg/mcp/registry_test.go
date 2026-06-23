@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/a2aproject/a2a-go/a2asrv"
+	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 // a2aCtx builds a context that carries an A2A CallContext with the given headers.
@@ -182,52 +183,52 @@ func TestMCPToolKindOf(t *testing.T) {
 
 	tests := []struct {
 		name string
-		meta map[string]any
+		meta mcpsdk.Meta
 		want mcpToolKind
 	}{
 		{
 			name: "app visibility list is app-only",
-			meta: map[string]any{"ui": map[string]any{"visibility": []any{"app"}}},
+			meta: mcpsdk.Meta{"ui": map[string]any{"visibility": []any{"app"}}},
 			want: mcpToolKindAppOnly,
 		},
 		{
 			name: "app visibility string is app-only",
-			meta: map[string]any{"ui": map[string]any{"visibility": "app"}},
+			meta: mcpsdk.Meta{"ui": map[string]any{"visibility": "app"}},
 			want: mcpToolKindAppOnly,
 		},
 		{
 			name: "app-only wins over a declared resource uri",
-			meta: map[string]any{"ui": map[string]any{"visibility": []any{"app"}, "resourceUri": "ui://forms/form.html"}},
+			meta: mcpsdk.Meta{"ui": map[string]any{"visibility": []any{"app"}, "resourceUri": "ui://forms/form.html"}},
 			want: mcpToolKindAppOnly,
 		},
 		{
 			name: "model and app visibility without resource is a plain agent tool",
-			meta: map[string]any{"ui": map[string]any{"visibility": []any{"model", "app"}}},
+			meta: mcpsdk.Meta{"ui": map[string]any{"visibility": []any{"model", "app"}}},
 			want: mcpToolKindAgent,
 		},
 		{
 			name: "model and app visibility with resource renders as app",
-			meta: map[string]any{"ui": map[string]any{"visibility": []any{"app", "model"}, "resourceUri": "ui://forms/form.html"}},
+			meta: mcpsdk.Meta{"ui": map[string]any{"visibility": []any{"app", "model"}, "resourceUri": "ui://forms/form.html"}},
 			want: mcpToolKindApp,
 		},
 		{
 			name: "model only visibility is a plain agent tool",
-			meta: map[string]any{"ui": map[string]any{"visibility": []any{"model"}}},
+			meta: mcpsdk.Meta{"ui": map[string]any{"visibility": []any{"model"}}},
 			want: mcpToolKindAgent,
 		},
 		{
 			name: "resource uri in ui object renders as app",
-			meta: map[string]any{"ui": map[string]any{"resourceUri": "ui://forms/form.html"}},
+			meta: mcpsdk.Meta{"ui": map[string]any{"resourceUri": "ui://forms/form.html"}},
 			want: mcpToolKindApp,
 		},
 		{
 			name: "legacy resource uri key renders as app",
-			meta: map[string]any{"ui/resourceUri": "ui://forms/form.html"},
+			meta: mcpsdk.Meta{"ui/resourceUri": "ui://forms/form.html"},
 			want: mcpToolKindApp,
 		},
 		{
 			name: "plain tool",
-			meta: map[string]any{},
+			meta: mcpsdk.Meta{},
 			want: mcpToolKindAgent,
 		},
 	}
