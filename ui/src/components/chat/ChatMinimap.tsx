@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
 interface ChatMinimapProps {
@@ -28,6 +28,7 @@ interface Segment {
  * through the history quickly.
  */
 export default function ChatMinimap({ containerRef, revision }: ChatMinimapProps) {
+  const viewportId = useId();
   const [segments, setSegments] = useState<Segment[]>([]);
   const [view, setView] = useState({ topPct: 0, heightPct: 100 });
   const [scrollable, setScrollable] = useState(false);
@@ -75,6 +76,9 @@ export default function ChatMinimap({ containerRef, revision }: ChatMinimapProps
   useEffect(() => {
     const vp = getViewport();
     if (!vp) return;
+    if (!vp.id) {
+      vp.id = viewportId;
+    }
 
     // Defer the initial measurement so its setState calls don't run
     // synchronously inside the effect (which triggers cascading renders).
@@ -95,7 +99,7 @@ export default function ChatMinimap({ containerRef, revision }: ChatMinimapProps
       vp.removeEventListener("scroll", onScroll);
       ro.disconnect();
     };
-  }, [getViewport, measure, updateView, revision]);
+  }, [getViewport, measure, updateView, revision, viewportId]);
 
   const scrollToClientY = useCallback(
     (clientY: number) => {
@@ -140,6 +144,10 @@ export default function ChatMinimap({ containerRef, revision }: ChatMinimapProps
         role="scrollbar"
         aria-label="Chat history minimap"
         aria-orientation="vertical"
+        aria-controls={viewportId}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(view.topPct)}
       >
         {segments.map((s, i) => (
           <div

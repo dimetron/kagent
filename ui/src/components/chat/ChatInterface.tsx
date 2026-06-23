@@ -1017,8 +1017,8 @@ export default function ChatInterface({ selectedAgentName, selectedNamespace, se
     );
   }
   return (
-    <div className="w-full h-full flex flex-col justify-center min-w-full items-center transition-all duration-300 ease-in-out">
-      <div className="flex-1 w-full overflow-hidden relative">
+    <div className="flex h-full min-h-0 w-full min-w-full flex-col items-center transition-all duration-300 ease-in-out">
+      <div className="relative min-h-0 w-full flex-1 overflow-hidden">
         <ScrollArea ref={containerRef} className="w-full h-full py-12">
           <div className="flex w-full min-w-0 max-w-full flex-col space-y-5 overflow-x-hidden px-4">
             {/* Never show loading for first message/new session */}
@@ -1095,7 +1095,7 @@ export default function ChatInterface({ selectedAgentName, selectedNamespace, se
         <ChatMinimap containerRef={containerRef} revision={allMessages.length} />
       </div>
 
-      <div className="w-full sticky bg-secondary bottom-0 md:bottom-2 rounded-none md:rounded-lg p-4 border  overflow-hidden transition-all duration-300 ease-in-out">
+      <div className="w-full shrink-0 overflow-hidden rounded-none border bg-secondary p-4 transition-all duration-300 ease-in-out md:rounded-lg">
         <div className="flex items-center justify-between mb-4">
           <StatusDisplay chatStatus={chatStatus} />
           {sessionStats.total > 0 && <SessionTokenStatsDisplay stats={sessionStats} />}

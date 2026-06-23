@@ -7,9 +7,9 @@ import (
 	"testing"
 
 	"github.com/a2aproject/a2a-go/a2asrv"
+	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 	adkagent "google.golang.org/adk/agent"
 	"google.golang.org/adk/tool"
-	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 // a2aCtx builds a context that carries an A2A CallContext with the given headers.
