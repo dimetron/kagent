@@ -71,7 +71,7 @@ export default async function ChatLayout({
 
   return (
     <SidebarProvider
-      className="h-full min-h-0"
+      className="!min-h-0 h-full"
       style={
         {
           "--sidebar-width": "350px",

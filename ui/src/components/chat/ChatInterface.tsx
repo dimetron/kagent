@@ -996,7 +996,7 @@ export default function ChatInterface({ selectedAgentName, selectedNamespace, se
     );
   }
   return (
-    <div className="flex h-full min-h-0 w-full min-w-full flex-col items-center transition-all duration-300 ease-in-out">
+    <div className="flex h-full min-h-0 w-full min-w-0 flex-col items-center transition-all duration-300 ease-in-out">
       <div className="relative min-h-0 w-full flex-1 overflow-hidden">
         <ScrollArea ref={containerRef} className="w-full h-full py-12">
           <div className="flex w-full min-w-0 max-w-full flex-col space-y-5 overflow-x-hidden px-4">
