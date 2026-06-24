@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { FunctionCall, TokenStats } from "@/types";
 import { FunctionSquare, CheckCircle, Clock, Code, ChevronUp, ChevronDown, Loader2, Text, Check, Copy, AlertCircle, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,7 @@ import TokenStatsTooltip from "@/components/chat/TokenStatsTooltip";
 import { convertToUserFriendlyName } from "@/lib/utils";
 import { McpAppRenderer } from "@/components/mcp-apps/McpAppRenderer";
 import type { ChatMcpAppTool } from "@/components/chat/ChatMcpAppsContext";
-import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import { buildMcpAppRenderPayload } from "@/lib/mcpAppToolResult";
 
 export type ToolCallStatus = "requested" | "executing" | "completed" | "pending_approval" | "approved" | "rejected";
 
@@ -32,47 +32,6 @@ interface ToolDisplayProps {
   onMcpAppSendMessage?: (text: string) => Promise<void>;
 }
 
-function isCallToolResult(value: unknown): value is CallToolResult {
-  return typeof value === "object" && value !== null && Array.isArray((value as { content?: unknown }).content);
-}
-
-function stringifyToolPayload(value: unknown, fallback: string): string {
-  if (typeof value === "string") {
-    return value;
-  }
-  if (value === undefined || value === null) {
-    return fallback;
-  }
-  try {
-    return JSON.stringify(value);
-  } catch {
-    return fallback;
-  }
-}
-
-function toMcpAppToolResult(value: unknown, fallbackContent: string): CallToolResult | undefined {
-  if (isCallToolResult(value)) {
-    return value;
-  }
-
-  if (typeof value !== "object" || value === null) {
-    return undefined;
-  }
-
-  const response = value as Record<string, unknown>;
-  const output = "output" in response ? response.output : value;
-  const isError = response.isError === true || response.error === true;
-
-  return {
-    content: [{
-      type: "text",
-      text: stringifyToolPayload(output, fallbackContent),
-    }],
-    structuredContent: typeof output === "object" && output !== null ? output as Record<string, unknown> : undefined,
-    isError,
-  };
-}
-
 const ToolDisplay = ({ call, result, status = "requested", isError = false, isDecided = false, subagentName, onApprove, onReject, tokenStats, mcpApp, onMcpAppSendMessage }: ToolDisplayProps) => {
   const [areArgumentsExpanded, setAreArgumentsExpanded] = useState(status === "pending_approval");
   const [areResultsExpanded, setAreResultsExpanded] = useState(false);
@@ -82,8 +41,13 @@ const ToolDisplay = ({ call, result, status = "requested", isError = false, isDe
   const [rejectionReason, setRejectionReason] = useState("");
 
   const hasResult = result !== undefined;
-  const appToolResult = hasResult ? toMcpAppToolResult(result.rawResult, result.content) : undefined;
-  const shouldRenderMcpApp = !!mcpApp && !!appToolResult && status === "completed" && !isError;
+  // Memoized so the {toolInput, toolResult} objects keep a stable identity across
+  // renders; AppRenderer keys its one-shot tool-input/result delivery off them.
+  const mcpAppPayload = useMemo(
+    () => (result ? buildMcpAppRenderPayload(result.rawResult, result.content, call.args) : undefined),
+    [result, call.args],
+  );
+  const shouldRenderMcpApp = !!mcpApp && !!mcpAppPayload?.toolResult && status === "completed" && !isError;
 
   const handleCopy = async () => {
     try {
@@ -333,8 +297,8 @@ const ToolDisplay = ({ call, result, status = "requested", isError = false, isDe
                 serverName={mcpApp.serverName}
                 toolName={mcpApp.toolName}
                 toolResourceUri={mcpApp.uiResourceUri}
-                toolInput={call.args}
-                toolResult={appToolResult}
+                toolInput={mcpAppPayload.toolInput}
+                toolResult={mcpAppPayload.toolResult}
                 onSendMessage={onMcpAppSendMessage}
               />
             </div>

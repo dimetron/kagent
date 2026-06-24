@@ -92,7 +92,7 @@ const extractToolCallRequests = (message: Message): FunctionCall[] => {
         functionCalls.push({
           id: data.id,
           name: data.name,
-          args: data.args
+          args: data.args ?? {},
         });
       }
     }

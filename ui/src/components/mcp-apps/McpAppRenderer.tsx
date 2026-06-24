@@ -2,10 +2,17 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppRenderer, type AppRendererProps } from "@mcp-ui/client";
-import type { CallToolResult, ReadResourceResult, ContentBlock } from "@modelcontextprotocol/sdk/types.js";
+import type { CallToolResult, ContentBlock } from "@modelcontextprotocol/sdk/types.js";
 import { useTheme } from "next-themes";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useChatMcpApps } from "@/components/chat/ChatMcpAppsContext";
+import { callMcpAppTool, readMcpAppResource } from "@/app/actions/mcp-apps";
+import { installMcpAppInitCompat } from "@/lib/mcpAppInitCompat";
+
+// Install at module load (before AppRenderer mounts and its transport connects)
+// so non-conformant guests that send `clientInfo` instead of `appInfo` in their
+// `ui/initialize` request still complete the handshake. See mcpAppInitCompat.
+installMcpAppInitCompat();
 
 interface McpAppRendererProps {
   namespace: string;
@@ -39,31 +46,6 @@ function requireData<T>(response: { data?: T; error?: string; message: string })
     throw new Error(response.error || response.message);
   }
   return response.data;
-}
-
-function mcpAppApiPath(namespace: string, name: string): string {
-  return `/api/mcp-apps/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}`;
-}
-
-async function fetchMcpAppApi<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, {
-    ...init,
-    cache: "no-store",
-    credentials: "same-origin",
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-      ...init?.headers,
-    },
-  });
-  const payload = await response.json().catch(() => ({
-    error: `MCP Apps request failed with status ${response.status}`,
-    message: response.statusText,
-  }));
-  if (!response.ok) {
-    throw new Error(payload.error || payload.message || `MCP Apps request failed with status ${response.status}`);
-  }
-  return requireData<T>(payload);
 }
 
 export function McpAppRenderer({
@@ -123,9 +105,7 @@ export function McpAppRenderer({
   }), []);
 
   const handleReadResource = useCallback<NonNullable<AppRendererProps["onReadResource"]>>(async ({ uri }) => {
-    return fetchMcpAppApi<ReadResourceResult>(
-      `${mcpAppApiPath(namespace, serverName)}/resources?uri=${encodeURIComponent(uri)}`,
-    );
+    return requireData(await readMcpAppResource(namespace, serverName, uri));
   }, [namespace, serverName]);
 
   // An iframe-initiated tools/call is the app updating itself: proxy it to the
@@ -145,13 +125,7 @@ export function McpAppRenderer({
       throw new Error(`MCP App requested tool ${requestedToolName}, but it is not configured as app-only or agent-visible.`);
     }
 
-    return fetchMcpAppApi<CallToolResult>(
-      `${mcpAppApiPath(namespace, serverName)}/tools/${encodeURIComponent(requestedToolName)}/call`,
-      {
-        method: "POST",
-        body: JSON.stringify({ arguments: args }),
-      },
-    );
+    return requireData(await callMcpAppTool(namespace, serverName, requestedToolName, args));
   }, [getMcpToolForAppCall, namespace, serverName, toolName]);
 
   // ui/message: the app asks the host to inject content into the conversation.

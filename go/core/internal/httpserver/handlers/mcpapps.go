@@ -11,10 +11,13 @@ import (
 
 	api "github.com/kagent-dev/kagent/go/api/httpapi"
 	"github.com/kagent-dev/kagent/go/api/v1alpha2"
+	agent_translator "github.com/kagent-dev/kagent/go/core/internal/controller/translator/agent"
 	"github.com/kagent-dev/kagent/go/core/internal/httpserver/errors"
 	"github.com/kagent-dev/kagent/go/core/internal/version"
 	"github.com/kagent-dev/kagent/go/core/pkg/auth"
+	kmcp "github.com/kagent-dev/kmcp/api/v1alpha1"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
@@ -50,7 +53,7 @@ func (h *MCPAppsHandler) HandleListTools(w ErrorResponseWriter, r *http.Request)
 
 	session, cancel, err := h.connect(r.Context(), namespace, name)
 	if err != nil {
-		w.RespondWithError(errors.NewInternalServerError("Failed to connect to RemoteMCPServer", err))
+		w.RespondWithError(errors.NewInternalServerError("Failed to connect to MCP server", err))
 		return
 	}
 	defer cancel()
@@ -108,7 +111,7 @@ func (h *MCPAppsHandler) HandleCallTool(w ErrorResponseWriter, r *http.Request) 
 
 	session, cancel, err := h.connect(r.Context(), namespace, name)
 	if err != nil {
-		w.RespondWithError(errors.NewInternalServerError("Failed to connect to RemoteMCPServer", err))
+		w.RespondWithError(errors.NewInternalServerError("Failed to connect to MCP server", err))
 		return
 	}
 	defer cancel()
@@ -143,7 +146,7 @@ func (h *MCPAppsHandler) HandleReadResource(w ErrorResponseWriter, r *http.Reque
 
 	session, cancel, err := h.connect(r.Context(), namespace, name)
 	if err != nil {
-		w.RespondWithError(errors.NewInternalServerError("Failed to connect to RemoteMCPServer", err))
+		w.RespondWithError(errors.NewInternalServerError("Failed to connect to MCP server", err))
 		return
 	}
 	defer cancel()
@@ -180,12 +183,43 @@ func (h *MCPAppsHandler) remoteMCPServerRef(w ErrorResponseWriter, r *http.Reque
 	return namespace, name, true
 }
 
+// resolveRemoteMCPServer locates the MCP endpoint for the given ref, supporting
+// both RemoteMCPServer (external URL) and the kmcp MCPServer CRD (an in-cluster
+// Deployment+Service). An MCPServer is converted to the same RemoteMCPServer
+// shape the controller uses for tool discovery, so both kinds share one connect
+// path.
+func (h *MCPAppsHandler) resolveRemoteMCPServer(ctx context.Context, namespace, name string) (*v1alpha2.RemoteMCPServer, error) {
+	key := client.ObjectKey{Namespace: namespace, Name: name}
+
+	server := &v1alpha2.RemoteMCPServer{}
+	err := h.KubeClient.Get(ctx, key, server)
+	if err == nil {
+		return server, nil
+	}
+	if !apierrors.IsNotFound(err) {
+		return nil, fmt.Errorf("failed to get RemoteMCPServer %s/%s: %w", namespace, name, err)
+	}
+
+	mcpServer := &kmcp.MCPServer{}
+	if err := h.KubeClient.Get(ctx, key, mcpServer); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, fmt.Errorf("no RemoteMCPServer or MCPServer %s/%s found", namespace, name)
+		}
+		return nil, fmt.Errorf("failed to get MCPServer %s/%s: %w", namespace, name, err)
+	}
+	server, err = agent_translator.ConvertMCPServerToRemoteMCPServer(mcpServer)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve MCPServer %s/%s endpoint: %w", namespace, name, err)
+	}
+	return server, nil
+}
+
 func (h *MCPAppsHandler) connect(ctx context.Context, namespace, name string) (*mcp.ClientSession, context.CancelFunc, error) {
 	log := ctrllog.FromContext(ctx).WithName("mcp-apps-handler").WithValues("namespace", namespace, "name", name)
 
-	server := &v1alpha2.RemoteMCPServer{}
-	if err := h.KubeClient.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, server); err != nil {
-		return nil, nil, fmt.Errorf("failed to get RemoteMCPServer %s/%s: %w", namespace, name, err)
+	server, err := h.resolveRemoteMCPServer(ctx, namespace, name)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	timeout := 30 * time.Second
@@ -226,7 +260,7 @@ func (h *MCPAppsHandler) connect(ctx context.Context, namespace, name string) (*
 		return nil, nil, fmt.Errorf("failed to connect MCP client: %w", err)
 	}
 
-	log.V(2).Info("Connected to RemoteMCPServer for MCP Apps")
+	log.V(2).Info("Connected to MCP server for MCP Apps")
 	return session, cancel, nil
 }
 
