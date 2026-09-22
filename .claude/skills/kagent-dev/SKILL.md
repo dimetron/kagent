@@ -116,8 +116,34 @@ For resource or collection authorization work, read the [scoped authorization gu
 - Substrate end-to-end coverage may remain non-blocking until the final conformance milestone, but the final release requires it.
 - Do not spend time preserving tests whose sole subject no longer exists.
 
+## Lint before every PR
+
+Run `make -C go lint` before opening or updating a PR, and before asking for review. It is not optional and it is not covered by `go build` or `go test`:
+
+- `gofmt` is enforced as a linter, so a misaligned struct literal builds and passes tests but fails CI's `go-lint` job.
+- CI runs this job on every push. A formatting-only failure costs a full round trip, so run it locally first.
+
+Useful adjacent targets:
+
+```bash
+make -C go lint        # golangci-lint, includes gofmt
+make -C go lint-fix    # apply auto-fixes
+make -C go fmt         # go fmt only
+```
+
+If `make -C go lint` fails while *building the kube-api-linter plugin* rather than linting, the environment is at fault, not the change. The plugin needs cgo, and on macOS it also needs `-no_fixup_chains`:
+
+| Symptom | Cause |
+| --- | --- |
+| `-buildmode=plugin requires external (cgo) linking` | `CGO_ENABLED=0` exported in the shell |
+| `plugin: not implemented`, or `unable to load custom analyzer` | The installed `golangci-lint` binary itself was built with cgo disabled |
+| `dlopen ... chained fixups, seg_count does not match number of segments` | macOS linked the plugin with chained fixups |
+
+`make -C go lint` handles all three. If you hit them after deleting `go/bin`, re-run the target; if the installed `golangci-lint` is the cgo-disabled one, remove `go/bin/golangci-lint*` and let it reinstall.
+
 ## PR discipline
 
+- Run lint before opening or updating a PR; see above.
 - Follow the roadmap dependency graph.
 - Keep Codex and Claude adapter work in separate PRs consuming the same resolved-bundle boundary.
 - Avoid concurrent ownership of protobuf registration, migrations, controller wiring, or generated CRDs.

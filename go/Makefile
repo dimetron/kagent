@@ -48,8 +48,27 @@ fmt: ## Run go fmt.
 vet: ## Run go vet.
 	go vet ./...
 
+## Location to install dependencies to.
+## Defined here, above its first use: $(KAL_SO) is a rule *target* below, and a
+## rule's target name is expanded when the file is parsed. With LOCALBIN
+## undefined at that point the target was literally "/kube-api-linter.so" while
+## the recipe wrote to $(LOCALBIN)/kube-api-linter.so, so the target never
+## existed and the plugin was rebuilt (re-cloning the linter source) on every
+## lint run.
+LOCALBIN ?= $(shell pwd)/bin
+
 KAL_SO = $(LOCALBIN)/kube-api-linter.so
 GO_TOOLCHAIN := $(shell go env GOVERSION)
+
+# golangci-lint loads kube-api-linter as a Go plugin, and plugin mode needs cgo
+# twice: to build the .so, and when building the host golangci-lint binary that
+# loads it. Both steps set CGO_ENABLED=1 explicitly below rather than exporting
+# it, so no other target changes behaviour.
+#
+# An inherited CGO_ENABLED=0 shows up as "-buildmode=plugin requires external
+# (cgo) linking" while building and "plugin: not implemented" / "unable to load
+# custom analyzer" while running. CI has no such export, so go-lint passes there
+# and this fails only locally, for no visible reason.
 
 .PHONY: lint
 lint: golangci-lint $(KAL_SO) ## Run golangci-lint.
@@ -63,13 +82,29 @@ lint-fix: golangci-lint $(KAL_SO) ## Run golangci-lint with auto-fix.
 lint-config: golangci-lint ## Verify golangci-lint linter configuration.
 	$(GOLANGCI_LINT) config verify
 
-$(KAL_SO):
+.PHONY: kube-api-linter
+kube-api-linter: $(KAL_SO) ## Build the kube-api-linter golangci-lint plugin.
+
+# macOS links plugins with chained fixups, which plugin.Open cannot load: dlopen
+# fails with "chained fixups, seg_count does not match number of segments" even
+# though the .so builds cleanly. Linking without fixup chains resolves it. This
+# is an ld64 flag, so it is Darwin-only -- ld on Linux rejects it. Override
+# KAL_LDFLAGS to disable.
+ifeq ($(shell uname -s),Darwin)
+KAL_LDFLAGS ?= -extldflags=-Wl,-no_fixup_chains
+endif
+
+# Depending on this Makefile rebuilds a plugin left behind by a cgo-disabled run
+# (a broken artifact, not a missing one, so a plain file-existence check would
+# keep an unusable .so forever) without re-cloning on every lint run. `make
+# clean` drops it.
+$(KAL_SO): Makefile
 	@mkdir -p $(LOCALBIN)
 	@echo "Building kube-api-linter plugin..."
 	@rm -rf $(LOCALBIN)/golangci-lint-src
 	@git clone --depth 1 --branch $(GOLANGCI_LINT_VERSION) --quiet https://github.com/golangci/golangci-lint.git $(LOCALBIN)/golangci-lint-src
 	@cd $(LOCALBIN)/golangci-lint-src && GOTOOLCHAIN=$(GO_TOOLCHAIN) go get sigs.k8s.io/kube-api-linter@$(KAL_VERSION)
-	@cd $(LOCALBIN)/golangci-lint-src && GOTOOLCHAIN=$(GO_TOOLCHAIN) go build -buildmode=plugin -o $(KAL_SO) sigs.k8s.io/kube-api-linter/pkg/plugin
+	@cd $(LOCALBIN)/golangci-lint-src && CGO_ENABLED=1 GOTOOLCHAIN=$(GO_TOOLCHAIN) go build -buildmode=plugin -ldflags="$(KAL_LDFLAGS)" -o $(KAL_SO) sigs.k8s.io/kube-api-linter/pkg/plugin
 	@rm -rf $(LOCALBIN)/golangci-lint-src
 
 .PHONY: govulncheck
@@ -146,8 +181,6 @@ e2e: core/bin/kagent-local ## Run end-to-end tests.
 
 ##@ Dependencies
 
-## Location to install dependencies to
-LOCALBIN ?= $(shell pwd)/bin
 $(LOCALBIN):
 	mkdir -p $(LOCALBIN)
 
@@ -192,6 +225,12 @@ $(ENVTEST): $(LOCALBIN)
 golangci-lint: $(GOLANGCI_LINT) ## Download golangci-lint locally if necessary.
 $(GOLANGCI_LINT): $(LOCALBIN)
 	$(call go-install-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/v2/cmd/golangci-lint,$(GOLANGCI_LINT_VERSION))
+
+# A golangci-lint built without cgo cannot load Go plugins at all and reports
+# "plugin: not implemented", however the plugin beside it was built. Target-
+# specific, and exported so it reaches the go build inside go-install-tool, so
+# no other target inherits it.
+$(GOLANGCI_LINT): export CGO_ENABLED = 1
 
 # go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
 # $1 - target path with name of binary
