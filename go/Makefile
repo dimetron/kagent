@@ -223,14 +223,27 @@ $(ENVTEST): $(LOCALBIN)
 
 .PHONY: golangci-lint
 golangci-lint: $(GOLANGCI_LINT) ## Download golangci-lint locally if necessary.
-$(GOLANGCI_LINT): $(LOCALBIN)
-	$(call go-install-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/v2/cmd/golangci-lint,$(GOLANGCI_LINT_VERSION))
 
 # A golangci-lint built without cgo cannot load Go plugins at all and reports
 # "plugin: not implemented", however the plugin beside it was built. Target-
-# specific, and exported so it reaches the go build inside go-install-tool, so
-# no other target inherits it.
+# specific and exported so it reaches the go build inside go-install-tool; no
+# other target inherits it.
 $(GOLANGCI_LINT): export CGO_ENABLED = 1
+# $(LOCALBIN) is a prerequisite so the directory exists before go version reads
+# from it. FORCE makes the recipe run every time: go-install-tool skips the
+# download when the versioned binary already exists, so a binary left behind by
+# an earlier CGO_ENABLED=0 run -- precisely the file that cannot load the plugin
+# -- would otherwise be trusted by its existence and never replaced. The extra
+# cost is a metadata read followed by a no-op when the binary is already good.
+$(GOLANGCI_LINT): $(LOCALBIN) FORCE
+	@if [ -f "$(GOLANGCI_LINT)" ] && ! go version -m "$(GOLANGCI_LINT)" 2>/dev/null | grep -q "CGO_ENABLED=1"; then \
+		echo "Replacing cgo-disabled $(notdir $(GOLANGCI_LINT)); it cannot load Go plugins..."; \
+		rm -f "$(GOLANGCI_LINT)" "$(GOLANGCI_LINT)-$(GOLANGCI_LINT_VERSION)"; \
+	fi
+	$(call go-install-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/v2/cmd/golangci-lint,$(GOLANGCI_LINT_VERSION))
+
+.PHONY: FORCE
+FORCE:
 
 # go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
 # $1 - target path with name of binary
