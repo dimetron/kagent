@@ -136,10 +136,10 @@ If `make -C go lint` fails while *building the kube-api-linter plugin* rather th
 | Symptom | Cause |
 | --- | --- |
 | `-buildmode=plugin requires external (cgo) linking` | `CGO_ENABLED=0` exported in the shell |
-| `plugin: not implemented`, or `unable to load custom analyzer` | The installed `golangci-lint` binary itself was built with cgo disabled |
+| `plugin: not implemented`, or `unable to load custom analyzer` | The installed `golangci-lint` binary was built with cgo disabled |
 | `dlopen ... chained fixups, seg_count does not match number of segments` | macOS linked the plugin with chained fixups |
 
-`make -C go lint` handles all three. If you hit them after deleting `go/bin`, re-run the target; if the installed `golangci-lint` is the cgo-disabled one, remove `go/bin/golangci-lint*` and let it reinstall.
+`make -C go lint` handles all three: the recipes that need cgo set `CGO_ENABLED=1` themselves, the plugin is linked without fixup chains on Darwin, and a `golangci-lint` binary that predates this (built cgo-disabled, which cannot load plugins at any version) is detected from its build metadata and replaced. The last one matters if you have been running lint since before this fix — the stale binary looks present and correct, so it is replaced rather than assumed good.
 
 ## PR discipline
 
