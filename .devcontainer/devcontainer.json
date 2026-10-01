@@ -3,19 +3,20 @@
   "build": {
     "dockerfile": "Dockerfile",
     "args": {
-      "TOOLS_GO_VERSION": "1.27.0",
-      "TOOLS_NODE_VERSION": "24.13.0",
-      "TOOLS_UV_VERSION": "0.10.4",
-      "TOOLS_K9S_VERSION": "0.50.4",
-      "TOOLS_KIND_VERSION": "0.27.0",
-      "TOOLS_ISTIO_VERSION": "1.26.0",
-      "TOOLS_ARGO_CD_VERSION": "v1.8.4",
-      "TOOLS_KUBECTL_VERSION": "1.33.4"
+      "TOOLS_GO_VERSION": "1.27.1",
+      "TOOLS_NODE_VERSION": "24.21.0",
+      "TOOLS_UV_VERSION": "0.12.21",
+      "TOOLS_PYTHON_VERSION": "3.13",
+      "TOOLS_K9S_VERSION": "0.51.0",
+      "TOOLS_KIND_VERSION": "0.33.0",
+      "TOOLS_ISTIO_VERSION": "1.31.1",
+      "TOOLS_ARGO_CD_VERSION": "v1.10.0",
+      "TOOLS_KUBECTL_VERSION": "1.35.9",
+      "TOOLS_SUBSTRATE_VERSION": "0.3.0-alpha3"
     }
   },
   "features": {
-    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": { "moby": false },
-    "ghcr.io/mpriscella/features/kind:1": {}
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": { "moby": false }
   },
   "customizations": {
     "vscode": {
@@ -27,11 +28,9 @@
         "dbaeumer.vscode-eslint",
         "ms-azuretools.vscode-docker",
         "ms-vscode.makefile-tools",
-        "ms-vscode.vscode-go",
         "ms-python.python",
         "ms-python.vscode-pylance",
         "ms-toolsai.jupyter",
-        "ms-vscode.makefile-tools",
         "ms-remote.remote-containers",
         "ms-vscode.vscode-typescript-next",
         "ms-azuretools.vscode-containers",
@@ -47,11 +46,17 @@
   "remoteUser": "root",
 
   //forward the following ports
-  "forwardPorts": [8082],
+  //8001: yarn dev, 8080: UI and 8083: controller (setup-cluster.sh), 8082: make kagent-ui-port-forward
+  "forwardPorts": [8001, 8080, 8082, 8083],
+
+  //kind and its registry run on the host daemon and publish on the host's 127.0.0.1
+  //(API server, localhost:5001); share the host network so kubectl and buildx reach them.
+  //Docker Desktop: enable Settings > Resources > Network > Enable host networking.
+  "runArgs": ["--network=host"],
 
   //mount docker directly on the host
   "mounts": ["source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"],
 
-  // Uncomment the next line to run commands after the container is created.
-  "postCreateCommand": "make print-tools-versions delete-kind-cluster create-kind-cluster"
+  //create (or reuse) the kind cluster; run scripts/setup-cluster/setup-cluster.sh for Substrate and kagent
+  "postCreateCommand": "make print-tools-versions create-kind-cluster"
 }

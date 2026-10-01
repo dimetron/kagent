@@ -22,9 +22,10 @@ RUN mkdir -p /etc/apt/keyrings \
 
 FROM base-os AS base
 ARG TOOLS_NODE_VERSION
+ARG TOOLS_PYTHON_VERSION
 
 # Install python
-RUN uv python install 3.12
+RUN uv python install ${TOOLS_PYTHON_VERSION}
 
 # Install nvm
 ENV NVM_DIR=/usr/local/nvm
@@ -34,7 +35,7 @@ ENV NODE_PATH=$NVM_DIR/v$TOOLS_NODE_VERSION/lib/node_modules
 
 # Install nvm with node and npm
 RUN mkdir -p  $NVM_DIR \
-    && curl https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh  | bash \
+    && curl https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.8/install.sh  | bash \
     && . $NVM_DIR/nvm.sh \
     && mkdir -p $NVM_DIR/versions \
     && nvm install $TOOLS_NODE_VERSION \
@@ -42,7 +43,8 @@ RUN mkdir -p  $NVM_DIR \
     && which node && node --version \
     && ln -sf $NVM_DIR/versions/node/v$TOOLS_NODE_VERSION/bin/node /usr/bin/node \
     && ln -sf $NVM_DIR/versions/node/v$TOOLS_NODE_VERSION/bin/npm /usr/bin/npm \
-    && ln -sf $NVM_DIR/versions/node/v$TOOLS_NODE_VERSION/bin/npx /usr/bin/npx
+    && ln -sf $NVM_DIR/versions/node/v$TOOLS_NODE_VERSION/bin/npx /usr/bin/npx \
+    && corepack enable
 
 ### STAGE 2: build + tools (extends base to inherit Node.js and Python)
 FROM --platform=$BUILDPLATFORM base AS builder
@@ -107,6 +109,7 @@ ARG TOOLS_KIND_VERSION
 ARG TOOLS_ISTIO_VERSION
 ARG TOOLS_ARGO_CD_VERSION
 ARG TOOLS_KUBECTL_VERSION
+ARG TOOLS_SUBSTRATE_VERSION
 
 # Install kubectl argo plugin
 RUN curl -o /usr/local/bin/kubectl-argo-rollouts -L https://github.com/argoproj/argo-rollouts/releases/download/${TOOLS_ARGO_CD_VERSION}/kubectl-argo-rollouts-linux-${ARCH} \
@@ -138,6 +141,10 @@ RUN curl -LO https://github.com/derailed/k9s/releases/download/v${TOOLS_K9S_VERS
 # Install kubectl
 RUN curl -Lo /usr/local/bin/kubectl "https://dl.k8s.io/release/v${TOOLS_KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl" \
     && chmod +x /usr/local/bin/kubectl
+
+# Install kubectl-ate, which mints the Substrate CA and JWT pools (scripts/setup-cluster/setup-cluster.sh)
+RUN curl -fsSLo /usr/local/bin/kubectl-ate "https://github.com/kagent-dev/substrate/releases/download/v${TOOLS_SUBSTRATE_VERSION}/kubectl-ate-linux-${ARCH}" \
+    && chmod +x /usr/local/bin/kubectl-ate
 
 RUN sh -c "$(wget https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh -O -)" \
     && STARSHIP_SUFFIX=$(case ${ARCH} in amd64) echo x86_64-unknown-linux-gnu;; arm64) echo aarch64-unknown-linux-musl;; esac) \
