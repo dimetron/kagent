@@ -417,6 +417,35 @@ agents:
 		"only the terminal node's structured output is shown; the intermediate one stays data")
 }
 
+func TestIntermediateStringOutputsStayOutOfTheChat(t *testing.T) {
+	reg := testRegistry(t)
+	spec, err := reg.Parse([]byte(`
+apiVersion: adk.declarative/v0.2
+kind: AgentSystem
+agents:
+  - name: wf
+    agent_class: Workflow
+    nodes:
+      - { id: first, type: function, function: prefix }
+      - { id: second, type: function, function: prefix }
+    edges: [{ from: START, to: first }, { from: first, to: second }]
+`))
+	require.NoError(t, err)
+	sys, err := Build(t.Context(), spec, reg)
+	require.NoError(t, err)
+
+	svc, id := newSession(t)
+	var texts []string
+	for _, ev := range run(t, sys.Root(), userMessage("go"), svc, id) {
+		if ev.Content != nil {
+			for _, p := range ev.Content.Parts {
+				texts = append(texts, p.Text)
+			}
+		}
+	}
+	require.Equal(t, []string{"item:item:go"}, texts, "only the terminal result is shown, as with native function nodes")
+}
+
 func TestChatModeAgentNodeKeepsItsDeclaredMode(t *testing.T) {
 	reg := NewRegistry()
 	spec, err := reg.Parse([]byte(`

@@ -74,9 +74,11 @@ Unknown fields anywhere in the document are decode errors.
 ### Output visibility
 
 A2A clients display event message text only; successor nodes read the structured
-`Event.Output`. The ADK engine fills message text for string outputs. For the
-terminal nodes of a graph, `function`, `dynamic` and `hitl` nodes also render a
-structured output as JSON text next to the data. A terminal `tool`, `join` or
+`Event.Output`. Function nodes are plain ADK function nodes: they emit data, so
+intermediate steps stay out of the chat, exactly as with a native
+`workflow.NewFunctionNode`. For the terminal nodes of a graph, `function`,
+`dynamic` and `hitl` nodes also render their output as message text: strings as
+they are, structured values as JSON. A terminal `tool`, `join` or
 `parallel_worker` node would end the run with output no client displays, so
 validation rejects it: end such a branch with a `function` node. A nested
 `workflow` node is checked through its own terminals.
@@ -178,6 +180,8 @@ drift from the Go validation.
 
 `go/adk/examples/declarative` serves a document through the A2A application
 builder, with Go functions, a tool, and an OpenAI model resolver registered.
-`go/adk/pkg/declarative/testdata` holds two documents the package tests run end
+[Workflow design patterns](workflow-patterns.md) shows router, fan-out and fan-in,
+map-reduce, loops, human approval, and more, each as Go next to YAML, with the
+graphs the engine rejects. `go/adk/pkg/declarative/testdata` holds two documents the package tests run end
 to end: `showcase.yaml` exercises every node type, route form and LLM option, and
 `composites.yaml` the sequential, parallel and loop agents.

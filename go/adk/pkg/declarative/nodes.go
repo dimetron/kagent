@@ -25,7 +25,7 @@ func (b *builder) node(bc *BuildContext, sc *scope, n *NodeSpec, render bool) (w
 		if err != nil {
 			return nil, err
 		}
-		return workflow.NewEmittingFunctionNode(n.ID, routedFunc(fn, render), cfg), nil
+		return workflow.NewFunctionNode(n.ID, functionBody(fn, render), cfg), nil
 	case NodeJoin:
 		return workflow.NewJoinNode(n.ID), nil
 	case NodeTool:
@@ -58,40 +58,46 @@ func (b *builder) function(name string) (Func, error) {
 	return fn, nil
 }
 
-// routedFunc adapts a Func to the engine. A routed result is emitted as one
-// event that carries both the output and the routes; the engine selects edges
-// from Event.Routes.
-func routedFunc(fn Func, render bool) workflow.EmittingFunctionFn[any, any] {
-	return func(ctx agent.Context, in any, emit func(*session.Event) error) (any, error) {
+// functionBody adapts a Func to a plain function node, as a native
+// workflow.NewFunctionNode would be written. A plain node emits data only, so
+// intermediate steps stay out of the chat; a result that carries routes, or
+// that ends the run, is returned as an event the engine yields unchanged.
+func functionBody(fn Func, render bool) func(agent.Context, any) (any, error) {
+	return func(ctx agent.Context, in any) (any, error) {
 		res, err := fn(ctx, in)
 		if err != nil {
 			return nil, err
 		}
-		return finish(ctx, emit, res.Output, res.Routes, render)
+		if len(res.Routes) == 0 && !(render && res.Output != nil) {
+			return res.Output, nil
+		}
+		return resultEvent(ctx, res.Output, res.Routes, render), nil
 	}
 }
 
-// finish hands a node result to the engine. Plain results return normally and
-// the engine emits them. A result that carries routes, or that must be
-// rendered as text, is emitted here as one event and the node returns nil so
-// the engine adds no second one.
-//
-// A2A clients display only Event.Content, while successor nodes read
-// Event.Output. The engine fills Content for string outputs; finish does the
-// same for structured outputs of terminal nodes, as JSON.
-func finish(ctx agent.Context, emit func(*session.Event) error, out any, routes []string, render bool) (any, error) {
-	_, isText := out.(string)
-	needsContent := render && out != nil && !isText
-	if len(routes) == 0 && !needsContent {
-		return out, nil
-	}
+// resultEvent builds one event carrying a node's output and routes. A2A
+// clients display only Event.Content while successor nodes read Event.Output,
+// so a terminal result is also rendered as message text: strings as they are,
+// structured values as JSON.
+func resultEvent(ctx agent.Context, out any, routes []string, render bool) *session.Event {
 	ev := session.NewEvent(ctx, ctx.InvocationID())
 	ev.Routes = routes
 	ev.Output = out
 	if render && out != nil {
 		ev.Content = &genai.Content{Parts: []*genai.Part{{Text: outputText(out)}}}
 	}
-	return nil, emit(ev)
+	return ev
+}
+
+// finish hands the result of an emitting node (dynamic, hitl) to the engine.
+// Plain results return normally and the engine emits them; a result that
+// must be rendered is emitted here as one event and the node returns nil so
+// the engine adds no second one.
+func finish(ctx agent.Context, emit func(*session.Event) error, out any, render bool) (any, error) {
+	if _, isText := out.(string); !render || out == nil || isText {
+		return out, nil
+	}
+	return nil, emit(resultEvent(ctx, out, nil, true))
 }
 
 // outputText renders a structured output for display.
@@ -191,7 +197,7 @@ func (b *builder) dynamicNode(sc *scope, n *NodeSpec, cfg workflow.NodeConfig, r
 		if err != nil {
 			return nil, err
 		}
-		return finish(ctx, emit, out, nil, render)
+		return finish(ctx, emit, out, render)
 	}, cfg), nil
 }
 
@@ -209,7 +215,7 @@ func hitlNode(n *NodeSpec, cfg workflow.NodeConfig, render bool) workflow.Node {
 		if err != nil {
 			return nil, err
 		}
-		return finish(ctx, emit, reply, nil, render)
+		return finish(ctx, emit, reply, render)
 	}, cfg)
 }
 
