@@ -23,6 +23,8 @@ complete values, not overrides. References, including those inside inline specs,
 resolve in the Agent's namespace. The reusable resources have no binding to each other. Child templates are selected
 with `tools[].subAgent.templateRef` and compile under the parent Agent's Harness.
 Each subagent requires `templateRef` and shares the parent's runtime and Harness.
+It shares the parent's Session unless its binding sets `isolation: Isolated`; see
+[Session isolation](a2a-subagents.md#session-isolation).
 Dedicated `agentRef` bindings are deferred and are not part of the served API.
 
 The resource boundary does not grant authorization by itself. Kubernetes RBAC

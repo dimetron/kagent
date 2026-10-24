@@ -108,7 +108,10 @@ branch. Two fields control the rest:
   new session seeded with a copy of the caller's state, so the agent never sees
   the caller's history, parallel calls cannot interfere, and its state writes
   are not copied back. An agent is either a `sub_agents` entry (shared session,
-  transfer) or an `agent_tools` entry, never both.
+  transfer) or an `agent_tools` entry, never both. This is the declarative form
+  of `isolation: Isolated` on an AgentTemplate subagent binding, which the
+  controller delivers to the kagent and BYO runtimes
+  ([Session isolation](a2a-subagents.md#session-isolation)).
 
 Branches isolate history, not state. Validation rejects two agents that run
 concurrently and write the same `output_key`: `ParallelAgent` sub-agents,

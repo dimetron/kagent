@@ -97,16 +97,7 @@ func TestAgentWorkflowFromValidation(t *testing.T) {
 			require.NoError(t, kube.Create(t.Context(), agent))
 			deleteOnCleanup(t, kube, agent)
 
-			var compatible *metav1.Condition
-			err := wait.PollUntilContextTimeout(t.Context(), time.Second, 2*time.Minute, true, func(ctx context.Context) (bool, error) {
-				if err := kube.Get(ctx, ctrlclient.ObjectKeyFromObject(agent), agent); err != nil {
-					return false, err
-				}
-				compatible = apimeta.FindStatusCondition(agent.Status.Conditions, v1alpha3.AgentConditionCompatible)
-				return compatible != nil && compatible.ObservedGeneration == agent.Generation && compatible.Status == metav1.ConditionFalse, nil
-			})
-			require.NoError(t, err, "last conditions: %+v", agent.Status.Conditions)
-			require.Equal(t, "UnsupportedConfiguration", compatible.Reason)
+			compatible := waitForIncompatible(t, kube, agent)
 			for _, want := range tt.want {
 				require.Contains(t, compatible.Message, want)
 			}
@@ -122,4 +113,22 @@ func deleteOnCleanup(t *testing.T, kube ctrlclient.Client, object ctrlclient.Obj
 			t.Errorf("delete %T %s/%s: %v", object, object.GetNamespace(), object.GetName(), err)
 		}
 	})
+}
+
+// waitForIncompatible waits for the controller to reject the Agent's current
+// generation with Compatible=False for an unsupported configuration, and returns
+// that condition.
+func waitForIncompatible(t *testing.T, kube ctrlclient.Client, agent *v1alpha3.Agent) *metav1.Condition {
+	t.Helper()
+	var compatible *metav1.Condition
+	err := wait.PollUntilContextTimeout(t.Context(), time.Second, 2*time.Minute, true, func(ctx context.Context) (bool, error) {
+		if err := kube.Get(ctx, ctrlclient.ObjectKeyFromObject(agent), agent); err != nil {
+			return false, err
+		}
+		compatible = apimeta.FindStatusCondition(agent.Status.Conditions, v1alpha3.AgentConditionCompatible)
+		return compatible != nil && compatible.ObservedGeneration == agent.Generation && compatible.Status == metav1.ConditionFalse, nil
+	})
+	require.NoError(t, err, "last conditions: %+v", agent.Status.Conditions)
+	require.Equal(t, "UnsupportedConfiguration", compatible.Reason)
+	return compatible
 }

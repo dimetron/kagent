@@ -15,6 +15,7 @@ import (
 	adkmodel "google.golang.org/adk/v2/model"
 	adkgemini "google.golang.org/adk/v2/model/gemini"
 	"google.golang.org/adk/v2/tool"
+	"google.golang.org/adk/v2/tool/agenttool"
 	"google.golang.org/adk/v2/tool/loadmemorytool"
 	"google.golang.org/adk/v2/tool/preloadmemorytool"
 	"google.golang.org/adk/v2/tool/skilltoolset"
@@ -56,14 +57,26 @@ func CreateGoogleADKAgent(ctx context.Context, config *configv1.ADKConfig, agent
 	if config.Agent.Workflow != nil {
 		return nil, fmt.Errorf("agent config carries a declarative workflow, which only BYO images run")
 	}
-	return createGoogleADKAgent(ctx, config.Agent, agentName, stsPlugin, runtimeconfig.ProcessConfig(config), extraTools...)
+	if config.Agent.GetIsolation() != configv1.ADKAgentIsolation_ADK_AGENT_ISOLATION_UNSPECIFIED {
+		return nil, fmt.Errorf("the root agent sets isolation, but it has no parent to isolate from")
+	}
+	return createGoogleADKAgent(ctx, config.Agent, agentName, stsPlugin, runtimeconfig.ProcessConfig(config), false, extraTools...)
 }
 
-func createGoogleADKAgent(ctx context.Context, agentConfig *configv1.ADKAgentConfig, agentName string, stsPlugin *sts.TokenPropagationPlugin, runtime *configv1.ADKRuntimeConfig, extraTools ...tool.Tool) (agent.Agent, error) {
+// createGoogleADKAgent builds one agent and its subagents. standalone marks an
+// agent that runs as a tool in a session of its own: nothing it does can reach
+// a person, so it gets no ask_user tool and cannot require approvals.
+func createGoogleADKAgent(ctx context.Context, agentConfig *configv1.ADKAgentConfig, agentName string, stsPlugin *sts.TokenPropagationPlugin, runtime *configv1.ADKRuntimeConfig, standalone bool, extraTools ...tool.Tool) (agent.Agent, error) {
 	log := logging.FromContext(ctx)
 
 	if agentConfig == nil {
 		return nil, fmt.Errorf("agent config is required")
+	}
+
+	if standalone {
+		if err := checkStandalone(agentConfig); err != nil {
+			return nil, err
+		}
 	}
 
 	propagateToken := runtime.GetTokenPropagation().GetEnabled()
@@ -117,7 +130,7 @@ func createGoogleADKAgent(ctx context.Context, agentConfig *configv1.ADKAgentCon
 		log.InfoContext(ctx, "wired remote A2A agent tool", "name", remoteAgent.Name, "url", remoteAgent.Url)
 	}
 
-	localTools, err := buildAgentTools(agentConfig, remoteAgentTools, extraTools, log)
+	localTools, err := buildAgentTools(agentConfig, remoteAgentTools, extraTools, !standalone, log)
 	if err != nil {
 		return nil, err
 	}
@@ -135,11 +148,21 @@ func createGoogleADKAgent(ctx context.Context, agentConfig *configv1.ADKAgentCon
 	if agentName == "" {
 		agentName = "agent"
 	}
+	// A subagent either joins the parent's tree and shares its session, or runs
+	// as a tool in a session of its own.
 	var subAgents []agent.Agent
 	for _, childConfig := range agentConfig.SubAgents {
-		child, err := createGoogleADKAgent(ctx, childConfig, childConfig.Name, stsPlugin, runtime)
+		isolated := childConfig.GetIsolation() == configv1.ADKAgentIsolation_ADK_AGENT_ISOLATION_SESSION
+		if isolated && runtime.GetTokenPropagation().GetStsWellKnownUri() != "" {
+			return nil, fmt.Errorf("subagent %q is isolated, which cannot be combined with STS token exchange: the exchanged token is cached per session", childConfig.Name)
+		}
+		child, err := createGoogleADKAgent(ctx, childConfig, childConfig.Name, stsPlugin, runtime, isolated)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create sub-agent %q: %w", childConfig.Name, err)
+		}
+		if isolated {
+			localTools = append(localTools, agenttool.New(child, nil))
+			continue
 		}
 		subAgents = append(subAgents, child)
 	}
@@ -227,7 +250,7 @@ func usesRawOutputSchema(model *configv1.ADKModelConfig) bool {
 	}
 }
 
-func buildAgentTools(agentConfig *configv1.ADKAgentConfig, remoteAgentTools, extraTools []tool.Tool, log *slog.Logger) ([]tool.Tool, error) {
+func buildAgentTools(agentConfig *configv1.ADKAgentConfig, remoteAgentTools, extraTools []tool.Tool, withAskUser bool, log *slog.Logger) ([]tool.Tool, error) {
 	var localTools []tool.Tool
 	if agentConfig.Memory != nil {
 		log.Info("memory configuration detected, adding memory tools")
@@ -239,12 +262,31 @@ func buildAgentTools(agentConfig *configv1.ADKAgentConfig, remoteAgentTools, ext
 	localTools = append(localTools, remoteAgentTools...)
 	localTools = append(localTools, extraTools...)
 
-	askUserTool, err := tools.NewAskUserTool()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create ask_user tool: %w", err)
+	if withAskUser {
+		askUserTool, err := tools.NewAskUserTool()
+		if err != nil {
+			return nil, fmt.Errorf("failed to create ask_user tool: %w", err)
+		}
+		localTools = append(localTools, askUserTool)
 	}
-	localTools = append(localTools, askUserTool)
 	return localTools, nil
+}
+
+// checkStandalone rejects what an agent that runs as a tool in its own session
+// cannot do: pause for a person. Its conversation ends with the tool call, so
+// an approval request would never be answered.
+func checkStandalone(agentConfig *configv1.ADKAgentConfig) error {
+	for _, server := range agentConfig.HttpTools {
+		if server.RequireApproval {
+			return fmt.Errorf("isolated subagent %q cannot pause for approval, but the MCP server %s requires it", agentConfig.Name, server.GetParams().GetUrl())
+		}
+	}
+	for _, server := range agentConfig.SseTools {
+		if server.RequireApproval {
+			return fmt.Errorf("isolated subagent %q cannot pause for approval, but the MCP server %s requires it", agentConfig.Name, server.GetParams().GetUrl())
+		}
+	}
+	return nil
 }
 
 // generateContentConfig returns the agent-level generation config derived from

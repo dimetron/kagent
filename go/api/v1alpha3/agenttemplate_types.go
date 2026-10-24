@@ -65,6 +65,23 @@ type MCPToolBinding struct {
 	RequireApproval bool `json:"requireApproval,omitempty"`
 }
 
+// SubAgentIsolation says how much of the Session a subagent shares with its parent.
+// +kubebuilder:validation:Enum=Shared;Isolated
+type SubAgentIsolation string
+
+const (
+	// SubAgentIsolationShared hands the conversation to the subagent in the
+	// parent's Session. The parent transfers control and the subagent answers in
+	// the same history. It is the default.
+	SubAgentIsolationShared SubAgentIsolation = "Shared"
+	// SubAgentIsolationIsolated calls the subagent as a tool in a new
+	// conversation seeded with a copy of the parent's state. The subagent never
+	// sees the parent's history, parallel calls cannot interfere, its state
+	// writes are not copied back, and it cannot pause for human input, so its
+	// MCP tools cannot require approval.
+	SubAgentIsolationIsolated SubAgentIsolation = "Isolated"
+)
+
 // SubAgentToolBinding exposes a same-namespace AgentTemplate as a logical tool.
 type SubAgentToolBinding struct {
 	// +kubebuilder:validation:MinLength=1
@@ -78,6 +95,12 @@ type SubAgentToolBinding struct {
 	// +kubebuilder:validation:XValidation:rule="has(self.name) && self.name != ''",message="templateRef.name must not be empty"
 	// +required
 	TemplateRef *corev1.LocalObjectReference `json:"templateRef"`
+	// Isolation selects how the parent runs the subagent. Omitting it is Shared.
+	// Isolated gives every call its own conversation, which a parent needs when
+	// it fans out to the same subagent in parallel. Only the kagent and BYO
+	// Harnesses support Isolated.
+	// +optional
+	Isolation SubAgentIsolation `json:"isolation,omitempty"`
 
 	// Deferred until Dedicated subagents can create and invoke their own Session.
 	// AgentRef *corev1.LocalObjectReference `json:"agentRef,omitempty"`

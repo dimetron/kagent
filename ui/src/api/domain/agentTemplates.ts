@@ -24,11 +24,21 @@ export interface McpToolBinding {
   requireApproval?: boolean;
 }
 
+/**
+ * How the parent runs a sub-agent. `Shared` (the default) transfers the conversation
+ * to it in the parent's Session. `Isolated` calls it as a tool in a new conversation
+ * seeded with a copy of the parent's state: it never sees the parent's history,
+ * parallel calls cannot interfere, and it cannot pause for human input, so its MCP
+ * tools cannot require approval. Only the kagent and BYO harnesses support it.
+ */
+export type SubAgentIsolation = "Shared" | "Isolated";
+
 /** Another AgentTemplate exposed as a tool in the parent's runtime. */
 export interface SubAgentToolBinding {
   name: string;
   description: string;
   templateRef: AgentTemplateLocalRef;
+  isolation?: SubAgentIsolation;
   // Deferred until Dedicated subagent execution is available.
   // agentRef?: AgentTemplateLocalRef;
 }

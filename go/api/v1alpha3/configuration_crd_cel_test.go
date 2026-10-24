@@ -349,6 +349,23 @@ func TestConfigurationCRDValidation(t *testing.T) {
 			wantReject: "spec.workflowFrom.name",
 		},
 		{
+			name:   "AgentTemplate accepts an Isolated subagent",
+			object: subAgentTemplate(namespace, "subagent-isolated", SubAgentIsolationIsolated),
+		},
+		{
+			name:   "AgentTemplate accepts a Shared subagent",
+			object: subAgentTemplate(namespace, "subagent-shared", SubAgentIsolationShared),
+		},
+		{
+			name:   "AgentTemplate accepts a subagent without isolation",
+			object: subAgentTemplate(namespace, "subagent-default", ""),
+		},
+		{
+			name:       "AgentTemplate rejects an unknown subagent isolation",
+			object:     subAgentTemplate(namespace, "subagent-private", SubAgentIsolation("Private")),
+			wantReject: "Unsupported value",
+		},
+		{
 			name: "AgentTemplate rejects unsupported MCP server kind",
 			object: validAgentTemplate(namespace, "unsupported-mcp-kind", []ToolBinding{{
 				MCP: &MCPToolBinding{Server: corev1.TypedLocalObjectReference{Kind: "Service", Name: "tools"}},
@@ -622,6 +639,12 @@ func validAgentTemplate(namespace, name string, tools []ToolBinding) *AgentTempl
 			Tools:       tools,
 		},
 	}
+}
+
+func subAgentTemplate(namespace, name string, isolation SubAgentIsolation) *AgentTemplate {
+	return validAgentTemplate(namespace, name, []ToolBinding{{SubAgent: &SubAgentToolBinding{
+		Name: "reviewer", Description: "Reviews work.", TemplateRef: &corev1.LocalObjectReference{Name: "reviewer"}, Isolation: isolation,
+	}}})
 }
 
 func workflowTemplate(namespace, name string, mutate func(*AgentTemplateSpec)) *AgentTemplate {

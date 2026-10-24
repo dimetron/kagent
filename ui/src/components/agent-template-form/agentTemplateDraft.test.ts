@@ -98,6 +98,38 @@ describe("the agent template draft", () => {
     expect(spec.systemPrompt).toBeUndefined();
   });
 
+  it("round-trips a sub-agent's isolation and sends only Isolated", () => {
+    const template = templateWithExtras();
+    template.resource.spec.tools = [
+      {
+        subAgent: {
+          name: "reviewer",
+          description: "Reviews work.",
+          templateRef: { name: "review" },
+          isolation: "Isolated",
+        },
+      },
+      {
+        subAgent: {
+          name: "drafter",
+          description: "Drafts.",
+          templateRef: { name: "draft" },
+          isolation: "Shared",
+        },
+      },
+    ];
+    const draft = draftFromTemplate(template);
+    expect(draft.subAgentTools.map((tool) => tool.isolated)).toEqual([true, false]);
+
+    const tools = specFromDraft(draft, template.resource.spec).tools ?? [];
+    expect(tools[0].subAgent?.isolation, "an edit must not drop the isolation").toBe("Isolated");
+    expect(tools[1].subAgent?.isolation, "Shared is the default and is not sent").toBeUndefined();
+
+    draft.subAgentTools[0] = { ...draft.subAgentTools[0], isolated: false };
+    const shared = specFromDraft(draft, template.resource.spec).tools ?? [];
+    expect(shared[0].subAgent?.isolation).toBeUndefined();
+  });
+
   it("round-trips the fields it does show", () => {
     const template = templateWithExtras();
     const spec = specFromDraft(
