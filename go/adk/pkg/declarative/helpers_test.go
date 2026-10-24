@@ -14,7 +14,6 @@ import (
 	"google.golang.org/adk/v2/runner"
 	"google.golang.org/adk/v2/session"
 	"google.golang.org/adk/v2/tool/functiontool"
-	"google.golang.org/adk/v2/workflow"
 	"google.golang.org/genai"
 )
 
@@ -67,15 +66,13 @@ func testRegistry(t testing.TB) *Registry {
 		"plan":           func(_ agent.Context, in any) (Result, error) { return Output(fmt.Sprintf("plan(%v)", in)), nil },
 		"execute":        func(_ agent.Context, in any) (Result, error) { return Output(fmt.Sprintf("exec(%v)", in)), nil },
 		"summarize_join": func(_ agent.Context, in any) (Result, error) { return Output(fmt.Sprintf("summary:%v", in)), nil },
+		"critic_step":    func(_ agent.Context, in any) (Result, error) { return Output(fmt.Sprintf("critiqued(%v)", in)), nil },
 	} {
 		require.NoError(t, reg.RegisterFunction(name, fn))
 	}
 	require.NoError(t, reg.RegisterDynamic("critique", func(_ agent.Context, in any, env *DynamicEnv) (any, error) {
-		critic := workflow.NewFunctionNode("critic", func(_ agent.Context, in any) (string, error) {
-			return fmt.Sprintf("critiqued(%v)", in), nil
-		}, workflow.NodeConfig{})
 		for {
-			if _, err := env.Run(critic, in); errors.Is(err, ErrIterationBudget) {
+			if _, err := env.RunChild("critic", in); errors.Is(err, ErrIterationBudget) {
 				return fmt.Sprintf("%v after %d runs", in, env.Runs()), nil
 			} else if err != nil {
 				return nil, err

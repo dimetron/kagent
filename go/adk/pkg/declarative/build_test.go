@@ -5,12 +5,15 @@ import (
 	"errors"
 	"fmt"
 	"iter"
+	"os"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"google.golang.org/adk/v2/agent"
 	adkmodel "google.golang.org/adk/v2/model"
+	"google.golang.org/adk/v2/runner"
 	"google.golang.org/adk/v2/session"
 	"google.golang.org/adk/v2/workflow"
 	"google.golang.org/genai"
@@ -179,25 +182,6 @@ func TestBuildFailures(t *testing.T) {
 		doc  string
 		want string
 	}{
-		{"unregistered function", header + `
-  - name: wf
-    agent_class: Workflow
-    nodes: [{ id: n, type: function, function: nope }]
-    edges: [{ from: START, to: n }]`, `function "nope" is not registered`},
-		{"unregistered tool", header + `
-  - name: wf
-    agent_class: Workflow
-    nodes: [{ id: n, type: tool, tool: nope }]
-    edges: [{ from: START, to: n }]`, `tool "nope" is not registered`},
-		{"unregistered dynamic function", header + `
-  - name: wf
-    agent_class: Workflow
-    nodes: [{ id: n, type: dynamic, function: nope }]
-    edges: [{ from: START, to: n }]`, `dynamic function "nope" is not registered`},
-		{"unregistered model", header + `
-  - { name: a, agent_class: LlmAgent, model: gpt-nope, instruction: hi }`, `model "gpt-nope" is not registered`},
-		{"unregistered llm tool", header + `
-  - { name: a, agent_class: LlmAgent, model: stub, instruction: hi, tools: [nope] }`, `tool "nope" is not registered`},
 		{"unconditional cycle is rejected by the engine", header + `
   - name: wf
     agent_class: Workflow
@@ -309,8 +293,11 @@ agents:
 	require.ErrorContains(t, err, "agents[0].nodes[0].message: required for node type shout")
 }
 
-func TestParallelWorkerWrapsToolAndAgent(t *testing.T) {
+func TestParallelWorkerWrapsTool(t *testing.T) {
 	reg := testRegistry(t)
+	require.NoError(t, reg.RegisterFunction("split_customers", func(agent.Context, any) (Result, error) {
+		return Output([]any{map[string]any{"customer_id": "c-1"}, map[string]any{"customer_id": "c-2"}}), nil
+	}))
 	spec, err := reg.Parse([]byte(`
 apiVersion: adk.declarative/v0.2
 kind: AgentSystem
@@ -318,24 +305,227 @@ agents:
   - name: fanout
     agent_class: Workflow
     nodes:
-      - { id: split, type: function, function: split_words }
+      - { id: split, type: function, function: split_customers }
       - { id: lookups, type: parallel_worker, tool: lookup_customer }
+      - { id: finish, type: function, function: summarize_join }
     edges:
       - { from: START, to: split }
       - { from: split, to: lookups }
+      - { from: lookups, to: finish }
 `))
-	require.NoError(t, err, "split_words is checked by Build, not by validation")
-	require.NoError(t, reg.RegisterFunction("split_words", func(agent.Context, any) (Result, error) {
-		return Output([]any{map[string]any{"customer_id": "c-1"}, map[string]any{"customer_id": "c-2"}}), nil
-	}))
+	require.NoError(t, err)
 	sys, err := Build(t.Context(), spec, reg)
 	require.NoError(t, err)
 	svc, id := newSession(t)
 	got := outputs(run(t, sys.Root(), userMessage("go"), svc, id))
-	require.Equal(t, []any{
-		map[string]any{"customer": "c-1", "plan": "pro"},
-		map[string]any{"customer": "c-2", "plan": "pro"},
-	}, got[len(got)-1])
+	require.Equal(t, "summary:[map[customer:c-1 plan:pro] map[customer:c-2 plan:pro]]", got[len(got)-1])
+}
+
+func TestParallelWorkerWrapsAgent(t *testing.T) {
+	reg := testRegistry(t)
+	require.NoError(t, reg.RegisterFunction("topics", func(agent.Context, any) (Result, error) {
+		return Output([]any{"go", "k8s"}), nil
+	}))
+	spec, err := reg.Parse([]byte(`
+apiVersion: adk.declarative/v0.2
+kind: AgentSystem
+agents:
+  - name: fanout
+    agent_class: Workflow
+    nodes:
+      - { id: split, type: function, function: topics }
+      - { id: explain, type: parallel_worker, agent: explainer, max_concurrency: 1 }
+      - { id: finish, type: function, function: summarize_join }
+    edges:
+      - { from: START, to: split }
+      - { from: split, to: explain }
+      - { from: explain, to: finish }
+  - { name: explainer, agent_class: LlmAgent, model: stub, mode: single_turn, instruction: Explain it. }
+`))
+	require.NoError(t, err)
+	sys, err := Build(t.Context(), spec, reg)
+	require.NoError(t, err)
+	svc, id := newSession(t)
+	got := outputs(run(t, sys.Root(), userMessage("go"), svc, id))
+	require.Equal(t, "summary:[[stub] go [stub] k8s]", got[len(got)-1])
+}
+
+func TestCompositeAgents(t *testing.T) {
+	data, err := os.ReadFile("testdata/composites.yaml")
+	require.NoError(t, err)
+	reg := NewRegistry()
+	spec, err := reg.Parse(data)
+	require.NoError(t, err)
+	sys, err := Build(t.Context(), spec, reg)
+	require.NoError(t, err)
+
+	authors := func(name string) []string {
+		a, ok := sys.Agent(name)
+		require.True(t, ok)
+		svc, id := newSession(t)
+		var out []string
+		for _, ev := range run(t, a, userMessage("topic"), svc, id) {
+			if ev.Content != nil && ev.Author != "" {
+				out = append(out, ev.Author)
+			}
+		}
+		return out
+	}
+	require.Equal(t, []string{"draft", "review"}, authors("pipeline"), "sequential keeps declaration order")
+	require.ElementsMatch(t, []string{"optimist", "pessimist"}, authors("panel"))
+	require.Equal(t, []string{"polish", "polish"}, authors("refiner"), "loop stops at max_iterations")
+}
+
+func TestTerminalStructuredOutputIsRenderedAsText(t *testing.T) {
+	reg := testRegistry(t)
+	require.NoError(t, reg.RegisterFunction("report", func(agent.Context, any) (Result, error) {
+		return Output(map[string]any{"status": "ok", "count": 2}), nil
+	}))
+	require.NoError(t, reg.RegisterFunction("pass", func(_ agent.Context, in any) (Result, error) {
+		return Output(map[string]any{"mid": in}), nil
+	}))
+	spec, err := reg.Parse([]byte(`
+apiVersion: adk.declarative/v0.2
+kind: AgentSystem
+agents:
+  - name: wf
+    agent_class: Workflow
+    nodes:
+      - { id: first, type: function, function: pass }
+      - id: nested
+        type: workflow
+        nodes: [{ id: inner, type: function, function: report }]
+        edges: [{ from: START, to: inner }]
+    edges:
+      - { from: START, to: first }
+      - { from: first, to: nested }
+`))
+	require.NoError(t, err)
+	sys, err := Build(t.Context(), spec, reg)
+	require.NoError(t, err)
+
+	svc, id := newSession(t)
+	var texts []string
+	for _, ev := range run(t, sys.Root(), userMessage("go"), svc, id) {
+		if ev.Content != nil {
+			for _, p := range ev.Content.Parts {
+				texts = append(texts, p.Text)
+			}
+		}
+	}
+	require.Equal(t, []string{`{"count":2,"status":"ok"}`}, texts,
+		"only the terminal node's structured output is shown; the intermediate one stays data")
+}
+
+func TestChatModeAgentNodeKeepsItsDeclaredMode(t *testing.T) {
+	reg := NewRegistry()
+	spec, err := reg.Parse([]byte(`
+apiVersion: adk.declarative/v0.2
+kind: AgentSystem
+agents:
+  - name: wf
+    agent_class: Workflow
+    nodes: [{ id: ask, type: agent, agent: coordinator }]
+    edges: [{ from: START, to: ask }]
+  - { name: coordinator, agent_class: LlmAgent, model: stub, mode: chat, instruction: Coordinate. }
+`))
+	require.NoError(t, err)
+	sys, err := Build(t.Context(), spec, reg)
+	require.NoError(t, err)
+	svc, id := newSession(t)
+	require.Contains(t, outputsOrText(run(t, sys.Root(), userMessage("hi"), svc, id)), "[stub] hi")
+}
+
+func TestNodeTimeoutCancelsSlowFunction(t *testing.T) {
+	reg := NewRegistry()
+	require.NoError(t, reg.RegisterFunction("slow", func(ctx agent.Context, _ any) (Result, error) {
+		select {
+		case <-ctx.Done():
+			return Result{}, ctx.Err()
+		case <-time.After(5 * time.Second):
+			return Output("too late"), nil
+		}
+	}))
+	spec, err := reg.Parse([]byte(`
+apiVersion: adk.declarative/v0.2
+kind: AgentSystem
+agents:
+  - name: wf
+    agent_class: Workflow
+    nodes: [{ id: only, type: function, function: slow, timeout: 20ms }]
+    edges: [{ from: START, to: only }]
+`))
+	require.NoError(t, err)
+	sys, err := Build(t.Context(), spec, reg)
+	require.NoError(t, err)
+
+	svc, id := newSession(t)
+	r, err := runner.New(runner.Config{AppName: "test", Agent: sys.Root(), SessionService: svc})
+	require.NoError(t, err)
+	var runErr error
+	for _, err := range r.Run(t.Context(), "user", id, userMessage("go"), agent.RunConfig{}) {
+		if err != nil {
+			runErr = err
+		}
+	}
+	require.ErrorIs(t, runErr, context.DeadlineExceeded)
+}
+
+// capturingModel records the requests it receives.
+type capturingModel struct {
+	adkmodel.LLM
+	requests chan *adkmodel.LLMRequest
+}
+
+func (m capturingModel) GenerateContent(ctx context.Context, req *adkmodel.LLMRequest, stream bool) iter.Seq2[*adkmodel.LLMResponse, error] {
+	m.requests <- req
+	return m.LLM.GenerateContent(ctx, req, stream)
+}
+
+func TestLLMOptionsReachTheModel(t *testing.T) {
+	reg := NewRegistry()
+	model := capturingModel{LLM: NewStubModel("spy"), requests: make(chan *adkmodel.LLMRequest, 4)}
+	require.NoError(t, reg.RegisterModel("spy", model))
+	spec, err := reg.Parse([]byte(`
+apiVersion: adk.declarative/v0.2
+kind: AgentSystem
+agents:
+  - name: solo
+    agent_class: LlmAgent
+    model: spy
+    instruction: Answer plainly.
+    global_instruction: Always be brief.
+    output_key: reply
+    output_schema:
+      type: object
+      properties:
+        answer: { type: string }
+      required: [answer]
+`))
+	require.NoError(t, err)
+	sys, err := Build(t.Context(), spec, reg)
+	require.NoError(t, err)
+
+	svc, id := newSession(t)
+	run(t, sys.Root(), userMessage("hi"), svc, id)
+	req := <-model.requests
+	instruction := req.Config.SystemInstruction.Parts[0].Text
+	require.Contains(t, instruction, "Always be brief.")
+	require.Contains(t, instruction, "Answer plainly.")
+	require.NotNil(t, req.Config.ResponseSchema, "output_schema must reach the model request")
+	require.Equal(t, "application/json", req.Config.ResponseMIMEType)
+	require.Contains(t, req.Config.ResponseSchema.Required, "answer")
+}
+
+func TestSystemLoader(t *testing.T) {
+	sys := buildShowcase(t)
+	loader, err := sys.Loader()
+	require.NoError(t, err)
+	require.Equal(t, "multi_agent_root", loader.RootAgent().Name())
+	require.ElementsMatch(t, sys.Names(), loader.ListAgents())
+	a, err := loader.LoadAgent("learning_coordinator")
+	require.NoError(t, err)
+	require.Equal(t, "learning_coordinator", a.Name())
 }
 
 func TestStubModel(t *testing.T) {
@@ -357,4 +547,10 @@ func TestStubModel(t *testing.T) {
 	defer stop2()
 	resp, _, _ = next2()
 	require.Equal(t, "[stub-x] ", resp.Content.Parts[0].Text)
+}
+
+func TestOutputTextFallsBackWhenJSONFails(t *testing.T) {
+	require.Equal(t, "plain", outputText("plain"))
+	require.Equal(t, `{"a":1}`, outputText(map[string]any{"a": 1}))
+	require.Equal(t, fmt.Sprint(make(chan int))[:2], outputText(make(chan int))[:2], "unmarshalable values degrade to fmt")
 }

@@ -8,7 +8,12 @@ import (
 	"google.golang.org/adk/v2/agent"
 	"google.golang.org/adk/v2/agent/llmagent"
 	"google.golang.org/adk/v2/agent/workflowagent"
+	"google.golang.org/adk/v2/agent/workflowagents/loopagent"
+	"google.golang.org/adk/v2/agent/workflowagents/parallelagent"
+	"google.golang.org/adk/v2/agent/workflowagents/sequentialagent"
 	"google.golang.org/adk/v2/workflow"
+
+	adkoutputschema "github.com/kagent-dev/kagent/go/adk/pkg/outputschema"
 )
 
 // System is the set of agents built from one document.
@@ -30,11 +35,22 @@ func (s *System) Agent(name string) (agent.Agent, bool) {
 // Names lists the declared agents in document order.
 func (s *System) Names() []string { return slices.Clone(s.names) }
 
+// Loader exposes every declared agent, root first, to ADK launchers and
+// servers that select an agent by name.
+func (s *System) Loader() (agent.Loader, error) {
+	others := make([]agent.Agent, 0, len(s.names)-1)
+	for _, name := range s.names[1:] {
+		others = append(others, s.agents[name])
+	}
+	return agent.NewMultiLoader(s.root, others...)
+}
+
 // Build validates spec against reg and constructs every declared agent. An
 // agent that is reachable from several places (sub_agents, agent nodes) is
 // built once and shared. Graph semantics such as reachability, unconditional
 // cycles and fan-in are enforced by the ADK workflow engine and reported with
-// the agent they belong to.
+// the agent they belong to. A model resolver's own failures also surface here,
+// because only it can tell whether a name resolves.
 func Build(ctx context.Context, spec *Spec, reg *Registry) (*System, error) {
 	if reg == nil {
 		reg = NewRegistry()
@@ -86,6 +102,8 @@ func (b *builder) agent(name string) (agent.Agent, error) {
 		a, err = b.workflowAgent(spec)
 	case ClassLlmAgent:
 		a, err = b.llmAgent(spec)
+	case ClassSequential, ClassParallel, ClassLoop:
+		a, err = b.composite(spec)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to build agent %q: %w", name, err)
@@ -107,16 +125,17 @@ func (b *builder) subAgents(names []string) ([]agent.Agent, error) {
 }
 
 func (b *builder) llmAgent(spec *AgentSpec) (agent.Agent, error) {
-	return b.newLLM(spec.Name, spec.Description, spec.Model, spec.Instruction, spec.OutputKey, spec.Mode, spec.Tools, spec.SubAgents)
+	return b.newLLM(spec.Name, spec.Description, &spec.LLMSpec, spec.Mode, spec.SubAgents, spec.DisallowTransferToParent, spec.DisallowTransferToPeers)
 }
 
-// newLLM is shared by LlmAgent agents and inline llm nodes.
-func (b *builder) newLLM(name, description, model, instruction, outputKey string, mode Mode, tools, subAgents []string) (agent.Agent, error) {
-	llm, err := b.reg.resolveModel(b.ctx, model)
+// newLLM is shared by LlmAgent agents and inline llm nodes, which pass their
+// own effective mode.
+func (b *builder) newLLM(name, description string, l *LLMSpec, mode Mode, subAgents []string, noParent, noPeers bool) (agent.Agent, error) {
+	llm, err := b.reg.resolveModel(b.ctx, l.Model)
 	if err != nil {
 		return nil, err
 	}
-	toolList, toolsets, err := b.reg.resolveTools(tools)
+	toolList, toolsets, err := b.reg.resolveTools(l.Tools)
 	if err != nil {
 		return nil, err
 	}
@@ -124,21 +143,49 @@ func (b *builder) newLLM(name, description, model, instruction, outputKey string
 	if err != nil {
 		return nil, err
 	}
-	return llmagent.New(llmagent.Config{
-		Name:        name,
-		Description: description,
-		Model:       llm,
-		Instruction: instruction,
-		Tools:       toolList,
-		Toolsets:    toolsets,
-		SubAgents:   subs,
-		OutputKey:   outputKey,
-		Mode:        llmagent.Mode(mode),
-	})
+	cfg := llmagent.Config{
+		Name:                     name,
+		Description:              description,
+		Model:                    llm,
+		Instruction:              l.Instruction,
+		GlobalInstruction:        l.GlobalInstruction,
+		Tools:                    toolList,
+		Toolsets:                 toolsets,
+		SubAgents:                subs,
+		OutputKey:                l.OutputKey,
+		Mode:                     llmagent.Mode(mode),
+		IncludeContents:          llmagent.IncludeContents(l.IncludeContents),
+		DisallowTransferToParent: noParent,
+		DisallowTransferToPeers:  noPeers,
+	}
+	if len(l.OutputSchema) > 0 {
+		if cfg.OutputSchema, err = adkoutputschema.ToGenAISchema(l.OutputSchema); err != nil {
+			return nil, fmt.Errorf("failed to convert output_schema: %w", err)
+		}
+	}
+	return llmagent.New(cfg)
+}
+
+// composite builds the classic ADK workflow agents, which orchestrate their
+// sub-agents without a graph.
+func (b *builder) composite(spec *AgentSpec) (agent.Agent, error) {
+	subs, err := b.subAgents(spec.SubAgents)
+	if err != nil {
+		return nil, err
+	}
+	cfg := agent.Config{Name: spec.Name, Description: spec.Description, SubAgents: subs}
+	switch spec.AgentClass {
+	case ClassSequential:
+		return sequentialagent.New(sequentialagent.Config{AgentConfig: cfg})
+	case ClassParallel:
+		return parallelagent.New(parallelagent.Config{AgentConfig: cfg})
+	default:
+		return loopagent.New(loopagent.Config{AgentConfig: cfg, MaxIterations: spec.MaxIterations})
+	}
 }
 
 func (b *builder) workflowAgent(spec *AgentSpec) (agent.Agent, error) {
-	nodes, err := b.nodes(spec.Nodes)
+	nodes, err := b.nodes(spec.Nodes, spec.Edges, true)
 	if err != nil {
 		return nil, err
 	}
@@ -155,19 +202,37 @@ func (b *builder) workflowAgent(spec *AgentSpec) (agent.Agent, error) {
 	})
 }
 
-// nodes builds every node of one graph scope, keyed by document id.
-func (b *builder) nodes(specs []NodeSpec) (map[string]workflow.Node, error) {
+// scope holds the nodes of one graph by document id. Dynamic nodes resolve
+// their children from it when they run, after every node has been built.
+type scope struct {
+	nodes map[string]workflow.Node
+}
+
+// nodes builds every node of one graph scope. terminal reports whether the
+// scope's terminal nodes end the run; those nodes render their output for
+// clients that only display message text.
+func (b *builder) nodes(specs []NodeSpec, edges []EdgeSpec, terminal bool) (map[string]workflow.Node, error) {
 	bc := &BuildContext{Context: b.ctx, Registry: b.reg, Agent: b.agent}
-	nodes := make(map[string]workflow.Node, len(specs))
+	sc := &scope{nodes: make(map[string]workflow.Node, len(specs))}
+	outgoing := make(map[string]bool, len(edges))
+	for _, e := range edges {
+		outgoing[e.From] = true
+	}
+	children := map[string]bool{}
+	for i := range specs {
+		for _, c := range specs[i].Children {
+			children[c] = true
+		}
+	}
 	for i := range specs {
 		n := &specs[i]
-		node, err := b.node(bc, n)
+		node, err := b.node(bc, sc, n, terminal && !outgoing[n.ID] && !children[n.ID])
 		if err != nil {
 			return nil, fmt.Errorf("failed to build node %q: %w", n.ID, err)
 		}
-		nodes[n.ID] = node
+		sc.nodes[n.ID] = node
 	}
-	return nodes, nil
+	return sc.nodes, nil
 }
 
 // toEdges resolves document edges against built nodes. entry is sugar for a

@@ -60,7 +60,7 @@ func TestValidateReportsFieldPaths(t *testing.T) {
 			"  - { name: b, agent_class: LlmAgent, model: m, instruction: i, sub_agents: [a] }\n",
 			[]string{"is part of a sub-agent cycle"}},
 		{"workflow without nodes", docHeader + "  - { name: a, agent_class: Workflow }\n",
-			[]string{"agents[0].nodes: a Workflow needs at least one node"}},
+			[]string{"agents[0].nodes: required for agent_class Workflow"}},
 		{"bad node ids", wf("[{ id: START, type: join }, { id: 'a-b', type: join }, { id: x, type: join }, { id: x, type: join }]", "[{ from: START, to: x }]"),
 			[]string{`nodes[0].id: "START" is reserved`, "nodes[1].id:", `nodes[3].id: duplicate node id "x"`}},
 		{"unknown node type", wf("[{ id: n, type: teleport }]", startTo("n")),
@@ -103,6 +103,37 @@ func TestValidateReportsFieldPaths(t *testing.T) {
 			[]string{`nodes[1]: node "b" is not connected by any edge`}},
 		{"unknown entry", wf("[{ id: a, type: join }]", "[{ from: START, to: a }]") + "    entry: ghost\n",
 			[]string{`entry: unknown node "ghost"`}},
+		{"composite agents require sub_agents", docHeader + "  - { name: s, agent_class: SequentialAgent }\n  - { name: p, agent_class: ParallelAgent }\n  - { name: l, agent_class: LoopAgent }\n",
+			[]string{"agents[0].sub_agents: required for agent_class SequentialAgent", "agents[1].sub_agents: required for agent_class ParallelAgent", "agents[2].sub_agents: required for agent_class LoopAgent"}},
+		{"composite agents reject foreign fields", docHeader +
+			"  - { name: w, agent_class: LlmAgent, model: m, instruction: i }\n" +
+			"  - { name: s, agent_class: SequentialAgent, sub_agents: [w], instruction: i, max_iterations: 2 }\n",
+			[]string{"agents[1].instruction: not allowed on agent_class SequentialAgent", "agents[1].max_iterations: not allowed on agent_class SequentialAgent"}},
+		{"max_iterations only belongs to LoopAgent", docHeader +
+			"  - { name: w, agent_class: LlmAgent, model: m, instruction: i, max_iterations: 3 }\n",
+			[]string{"agents[0].max_iterations: not allowed on agent_class LlmAgent"}},
+		{"unknown agent class lists the known ones", docHeader + "  - { name: a, agent_class: Graph }\n",
+			[]string{"LlmAgent, LoopAgent, ParallelAgent, SequentialAgent, Workflow"}},
+		{"bad include_contents", docHeader + "  - { name: a, agent_class: LlmAgent, model: m, instruction: i, include_contents: all }\n",
+			[]string{"agents[0].include_contents: must be default or none"}},
+		{"invalid output_schema", docHeader + "  - { name: a, agent_class: LlmAgent, model: m, instruction: i, output_schema: { type: 12 } }\n",
+			[]string{"agents[0].output_schema:"}},
+		{"model name shape", docHeader + "  - { name: a, agent_class: LlmAgent, model: 'bad model!', instruction: i }\n",
+			[]string{"agents[0].model:"}},
+		{"terminal structured nodes are rejected", wf("[{ id: t, type: tool, tool: x }, { id: j, type: join }, { id: p, type: parallel_worker, function: f }]",
+			"[{ from: START, to: t }, { from: START, to: j }, { from: START, to: p }]"),
+			[]string{"nodes[0]: terminal tool node emits structured output", "nodes[1]: terminal join node", "nodes[2]: terminal parallel_worker node"}},
+		{"terminal check reaches into a terminal nested workflow", wf("[{ id: outer, type: workflow, nodes: [{ id: t, type: tool, tool: x }], edges: [{ from: START, to: t }] }]", startTo("outer")),
+			[]string{"agents[0].nodes[0].nodes[0]: terminal tool node"}},
+		{"bad tool node name", wf("[{ id: t, type: tool, tool: 'bad name' }, { id: f, type: function, function: g }]", "[{ from: START, to: t }, { from: t, to: f }]"),
+			[]string{"nodes[0].tool:"}},
+		{"dynamic children must exist and not be self", wf("[{ id: d, type: dynamic, function: f, children: [ghost, d] }]", startTo("d")),
+			[]string{`nodes[0].children[0]: unknown node "ghost"`, "nodes[0].children[1]: a node cannot be its own child"}},
+		{"dynamic children cannot have edges", wf("[{ id: d, type: dynamic, function: f, children: [c] }, { id: c, type: function, function: f }, { id: e, type: function, function: f }]",
+			"[{ from: START, to: d }, { from: START, to: c }, { from: c, to: e }]"),
+			[]string{`node "c" is a dynamic child and cannot have edges`}},
+		{"children only belong to dynamic nodes", wf("[{ id: f, type: function, function: f, children: [f] }]", startTo("f")),
+			[]string{"nodes[0].children: not allowed on node type function"}},
 		{"errors inside a nested workflow carry the full path", wf("[{ id: outer, type: workflow, nodes: [{ id: in, type: function }], edges: [{ from: START, to: in }] }]", startTo("outer")),
 			[]string{"agents[0].nodes[0].nodes[0].function: required for node type function"}},
 	}
@@ -131,7 +162,7 @@ func TestValidateNilSpec(t *testing.T) {
 }
 
 func TestEntryMayRepeatAnExplicitStartEdge(t *testing.T) {
-	doc := wf("[{ id: a, type: join }]", "[{ from: START, to: a }]") + "    entry: a\n"
+	doc := wf("[{ id: a, type: function, function: f }]", "[{ from: START, to: a }]") + "    entry: a\n"
 	_, err := Parse([]byte(doc))
 	require.NoError(t, err)
 }
@@ -151,4 +182,38 @@ func TestParseRejectsUnknownFields(t *testing.T) {
 			require.False(t, IsValidation(err))
 		})
 	}
+}
+
+func TestNestingDepthIsBounded(t *testing.T) {
+	inner := "{ id: leaf, type: function, function: f }"
+	for range maxNesting + 2 {
+		inner = "{ id: w, type: workflow, nodes: [" + inner + "], edges: [{ from: START, to: " + firstID(inner) + " }] }"
+	}
+	_, err := Parse([]byte(wf("["+inner+"]", "[{ from: START, to: w }]")))
+	require.ErrorContains(t, err, "nested deeper than 8 levels")
+}
+
+func firstID(node string) string {
+	rest := node[strings.Index(node, "id: ")+len("id: "):]
+	return rest[:strings.IndexAny(rest, ",}")]
+}
+
+func TestChildrenAreNotReportedAsUnconnected(t *testing.T) {
+	doc := wf("[{ id: d, type: dynamic, function: f, children: [c] }, { id: c, type: function, function: f }]", "[{ from: START, to: d }]")
+	_, err := Parse([]byte(doc))
+	require.NoError(t, err)
+}
+
+func TestNonTerminalStructuredNodesAreAllowed(t *testing.T) {
+	doc := wf("[{ id: t, type: tool, tool: x }, { id: f, type: function, function: g }]", "[{ from: START, to: t }, { from: t, to: f }]")
+	_, err := Parse([]byte(doc))
+	require.NoError(t, err)
+}
+
+func TestValidateWithRulesAcceptsExtraNodeTypes(t *testing.T) {
+	doc := wf("[{ id: s, type: shout, message: hi }]", "[{ from: START, to: s }]")
+	spec, err := decode([]byte(doc))
+	require.NoError(t, err)
+	require.ErrorContains(t, Validate(spec), `unknown node type "shout"`)
+	require.NoError(t, ValidateWithRules(spec, map[NodeType]NodeRule{"shout": {Required: []string{"message"}}}))
 }

@@ -1,10 +1,12 @@
 package declarative
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"google.golang.org/adk/v2/agent"
+	adkmodel "google.golang.org/adk/v2/model"
 	"google.golang.org/adk/v2/tool"
 	"google.golang.org/adk/v2/tool/functiontool"
 	"google.golang.org/adk/v2/workflow"
@@ -80,6 +82,86 @@ func TestDynamicEnvBudget(t *testing.T) {
 	_, err := bounded.Run(child, nil)
 	require.ErrorIs(t, err, ErrIterationBudget)
 	require.Equal(t, 1, bounded.Runs(), "a refused run is not counted")
+}
+
+func TestDynamicEnvRunChildRejectsUnknownIDs(t *testing.T) {
+	env := &DynamicEnv{}
+	_, err := env.RunChild("ghost", nil)
+	require.ErrorContains(t, err, `no child "ghost"`)
+	require.Zero(t, env.Runs())
+}
+
+func TestRegistryValidateReportsUnresolvedReferencesTogether(t *testing.T) {
+	reg := NewRegistry()
+	require.NoError(t, reg.RegisterFunction("known", noopFunc))
+	_, err := reg.Parse([]byte(`
+apiVersion: adk.declarative/v0.2
+kind: AgentSystem
+agents:
+  - { name: a, agent_class: LlmAgent, model: gpt-nope, instruction: hi, tools: [load_memory, ghost_tool] }
+  - name: wf
+    agent_class: Workflow
+    nodes:
+      - { id: f, type: function, function: nope }
+      - { id: k, type: function, function: known }
+      - { id: t, type: tool, tool: ghost_tool }
+      - { id: d, type: dynamic, function: nope_dyn }
+      - { id: p, type: parallel_worker, function: nope_too }
+      - { id: l, type: llm, model: gpt-nope, instruction: hi, tools: [ghost_tool] }
+      - { id: end, type: function, function: known }
+    edges:
+      - { from: START, to: f }
+      - { from: f, to: k }
+      - { from: k, to: t }
+      - { from: t, to: d }
+      - { from: d, to: p }
+      - { from: p, to: l }
+      - { from: l, to: end }
+`))
+	require.True(t, IsValidation(err))
+	for _, want := range []string{
+		`agents[0].model: model "gpt-nope" is not registered`,
+		`agents[0].tools[1]: tool "ghost_tool" is not registered`,
+		`agents[1].nodes[0].function: function "nope" is not registered`,
+		`agents[1].nodes[2].tool: tool "ghost_tool" is not registered`,
+		`agents[1].nodes[3].function: dynamic function "nope_dyn" is not registered`,
+		`agents[1].nodes[4].function: function "nope_too" is not registered`,
+		`agents[1].nodes[5].model: model "gpt-nope" is not registered`,
+		`agents[1].nodes[5].tools[0]: tool "ghost_tool" is not registered`,
+	} {
+		require.Contains(t, err.Error(), want)
+	}
+	require.NotContains(t, err.Error(), "load_memory", "built-in tools resolve")
+	require.NotContains(t, err.Error(), `function "known"`)
+}
+
+func TestToolsetsResolveInLLMToolListsButNotAsToolNodes(t *testing.T) {
+	reg := NewRegistry()
+	require.NoError(t, reg.RegisterToolset(namedToolset("mcp-server")))
+	_, err := reg.Parse([]byte(`
+apiVersion: adk.declarative/v0.2
+kind: AgentSystem
+agents:
+  - { name: a, agent_class: LlmAgent, model: stub, instruction: hi, tools: [mcp-server] }
+  - name: wf
+    agent_class: Workflow
+    nodes: [{ id: t, type: tool, tool: mcp-server }, { id: f, type: function, function: f }]
+    edges: [{ from: START, to: t }, { from: t, to: f }]
+`))
+	require.ErrorContains(t, err, `agents[1].nodes[0].tool: tool "mcp-server" is not registered`)
+	require.NotContains(t, err.Error(), "agents[0]")
+}
+
+func TestModelResolverSatisfiesReferenceCheck(t *testing.T) {
+	reg := NewRegistry()
+	reg.SetModelResolver(func(context.Context, string) (adkmodel.LLM, error) { return NewStubModel("x"), nil })
+	_, err := reg.Parse([]byte(`
+apiVersion: adk.declarative/v0.2
+kind: AgentSystem
+agents:
+  - { name: a, agent_class: LlmAgent, model: any-model, instruction: hi }
+`))
+	require.NoError(t, err)
 }
 
 func TestResultHelpers(t *testing.T) {

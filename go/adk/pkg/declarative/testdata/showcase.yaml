@@ -55,7 +55,9 @@ agents:
         instruction: Summarize the ticket in one short sentence.
         tools: [lookup_customer]
         output_key: ticket_summary
-      - { id: refine, type: dynamic, function: critique, max_iters: 2 }
+      - { id: refine, type: dynamic, function: critique, max_iters: 2, children: [critic] }
+      # Owned by `refine`: no edges, scheduled only by the dynamic function.
+      - { id: critic, type: function, function: critic_step }
       - { id: approve, type: hitl, message: "Confirm final reply before send (yes/no)" }
       - { id: finish_other, type: function, function: summarize_join }
 
@@ -105,6 +107,9 @@ agents:
     mode: single_turn
     description: Coding helper sub-agent
     instruction: Answer coding questions briefly with a short example.
+    global_instruction: Be concise.
+    include_contents: none
+    disallow_transfer_to_peers: true
 
   # A chat coordinator is not a graph node; it documents the chat + sub_agents
   # pattern and is addressable through System.Agent.
@@ -124,3 +129,8 @@ agents:
     mode: single_turn
     description: Documentation helper
     instruction: Answer documentation questions briefly.
+    output_schema:
+      type: object
+      properties:
+        answer: { type: string }
+      required: [answer]

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
 
 	"google.golang.org/adk/v2/agent"
 	adkmodel "google.golang.org/adk/v2/model"
@@ -51,8 +52,9 @@ type DynamicEnv struct {
 	// Emit publishes an intermediate event such as a state delta.
 	Emit func(*session.Event) error
 
-	ctx  agent.Context
-	runs int
+	ctx      agent.Context
+	children map[string]workflow.Node
+	runs     int
 }
 
 // Run executes child as part of this node and returns its output. Each call
@@ -63,6 +65,16 @@ func (e *DynamicEnv) Run(child workflow.Node, input any) (any, error) {
 	}
 	e.runs++
 	return workflow.RunNode[any](e.ctx, child, input)
+}
+
+// RunChild executes the child node declared under id in the node's children
+// list. It spends one iteration like Run.
+func (e *DynamicEnv) RunChild(id string, input any) (any, error) {
+	child, ok := e.children[id]
+	if !ok {
+		return nil, fmt.Errorf("dynamic node has no child %q", id)
+	}
+	return e.Run(child, input)
 }
 
 // Runs reports how many iterations were spent so far.
@@ -120,16 +132,18 @@ func NewRegistry() *Registry {
 	return r
 }
 
-func register[V any](kind, name string, m map[string]V, v V, taken ...func(string) bool) error {
-	if !identifier.MatchString(name) {
-		return fmt.Errorf("registering %s %q: name must match %s", kind, name, identifier)
+// register adds v under name after checking the name's shape, uniqueness, and
+// that no registration kept in another table already uses it.
+func register[V any](kind, name string, valid *regexp.Regexp, m map[string]V, v V, taken ...func(string) bool) error {
+	if !valid.MatchString(name) {
+		return fmt.Errorf("failed to register %s %q: name must match %s", kind, name, valid)
 	}
 	if _, dup := m[name]; dup {
-		return fmt.Errorf("registering %s %q: already registered", kind, name)
+		return fmt.Errorf("failed to register %s %q: already registered", kind, name)
 	}
 	for _, isTaken := range taken {
 		if isTaken(name) {
-			return fmt.Errorf("registering %s %q: name is used by another registration", kind, name)
+			return fmt.Errorf("failed to register %s %q: name is used by another registration", kind, name)
 		}
 	}
 	m[name] = v
@@ -141,7 +155,7 @@ func (r *Registry) RegisterFunction(name string, fn Func) error {
 	if fn == nil {
 		return fmt.Errorf("failed to register function %q: nil func", name)
 	}
-	return register("function", name, r.funcs, fn)
+	return register("function", name, identifier, r.funcs, fn)
 }
 
 // RegisterDynamic makes fn available to dynamic nodes.
@@ -149,7 +163,7 @@ func (r *Registry) RegisterDynamic(name string, fn DynamicFunc) error {
 	if fn == nil {
 		return fmt.Errorf("failed to register dynamic function %q: nil func", name)
 	}
-	return register("dynamic function", name, r.dynamics, fn)
+	return register("dynamic function", name, identifier, r.dynamics, fn)
 }
 
 // RegisterTool makes t available to tool nodes and to the tools list of
@@ -158,7 +172,7 @@ func (r *Registry) RegisterTool(t tool.Tool) error {
 	if t == nil {
 		return errors.New("failed to register tool: nil tool")
 	}
-	return register("tool", t.Name(), r.tools, t, func(n string) bool { _, ok := r.toolsets[n]; return ok })
+	return register("tool", t.Name(), toolName, r.tools, t, func(n string) bool { _, ok := r.toolsets[n]; return ok })
 }
 
 // RegisterToolset makes ts, for example an MCP toolset, available to the
@@ -167,7 +181,7 @@ func (r *Registry) RegisterToolset(ts tool.Toolset) error {
 	if ts == nil {
 		return errors.New("failed to register toolset: nil toolset")
 	}
-	return register("toolset", ts.Name(), r.toolsets, ts, func(n string) bool { _, ok := r.tools[n]; return ok })
+	return register("toolset", ts.Name(), toolName, r.toolsets, ts, func(n string) bool { _, ok := r.tools[n]; return ok })
 }
 
 // RegisterModel makes m available under name.
@@ -209,12 +223,15 @@ func (r *Registry) RegisterNodeType(t NodeType, rule NodeRule, build NodeBuilder
 	return nil
 }
 
-// Validate is the package-level Validate extended with the node types of r.
+// Validate is the package-level Validate extended with the vocabulary of r:
+// its node types, and a check that every function, tool and model a document
+// names is registered. All issues are reported together with their field
+// paths.
 func (r *Registry) Validate(spec *Spec) error {
-	return ValidateWithRules(spec, r.rules())
+	return validate(spec, r.rules(), r)
 }
 
-// Parse decodes a document and validates it against the vocabulary of r.
+// Parse decodes a document and validates it against r.
 func (r *Registry) Parse(data []byte) (*Spec, error) {
 	spec, err := decode(data)
 	if err != nil {
@@ -232,6 +249,22 @@ func (r *Registry) rules() map[NodeType]NodeRule {
 		rules[t] = nt.rule
 	}
 	return rules
+}
+
+func (r *Registry) hasFunction(name string) bool { _, ok := r.funcs[name]; return ok }
+func (r *Registry) hasDynamic(name string) bool  { _, ok := r.dynamics[name]; return ok }
+func (r *Registry) hasTool(name string) bool     { _, ok := r.tools[name]; return ok }
+
+func (r *Registry) hasToolOrToolset(name string) bool {
+	_, ok := r.toolsets[name]
+	return ok || r.hasTool(name)
+}
+
+// hasModel reports whether name can be resolved. With a resolver installed any
+// name may resolve, and the resolver's own error surfaces from Build.
+func (r *Registry) hasModel(name string) bool {
+	_, ok := r.models[name]
+	return ok || r.resolver != nil
 }
 
 func (r *Registry) resolveModel(ctx context.Context, name string) (adkmodel.LLM, error) {

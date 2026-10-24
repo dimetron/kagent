@@ -1,5 +1,7 @@
 package declarative
 
+import "encoding/json"
+
 // Document identity.
 const (
 	APIVersion      = "adk.declarative/v0.2"
@@ -15,6 +17,13 @@ const (
 	ClassWorkflow AgentClass = "Workflow"
 	// ClassLlmAgent is a model-backed agent.
 	ClassLlmAgent AgentClass = "LlmAgent"
+	// ClassSequential runs its sub-agents one after another.
+	ClassSequential AgentClass = "SequentialAgent"
+	// ClassParallel runs its sub-agents concurrently in isolated branches.
+	ClassParallel AgentClass = "ParallelAgent"
+	// ClassLoop runs its sub-agents repeatedly until max_iterations or until a
+	// sub-agent escalates.
+	ClassLoop AgentClass = "LoopAgent"
 )
 
 // NodeType selects how a workflow node is built.
@@ -50,6 +59,17 @@ const (
 	ModeSingleTurn Mode = "single_turn"
 )
 
+// IncludeContents controls how much conversation history a model sees.
+type IncludeContents string
+
+const (
+	// IncludeContentsDefault sends the history that the ADK selects for the
+	// agent's placement.
+	IncludeContentsDefault IncludeContents = "default"
+	// IncludeContentsNone sends only the current turn.
+	IncludeContentsNone IncludeContents = "none"
+)
+
 // Spec is an AgentSystem document. The first agent is the root.
 type Spec struct {
 	APIVersion string      `json:"apiVersion"`
@@ -57,15 +77,35 @@ type Spec struct {
 	Agents     []AgentSpec `json:"agents"`
 }
 
-// AgentSpec declares one named agent. Fields are grouped by the class that
-// accepts them; validation rejects a field on the wrong class.
+// LLMSpec is the model configuration shared by LlmAgent agents and inline llm
+// nodes. It is embedded, so its fields sit directly on the owner in YAML.
+type LLMSpec struct {
+	// Model names a registered model, or one the registry's resolver knows.
+	Model string `json:"model,omitempty"`
+	Mode  Mode   `json:"mode,omitempty"`
+	// Instruction is the system prompt of the agent.
+	Instruction string `json:"instruction,omitempty"`
+	// GlobalInstruction applies to the whole agent tree below the agent.
+	GlobalInstruction string `json:"global_instruction,omitempty"`
+	// Tools names registered tools and toolsets.
+	Tools []string `json:"tools,omitempty"`
+	// OutputKey stores the final reply in session state under this key.
+	OutputKey string `json:"output_key,omitempty"`
+	// OutputSchema is a JSON Schema the reply must satisfy.
+	OutputSchema    json.RawMessage `json:"output_schema,omitempty"`
+	IncludeContents IncludeContents `json:"include_contents,omitempty"`
+}
+
+// AgentSpec declares one named agent. Which fields apply depends on
+// AgentClass; see agentRules.
 type AgentSpec struct {
 	Name        string     `json:"name"`
 	AgentClass  AgentClass `json:"agent_class"`
 	Description string     `json:"description,omitempty"`
 	// SubAgents names other agents of the document. For a Workflow they are
-	// made available to the engine and to agent nodes; for an LlmAgent they
-	// are transfer targets.
+	// made available to the engine; for an LlmAgent they are transfer
+	// targets; for Sequential, Parallel and Loop agents they are the agents
+	// being orchestrated.
 	SubAgents []string `json:"sub_agents,omitempty"`
 
 	// Workflow fields.
@@ -77,15 +117,17 @@ type AgentSpec struct {
 	Edges []EdgeSpec `json:"edges,omitempty"`
 
 	// LlmAgent fields.
-	Model       string   `json:"model,omitempty"`
-	Mode        Mode     `json:"mode,omitempty"`
-	Instruction string   `json:"instruction,omitempty"`
-	Tools       []string `json:"tools,omitempty"`
-	OutputKey   string   `json:"output_key,omitempty"`
+	LLMSpec
+	DisallowTransferToParent bool `json:"disallow_transfer_to_parent,omitempty"`
+	DisallowTransferToPeers  bool `json:"disallow_transfer_to_peers,omitempty"`
+
+	// MaxIterations bounds a LoopAgent. Zero loops until a sub-agent
+	// escalates.
+	MaxIterations uint `json:"max_iterations,omitempty"`
 }
 
 // NodeSpec declares one workflow node. Which fields apply depends on Type;
-// see nodeRules.
+// see builtinNodeRules.
 type NodeSpec struct {
 	ID          string   `json:"id"`
 	Type        NodeType `json:"type"`
@@ -104,15 +146,14 @@ type NodeSpec struct {
 	MaxConcurrency int `json:"max_concurrency,omitempty"`
 	// MaxIters bounds the child runs of a dynamic node.
 	MaxIters int `json:"max_iters,omitempty"`
+	// Children names nodes of the same graph that a dynamic node may run by
+	// id. A child has no edges: only its dynamic parent schedules it.
+	Children []string `json:"children,omitempty"`
 	// Message is the prompt a hitl node shows the human.
 	Message string `json:"message,omitempty"`
 
 	// Inline llm node fields.
-	Model       string   `json:"model,omitempty"`
-	Mode        Mode     `json:"mode,omitempty"`
-	Instruction string   `json:"instruction,omitempty"`
-	Tools       []string `json:"tools,omitempty"`
-	OutputKey   string   `json:"output_key,omitempty"`
+	LLMSpec
 
 	// Nested workflow fields. A nested workflow has its own START.
 	Nodes []NodeSpec `json:"nodes,omitempty"`

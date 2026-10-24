@@ -1,17 +1,20 @@
 package declarative
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 
 	"google.golang.org/adk/v2/agent"
 	"google.golang.org/adk/v2/session"
 	"google.golang.org/adk/v2/workflow"
+	"google.golang.org/genai"
 )
 
 // node dispatches on the node type. Registered types are consulted after the
-// built-ins, which they cannot shadow.
-func (b *builder) node(bc *BuildContext, n *NodeSpec) (workflow.Node, error) {
+// built-ins, which they cannot shadow. render is set for terminal nodes whose
+// output must be readable as message text.
+func (b *builder) node(bc *BuildContext, sc *scope, n *NodeSpec, render bool) (workflow.Node, error) {
 	cfg, err := nodeConfig(n)
 	if err != nil {
 		return nil, err
@@ -22,7 +25,7 @@ func (b *builder) node(bc *BuildContext, n *NodeSpec) (workflow.Node, error) {
 		if err != nil {
 			return nil, err
 		}
-		return workflow.NewEmittingFunctionNode(n.ID, routedFunc(fn), cfg), nil
+		return workflow.NewEmittingFunctionNode(n.ID, routedFunc(fn, render), cfg), nil
 	case NodeJoin:
 		return workflow.NewJoinNode(n.ID), nil
 	case NodeTool:
@@ -32,13 +35,13 @@ func (b *builder) node(bc *BuildContext, n *NodeSpec) (workflow.Node, error) {
 	case NodeLLM:
 		return b.llmNode(n, cfg)
 	case NodeWorkflow:
-		return b.workflowNode(n)
+		return b.workflowNode(n, render)
 	case NodeParallelWorker:
 		return b.parallelWorker(n, cfg)
 	case NodeDynamic:
-		return b.dynamicNode(n, cfg)
+		return b.dynamicNode(sc, n, cfg, render)
 	case NodeHITL:
-		return hitlNode(n, cfg), nil
+		return hitlNode(n, cfg, render), nil
 	}
 	custom, ok := b.reg.nodeTypes[n.Type]
 	if !ok {
@@ -58,20 +61,48 @@ func (b *builder) function(name string) (Func, error) {
 // routedFunc adapts a Func to the engine. A routed result is emitted as one
 // event that carries both the output and the routes; the engine selects edges
 // from Event.Routes.
-func routedFunc(fn Func) workflow.EmittingFunctionFn[any, any] {
+func routedFunc(fn Func, render bool) workflow.EmittingFunctionFn[any, any] {
 	return func(ctx agent.Context, in any, emit func(*session.Event) error) (any, error) {
 		res, err := fn(ctx, in)
 		if err != nil {
 			return nil, err
 		}
-		if len(res.Routes) == 0 {
-			return res.Output, nil
-		}
-		ev := session.NewEvent(ctx, ctx.InvocationID())
-		ev.Routes = res.Routes
-		ev.Output = res.Output
-		return nil, emit(ev)
+		return finish(ctx, emit, res.Output, res.Routes, render)
 	}
+}
+
+// finish hands a node result to the engine. Plain results return normally and
+// the engine emits them. A result that carries routes, or that must be
+// rendered as text, is emitted here as one event and the node returns nil so
+// the engine adds no second one.
+//
+// A2A clients display only Event.Content, while successor nodes read
+// Event.Output. The engine fills Content for string outputs; finish does the
+// same for structured outputs of terminal nodes, as JSON.
+func finish(ctx agent.Context, emit func(*session.Event) error, out any, routes []string, render bool) (any, error) {
+	_, isText := out.(string)
+	needsContent := render && out != nil && !isText
+	if len(routes) == 0 && !needsContent {
+		return out, nil
+	}
+	ev := session.NewEvent(ctx, ctx.InvocationID())
+	ev.Routes = routes
+	ev.Output = out
+	if render && out != nil {
+		ev.Content = &genai.Content{Parts: []*genai.Part{{Text: outputText(out)}}}
+	}
+	return nil, emit(ev)
+}
+
+// outputText renders a structured output for display.
+func outputText(out any) string {
+	if s, ok := out.(string); ok {
+		return s
+	}
+	if data, err := json.Marshal(out); err == nil {
+		return string(data)
+	}
+	return fmt.Sprint(out)
 }
 
 func (b *builder) toolNode(id, toolName string, cfg workflow.NodeConfig) (workflow.Node, error) {
@@ -99,15 +130,15 @@ func (b *builder) llmNode(n *NodeSpec, cfg workflow.NodeConfig) (workflow.Node, 
 	if mode == "" {
 		mode = ModeSingleTurn
 	}
-	a, err := b.newLLM(n.ID, n.Description, n.Model, n.Instruction, n.OutputKey, mode, n.Tools, nil)
+	a, err := b.newLLM(n.ID, n.Description, &n.LLMSpec, mode, nil, false, false)
 	if err != nil {
 		return nil, err
 	}
 	return workflow.NewAgentNode(a, cfg)
 }
 
-func (b *builder) workflowNode(n *NodeSpec) (workflow.Node, error) {
-	nodes, err := b.nodes(n.Nodes)
+func (b *builder) workflowNode(n *NodeSpec, render bool) (workflow.Node, error) {
+	nodes, err := b.nodes(n.Nodes, n.Edges, render)
 	if err != nil {
 		return nil, err
 	}
@@ -145,28 +176,40 @@ func plainFunc(fn Func) func(agent.Context, any) (any, error) {
 	}
 }
 
-func (b *builder) dynamicNode(n *NodeSpec, cfg workflow.NodeConfig) (workflow.Node, error) {
+func (b *builder) dynamicNode(sc *scope, n *NodeSpec, cfg workflow.NodeConfig, render bool) (workflow.Node, error) {
 	fn, ok := b.reg.dynamics[n.Function]
 	if !ok {
 		return nil, fmt.Errorf("dynamic function %q is not registered", n.Function)
 	}
-	maxIters := n.MaxIters
+	maxIters, childIDs := n.MaxIters, n.Children
 	return workflow.NewDynamicNode(n.ID, func(ctx agent.Context, in any, emit func(*session.Event) error) (any, error) {
-		return fn(ctx, in, &DynamicEnv{MaxIters: maxIters, Emit: emit, ctx: ctx})
+		children := make(map[string]workflow.Node, len(childIDs))
+		for _, id := range childIDs {
+			children[id] = sc.nodes[id]
+		}
+		out, err := fn(ctx, in, &DynamicEnv{MaxIters: maxIters, Emit: emit, ctx: ctx, children: children})
+		if err != nil {
+			return nil, err
+		}
+		return finish(ctx, emit, out, nil, render)
 	}, cfg), nil
 }
 
 // hitlNode pauses the workflow until a human answers and forwards the answer.
 // The node re-runs on resume, so the interrupt id must be stable within a run
 // and unique across runs; the invocation id gives both.
-func hitlNode(n *NodeSpec, cfg workflow.NodeConfig) workflow.Node {
+func hitlNode(n *NodeSpec, cfg workflow.NodeConfig, render bool) workflow.Node {
 	rerun := true
 	cfg.RerunOnResume = &rerun
 	return workflow.NewEmittingFunctionNode(n.ID, func(ctx agent.Context, _ any, emit func(*session.Event) error) (any, error) {
-		return workflow.ResumeOrRequestInput(ctx, emit, session.RequestInput{
+		reply, err := workflow.ResumeOrRequestInput(ctx, emit, session.RequestInput{
 			InterruptID: n.ID + "-" + ctx.InvocationID(),
 			Message:     n.Message,
 		})
+		if err != nil {
+			return nil, err
+		}
+		return finish(ctx, emit, reply, nil, render)
 	}, cfg)
 }
 
