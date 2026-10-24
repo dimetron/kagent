@@ -250,6 +250,30 @@ var catalog = []Pattern{
 		Cases:   []Case{{Input: "go", Want: []string{"out:recovered: go"}}},
 	},
 	{
+		Name: "fan_out_agents", Title: "Fan-out of agents (isolated by default)", Go: fanOutAgentsGo,
+		Summary: "Concurrent branches get their own branch of the session: neither agent is shown the other's reply, so both answer saw=1 (just the user's message). Sibling isolation is automatic for static fan-out, parallel workers and ParallelAgent.",
+		Shape:   "START → left  ─┐\n      └→ right ─┴→ gather → combine",
+		Cases:   []Case{{Input: "hi", Want: []string{"out:left=saw=1|right=saw=1"}}},
+	},
+	{
+		Name: "shared_children", Title: "Dynamic children sharing the conversation", Go: sharedChildrenGo, Ordered: true,
+		Summary: "By default a dynamic node runs its children on its own branch, so the second child is shown what the first one said (saw=3 against saw=1).",
+		Shape:   "START → review (runs first, then second, shared)",
+		Cases:   []Case{{Input: "hi", Want: []string{"out:first saw=1, second saw=3"}}},
+	},
+	{
+		Name: "isolated_children", Title: "Dynamic children isolated from each other", Go: isolatedChildrenGo, Ordered: true,
+		Summary: "isolation: branch (WithUseSubBranch in Go) gives every child run its own branch, so the second child is back to saw=1 and no longer sees the first one's reply. Use isolation: scope (WithIsolationScopeFromNodePath) to hide ancestor events too.",
+		Shape:   "START → review (runs first, then second, each on its own branch)",
+		Cases:   []Case{{Input: "hi", Want: []string{"out:first saw=1, second saw=1"}}},
+	},
+	{
+		Name: "agent_as_tool", Title: "Agent as a tool (a session of its own)", Go: agentAsToolGo, Ordered: true,
+		Summary: "agent_tools (agenttool in Go) runs the agent in a new session, seeded with a copy of the caller's state, so it sees only the request it was given (saw=1) and parallel calls cannot interfere. A sub_agent, by contrast, shares the caller's session.",
+		Shape:   "caller ──call──▶ specialist (own session)",
+		Cases:   []Case{{Input: "question", Want: []string{"say:agent_as_tool:tool said: saw=1"}}},
+	},
+	{
 		Name: "sequential_agent", Title: "Sequential agents", Go: sequentialAgentGo, Ordered: true,
 		Summary: "The classic ADK SequentialAgent runs its sub-agents in order; each sees the conversation so far, including what earlier agents said.",
 		Shape:   "draft → review",

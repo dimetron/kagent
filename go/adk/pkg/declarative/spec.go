@@ -59,6 +59,24 @@ const (
 	ModeSingleTurn Mode = "single_turn"
 )
 
+// Isolation says how much of the session a child run can see. Each level
+// hides more than the one before it.
+type Isolation string
+
+const (
+	// IsolationShared runs the child on its parent's branch: it sees the
+	// whole conversation, including what earlier children said. This is the
+	// ADK default for children of a dynamic node.
+	IsolationShared Isolation = "shared"
+	// IsolationBranch gives every child run its own branch: it sees its
+	// ancestors' history but not its siblings'. Static fan-out, parallel
+	// workers and ParallelAgent always run this way.
+	IsolationBranch Isolation = "branch"
+	// IsolationScope also tags the child's events with a scope unique to the
+	// run, so it sees only its own events.
+	IsolationScope Isolation = "scope"
+)
+
 // IncludeContents controls how much conversation history a model sees.
 type IncludeContents string
 
@@ -121,6 +139,13 @@ type AgentSpec struct {
 	DisallowTransferToParent bool `json:"disallow_transfer_to_parent,omitempty"`
 	DisallowTransferToPeers  bool `json:"disallow_transfer_to_peers,omitempty"`
 
+	// AgentTools names agents that this LlmAgent calls as tools. Every call
+	// runs in a new session seeded with a copy of the caller's state, so the
+	// agent never sees the caller's history and parallel calls cannot
+	// interfere. An agent is either a sub_agent (shared session, transfer) or
+	// an agent tool (separate session), not both.
+	AgentTools []string `json:"agent_tools,omitempty"`
+
 	// MaxIterations bounds a LoopAgent. Zero loops until a sub-agent
 	// escalates.
 	MaxIterations uint `json:"max_iterations,omitempty"`
@@ -149,6 +174,9 @@ type NodeSpec struct {
 	// Children names nodes of the same graph that a dynamic node may run by
 	// id. A child has no edges: only its dynamic parent schedules it.
 	Children []string `json:"children,omitempty"`
+	// Isolation sets how much of the session each child run of a dynamic
+	// node sees. Unset is shared.
+	Isolation Isolation `json:"isolation,omitempty"`
 	// Message is the prompt a hitl node shows the human.
 	Message string `json:"message,omitempty"`
 

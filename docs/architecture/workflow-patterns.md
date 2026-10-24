@@ -762,6 +762,216 @@ agents:
 <tr>
 <td valign="top">
 
+**Fan-out of agents (isolated by default)**
+
+Concurrent branches get their own branch of the session: neither agent is shown the other's reply, so both answer saw=1 (just the user's message). Sibling isolation is automatic for static fan-out, parallel workers and ParallelAgent.
+
+```text
+START → left  ─┐
+      └→ right ─┴→ gather → combine
+```
+
+Run: `"hi"` → `out:left=saw=1|right=saw=1`
+
+</td>
+<td valign="top">
+
+```go
+func fanOutAgentsGo() (agent.Agent, error) {
+	left, err := chatAgent("left")
+	if err != nil {
+		return nil, err
+	}
+	right, err := chatAgent("right")
+	if err != nil {
+		return nil, err
+	}
+	leftNode, err := workflow.NewAgentNode(left, workflow.NodeConfig{})
+	if err != nil {
+		return nil, err
+	}
+	rightNode, err := workflow.NewAgentNode(right, workflow.NodeConfig{})
+	if err != nil {
+		return nil, err
+	}
+	gather := workflow.NewJoinNode("gather")
+	merge := workflow.NewFunctionNode("combine", func(_ agent.Context, in map[string]any) (string, error) {
+		return combine(in), nil
+	}, workflow.NodeConfig{})
+	return workflowagent.New(workflowagent.Config{
+		Name: "fan_out_agents",
+		Edges: workflow.NewEdgeBuilder().
+			AddFanOut(workflow.Start, leftNode, rightNode).
+			AddFanIn(gather, leftNode, rightNode).
+			Add(gather, merge).
+			Build(),
+	})
+}
+```
+
+</td>
+<td valign="top">
+
+```yaml
+apiVersion: adk.declarative/v0.2
+kind: AgentSystem
+agents:
+  - name: fan_out_agents
+    agent_class: Workflow
+    nodes:
+      - { id: ask_left, type: agent, agent: left }
+      - { id: ask_right, type: agent, agent: right }
+      - { id: gather, type: join }
+      - { id: combine, type: function, function: combine }
+    edges:
+      - { from: START, to: ask_left }
+      - { from: START, to: ask_right }
+      - { from: ask_left, to: gather }
+      - { from: ask_right, to: gather }
+      - { from: gather, to: combine }
+  - { name: left, agent_class: LlmAgent, model: history, mode: chat, instruction: Answer. }
+  - { name: right, agent_class: LlmAgent, model: history, mode: chat, instruction: Answer. }
+```
+
+</td>
+</tr>
+<tr>
+<td valign="top">
+
+**Dynamic children sharing the conversation**
+
+By default a dynamic node runs its children on its own branch, so the second child is shown what the first one said (saw=3 against saw=1).
+
+```text
+START → review (runs first, then second, shared)
+```
+
+Run: `"hi"` → `out:first saw=1, second saw=3`
+
+</td>
+<td valign="top">
+
+```go
+func sharedChildrenGo() (agent.Agent, error) { return reviewersGo("shared_children") }
+```
+
+</td>
+<td valign="top">
+
+```yaml
+apiVersion: adk.declarative/v0.2
+kind: AgentSystem
+agents:
+  - name: shared_children
+    agent_class: Workflow
+    nodes:
+      - { id: review, type: dynamic, function: review_both, children: [ask_first, ask_second] }
+      - { id: ask_first, type: agent, agent: first }
+      - { id: ask_second, type: agent, agent: second }
+    edges:
+      - { from: START, to: review }
+  - { name: first, agent_class: LlmAgent, model: history, mode: chat, instruction: Answer. }
+  - { name: second, agent_class: LlmAgent, model: history, mode: chat, instruction: Answer. }
+```
+
+</td>
+</tr>
+<tr>
+<td valign="top">
+
+**Dynamic children isolated from each other**
+
+isolation: branch (WithUseSubBranch in Go) gives every child run its own branch, so the second child is back to saw=1 and no longer sees the first one's reply. Use isolation: scope (WithIsolationScopeFromNodePath) to hide ancestor events too.
+
+```text
+START → review (runs first, then second, each on its own branch)
+```
+
+Run: `"hi"` → `out:first saw=1, second saw=1`
+
+</td>
+<td valign="top">
+
+```go
+func isolatedChildrenGo() (agent.Agent, error) {
+	return reviewersGo("isolated_children", workflow.WithUseSubBranch())
+}
+```
+
+</td>
+<td valign="top">
+
+```yaml
+apiVersion: adk.declarative/v0.2
+kind: AgentSystem
+agents:
+  - name: isolated_children
+    agent_class: Workflow
+    nodes:
+      - { id: review, type: dynamic, function: review_both, children: [ask_first, ask_second], isolation: branch }
+      - { id: ask_first, type: agent, agent: first }
+      - { id: ask_second, type: agent, agent: second }
+    edges:
+      - { from: START, to: review }
+  - { name: first, agent_class: LlmAgent, model: history, mode: chat, instruction: Answer. }
+  - { name: second, agent_class: LlmAgent, model: history, mode: chat, instruction: Answer. }
+```
+
+</td>
+</tr>
+<tr>
+<td valign="top">
+
+**Agent as a tool (a session of its own)**
+
+agent_tools (agenttool in Go) runs the agent in a new session, seeded with a copy of the caller's state, so it sees only the request it was given (saw=1) and parallel calls cannot interfere. A sub_agent, by contrast, shares the caller's session.
+
+```text
+caller ──call──▶ specialist (own session)
+```
+
+Run: `"question"` → `say:agent_as_tool:tool said: saw=1`
+
+</td>
+<td valign="top">
+
+```go
+func agentAsToolGo() (agent.Agent, error) {
+	specialist, err := llmagent.New(llmagent.Config{
+		Name: "specialist", Description: "Answers one question.", Instruction: "Answer.", Model: historyModel{},
+	})
+	if err != nil {
+		return nil, err
+	}
+	return llmagent.New(llmagent.Config{
+		Name:        "agent_as_tool",
+		Instruction: "Delegate to the specialist.",
+		Model:       callerModel{tool: "specialist"},
+		Tools:       []tool.Tool{agenttool.New(specialist, nil)},
+	})
+}
+```
+
+</td>
+<td valign="top">
+
+```yaml
+apiVersion: adk.declarative/v0.2
+kind: AgentSystem
+agents:
+  - name: agent_as_tool
+    agent_class: LlmAgent
+    model: caller
+    instruction: Delegate to the specialist.
+    agent_tools: [specialist]
+  - { name: specialist, agent_class: LlmAgent, model: history, description: Answers one question., instruction: Answer. }
+```
+
+</td>
+</tr>
+<tr>
+<td valign="top">
+
 **Sequential agents**
 
 The classic ADK SequentialAgent runs its sub-agents in order; each sees the conversation so far, including what earlier agents said.
@@ -1211,6 +1421,30 @@ agents:
 </tr>
 </tbody>
 </table>
+
+## Session isolation
+
+Concurrent branches and subagents differ in how much of the session they can see. There are four levels, and each boundary has a default and a control. The first two rows were measured against ADK v2.6.0 by `isolation_test.go` in `pkg/declarative`; a change upstream fails those tests.
+
+| Boundary | Sees the others' history by default | Control |
+| --- | --- | --- |
+| Static fan-out (several edges from one node) | no, own branch | none: always branch-isolated |
+| `parallel_worker` items | no, own branch | none: always branch-isolated |
+| `ParallelAgent` sub-agents | no, own branch | none: always branch-isolated |
+| `SequentialAgent` / `LoopAgent` sub-agents | yes, by design | none that hides earlier agents; run them as `single_turn` agent nodes in a graph, or as `agent_tools` |
+| Children of a `dynamic` node | yes | `isolation: shared | branch | scope` on the node |
+| `sub_agents` of an `LlmAgent` (transfer) | yes, same session | none; call it as an `agent_tools` entry instead |
+| `single_turn` agent node in a graph | no, sees only its predecessor's output | the mode is the control |
+| `agent_tools` of an `LlmAgent` | no, a separate session | the agent is the control: use `agent_tools` instead of `sub_agents` |
+
+- **shared**: the child runs on its parent's branch and sees the whole conversation.
+- **branch**: the child has its own branch. It sees its ancestors' history, not its siblings'.
+- **scope**: the child also gets a scope unique to the run, so it sees only its own events. The user's message and the input you hand it still arrive; earlier agents' replies do not.
+- **session** (`agent_tools`): the agent runs in a new session seeded with a copy of the caller's state. It never sees the caller's history, parallel calls get one session each, and its state writes are not copied back.
+
+`include_contents: none` is not isolation. It keeps the current turn, and the replies of agents that ran earlier in that turn are part of it, so a sequential sub-agent still receives what the one before it said (and loses the user's message).
+
+Isolation covers history, not state. Branches share one session state, so two concurrent agents that write the same `output_key` race; validation rejects that for `ParallelAgent`, for unconditional fan-out successors, and for `parallel_worker` agents. Remember that a tool agent starts from a copy of the caller's state, so do not keep secrets there that the tool agent should not see.
 
 ## Reading the table
 

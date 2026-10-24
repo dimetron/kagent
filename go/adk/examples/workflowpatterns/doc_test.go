@@ -160,6 +160,30 @@ The models are the offline stub, so nothing needs credentials.
 `
 
 const docOutro = `
+## Session isolation
+
+Concurrent branches and subagents differ in how much of the session they can see. There are four levels, and each boundary has a default and a control. The first two rows were measured against ADK v2.6.0 by ` + "`isolation_test.go`" + ` in ` + "`pkg/declarative`" + `; a change upstream fails those tests.
+
+| Boundary | Sees the others' history by default | Control |
+| --- | --- | --- |
+| Static fan-out (several edges from one node) | no, own branch | none: always branch-isolated |
+| ` + "`parallel_worker`" + ` items | no, own branch | none: always branch-isolated |
+| ` + "`ParallelAgent`" + ` sub-agents | no, own branch | none: always branch-isolated |
+| ` + "`SequentialAgent`" + ` / ` + "`LoopAgent`" + ` sub-agents | yes, by design | none that hides earlier agents; run them as ` + "`single_turn`" + ` agent nodes in a graph, or as ` + "`agent_tools`" + ` |
+| Children of a ` + "`dynamic`" + ` node | yes | ` + "`isolation: shared | branch | scope`" + ` on the node |
+| ` + "`sub_agents`" + ` of an ` + "`LlmAgent`" + ` (transfer) | yes, same session | none; call it as an ` + "`agent_tools`" + ` entry instead |
+| ` + "`single_turn`" + ` agent node in a graph | no, sees only its predecessor's output | the mode is the control |
+| ` + "`agent_tools`" + ` of an ` + "`LlmAgent`" + ` | no, a separate session | the agent is the control: use ` + "`agent_tools`" + ` instead of ` + "`sub_agents`" + ` |
+
+- **shared**: the child runs on its parent's branch and sees the whole conversation.
+- **branch**: the child has its own branch. It sees its ancestors' history, not its siblings'.
+- **scope**: the child also gets a scope unique to the run, so it sees only its own events. The user's message and the input you hand it still arrive; earlier agents' replies do not.
+- **session** (` + "`agent_tools`" + `): the agent runs in a new session seeded with a copy of the caller's state. It never sees the caller's history, parallel calls get one session each, and its state writes are not copied back.
+
+` + "`include_contents: none`" + ` is not isolation. It keeps the current turn, and the replies of agents that ran earlier in that turn are part of it, so a sequential sub-agent still receives what the one before it said (and loses the user's message).
+
+Isolation covers history, not state. Branches share one session state, so two concurrent agents that write the same ` + "`output_key`" + ` race; validation rejects that for ` + "`ParallelAgent`" + `, for unconditional fan-out successors, and for ` + "`parallel_worker`" + ` agents. Remember that a tool agent starts from a copy of the caller's state, so do not keep secrets there that the tool agent should not see.
+
 ## Reading the table
 
 - **One result.** A workflow ends in exactly one terminal output. Branches that run concurrently must converge in a ` + "`join`" + `, or all but one must finish without output.

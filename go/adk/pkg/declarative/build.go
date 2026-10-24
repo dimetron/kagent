@@ -11,6 +11,7 @@ import (
 	"google.golang.org/adk/v2/agent/workflowagents/loopagent"
 	"google.golang.org/adk/v2/agent/workflowagents/parallelagent"
 	"google.golang.org/adk/v2/agent/workflowagents/sequentialagent"
+	"google.golang.org/adk/v2/tool/agenttool"
 	"google.golang.org/adk/v2/workflow"
 
 	adkoutputschema "github.com/kagent-dev/kagent/go/adk/pkg/outputschema"
@@ -125,12 +126,12 @@ func (b *builder) subAgents(names []string) ([]agent.Agent, error) {
 }
 
 func (b *builder) llmAgent(spec *AgentSpec) (agent.Agent, error) {
-	return b.newLLM(spec.Name, spec.Description, &spec.LLMSpec, spec.Mode, spec.SubAgents, spec.DisallowTransferToParent, spec.DisallowTransferToPeers)
+	return b.newLLM(spec.Name, spec.Description, &spec.LLMSpec, spec.Mode, spec.SubAgents, spec.AgentTools, spec.DisallowTransferToParent, spec.DisallowTransferToPeers)
 }
 
 // newLLM is shared by LlmAgent agents and inline llm nodes, which pass their
 // own effective mode.
-func (b *builder) newLLM(name, description string, l *LLMSpec, mode Mode, subAgents []string, noParent, noPeers bool) (agent.Agent, error) {
+func (b *builder) newLLM(name, description string, l *LLMSpec, mode Mode, subAgents, agentTools []string, noParent, noPeers bool) (agent.Agent, error) {
 	llm, err := b.reg.resolveModel(b.ctx, l.Model)
 	if err != nil {
 		return nil, err
@@ -142,6 +143,14 @@ func (b *builder) newLLM(name, description string, l *LLMSpec, mode Mode, subAge
 	subs, err := b.subAgents(subAgents)
 	if err != nil {
 		return nil, err
+	}
+	// An agent tool runs in a session of its own, so it never joins the tree.
+	for _, name := range agentTools {
+		target, err := b.agent(name)
+		if err != nil {
+			return nil, err
+		}
+		toolList = append(toolList, agenttool.New(target, nil))
 	}
 	cfg := llmagent.Config{
 		Name:                     name,

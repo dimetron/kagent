@@ -136,7 +136,7 @@ func (b *builder) llmNode(n *NodeSpec, cfg workflow.NodeConfig) (workflow.Node, 
 	if mode == "" {
 		mode = ModeSingleTurn
 	}
-	a, err := b.newLLM(n.ID, n.Description, &n.LLMSpec, mode, nil, false, false)
+	a, err := b.newLLM(n.ID, n.Description, &n.LLMSpec, mode, nil, nil, false, false)
 	if err != nil {
 		return nil, err
 	}
@@ -187,13 +187,13 @@ func (b *builder) dynamicNode(sc *scope, n *NodeSpec, cfg workflow.NodeConfig, r
 	if !ok {
 		return nil, fmt.Errorf("dynamic function %q is not registered", n.Function)
 	}
-	maxIters, childIDs := n.MaxIters, n.Children
+	maxIters, childIDs, isolation := n.MaxIters, n.Children, n.Isolation
 	return workflow.NewDynamicNode(n.ID, func(ctx agent.Context, in any, emit func(*session.Event) error) (any, error) {
 		children := make(map[string]workflow.Node, len(childIDs))
 		for _, id := range childIDs {
 			children[id] = sc.nodes[id]
 		}
-		out, err := fn(ctx, in, &DynamicEnv{MaxIters: maxIters, Emit: emit, ctx: ctx, children: children})
+		out, err := fn(ctx, in, &DynamicEnv{MaxIters: maxIters, Emit: emit, ctx: ctx, children: children, isolation: isolation})
 		if err != nil {
 			return nil, err
 		}

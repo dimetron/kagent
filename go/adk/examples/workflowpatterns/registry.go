@@ -29,6 +29,12 @@ func routeFunc(f func(string) []string) declarative.Func {
 // the flaky step start from zero.
 func newRegistry() (*declarative.Registry, error) {
 	reg := declarative.NewRegistry()
+	if err := reg.RegisterModel("history", historyModel{}); err != nil {
+		return nil, err
+	}
+	if err := reg.RegisterModel("caller", callerModel{tool: "specialist"}); err != nil {
+		return nil, err
+	}
 
 	functions := map[string]declarative.Func{
 		"clean": textFunc(clean), "upper": textFunc(upper), "lower": textFunc(lower),
@@ -71,6 +77,21 @@ func newRegistry() (*declarative.Registry, error) {
 		if err := reg.RegisterFunction(name, fn); err != nil {
 			return nil, err
 		}
+	}
+
+	// A dynamic node that runs two reviewers in turn and reports both answers.
+	if err := reg.RegisterDynamic("review_both", func(_ agent.Context, in any, env *declarative.DynamicEnv) (any, error) {
+		first, err := env.RunChild("ask_first", in)
+		if err != nil {
+			return nil, err
+		}
+		second, err := env.RunChild("ask_second", in)
+		if err != nil {
+			return nil, err
+		}
+		return fmt.Sprintf("first %v, second %v", first, second), nil
+	}); err != nil {
+		return nil, err
 	}
 
 	// A dynamic node decides at run time how often to run its child.

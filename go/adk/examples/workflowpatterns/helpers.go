@@ -1,8 +1,10 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"iter"
 	"slices"
 	"strconv"
 	"strings"
@@ -10,10 +12,12 @@ import (
 
 	"google.golang.org/adk/v2/agent"
 	"google.golang.org/adk/v2/agent/llmagent"
+	adkmodel "google.golang.org/adk/v2/model"
 	"google.golang.org/adk/v2/session"
 	"google.golang.org/adk/v2/tool"
 	"google.golang.org/adk/v2/tool/functiontool"
 	"google.golang.org/adk/v2/workflow"
+	"google.golang.org/genai"
 
 	"github.com/kagent-dev/kagent/go/adk/pkg/declarative"
 )
@@ -172,5 +176,67 @@ func router(name string, decide func(string) []string) workflow.Node {
 func worker(name, instruction string) (agent.Agent, error) {
 	return llmagent.New(llmagent.Config{
 		Name: name, Instruction: instruction, Model: declarative.NewStubModel("stub"),
+	})
+}
+
+// historyModel makes session isolation visible: it replies "saw=N", where N is
+// how many text parts of conversation it was shown. An agent that shares the
+// conversation sees more than one that is isolated from it.
+type historyModel struct{}
+
+func (historyModel) Name() string { return "history" }
+
+func (historyModel) GenerateContent(_ context.Context, req *adkmodel.LLMRequest, _ bool) iter.Seq2[*adkmodel.LLMResponse, error] {
+	return func(yield func(*adkmodel.LLMResponse, error) bool) {
+		seen := 0
+		for _, c := range req.Contents {
+			for _, part := range c.Parts {
+				if part != nil && part.Text != "" {
+					seen++
+				}
+			}
+		}
+		yield(&adkmodel.LLMResponse{
+			Content:      genai.NewContentFromText(fmt.Sprintf("saw=%d", seen), genai.RoleModel),
+			TurnComplete: true,
+		}, nil)
+	}
+}
+
+// callerModel is a parent model that calls one tool with the user's message,
+// then answers with the tool's result.
+type callerModel struct{ tool string }
+
+func (callerModel) Name() string { return "caller" }
+
+func (m callerModel) GenerateContent(_ context.Context, req *adkmodel.LLMRequest, _ bool) iter.Seq2[*adkmodel.LLMResponse, error] {
+	return func(yield func(*adkmodel.LLMResponse, error) bool) {
+		var request, result string
+		for _, c := range req.Contents {
+			for _, part := range c.Parts {
+				switch {
+				case part == nil:
+				case part.FunctionResponse != nil:
+					result = fmt.Sprint(part.FunctionResponse.Response["result"])
+				case part.Text != "" && request == "":
+					request = part.Text
+				}
+			}
+		}
+		if result != "" {
+			yield(&adkmodel.LLMResponse{Content: genai.NewContentFromText("tool said: "+result, genai.RoleModel), TurnComplete: true}, nil)
+			return
+		}
+		yield(&adkmodel.LLMResponse{Content: &genai.Content{Role: genai.RoleModel, Parts: []*genai.Part{{
+			FunctionCall: &genai.FunctionCall{ID: "call-1", Name: m.tool, Args: map[string]any{"request": request}},
+		}}}, TurnComplete: true}, nil)
+	}
+}
+
+// chatAgent returns a chat-mode agent on the history model, so its answer
+// shows how much of the conversation it shares.
+func chatAgent(name string) (agent.Agent, error) {
+	return llmagent.New(llmagent.Config{
+		Name: name, Instruction: "Answer.", Model: historyModel{}, Mode: llmagent.ModeChat,
 	})
 }

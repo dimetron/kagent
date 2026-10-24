@@ -82,7 +82,9 @@ func validate(spec *Spec, extra map[NodeType]NodeRule, refs *Registry) error {
 }
 
 type validator struct {
-	rules map[NodeType]NodeRule
+	// agents indexes the document's agents by name.
+	agents map[string]*AgentSpec
+	rules  map[NodeType]NodeRule
 	// refs, when set, resolves the names a document uses to registrations.
 	refs   *Registry
 	issues []Issue
@@ -124,6 +126,7 @@ func (v *validator) spec(spec *Spec) {
 	}
 
 	classes := make(map[string]AgentClass, len(spec.Agents))
+	v.agents = make(map[string]*AgentSpec, len(spec.Agents))
 	for i, a := range spec.Agents {
 		path := fmt.Sprintf("agents[%d]", i)
 		switch {
@@ -136,12 +139,14 @@ func (v *validator) spec(spec *Spec) {
 				v.add(path+".name", "duplicate agent name %q", a.Name)
 			}
 			classes[a.Name] = a.AgentClass
+			v.agents[a.Name] = &spec.Agents[i]
 		}
 	}
 	for i := range spec.Agents {
 		v.agent(fmt.Sprintf("agents[%d]", i), &spec.Agents[i], classes)
 	}
 	v.agentTree(spec)
+	v.agentReferences(spec)
 }
 
 // agentRule lists the AgentSpec fields a class requires and accepts beyond
@@ -156,7 +161,7 @@ var agentRules = map[AgentClass]agentRule{
 	ClassWorkflow: {required: []string{"nodes"}, optional: []string{"description", "sub_agents", "entry", "edges"}},
 	ClassLlmAgent: {
 		required: []string{"model", "instruction"},
-		optional: append([]string{"description", "sub_agents", "disallow_transfer_to_parent", "disallow_transfer_to_peers"}, llmAgentFields...),
+		optional: append([]string{"description", "sub_agents", "agent_tools", "disallow_transfer_to_parent", "disallow_transfer_to_peers"}, llmAgentFields...),
 	},
 	ClassSequential: {required: []string{"sub_agents"}, optional: []string{"description"}},
 	ClassParallel:   {required: []string{"sub_agents"}, optional: []string{"description"}},
@@ -168,6 +173,7 @@ func presentAgentFields(a *AgentSpec) map[string]bool {
 	maps.Copy(present, map[string]bool{
 		"description": a.Description != "", "sub_agents": len(a.SubAgents) > 0,
 		"entry": a.Entry != "", "nodes": len(a.Nodes) > 0, "edges": len(a.Edges) > 0,
+		"agent_tools":                 len(a.AgentTools) > 0,
 		"disallow_transfer_to_parent": a.DisallowTransferToParent,
 		"disallow_transfer_to_peers":  a.DisallowTransferToPeers,
 		"max_iterations":              a.MaxIterations != 0,
@@ -192,6 +198,23 @@ func (v *validator) agent(path string, a *AgentSpec, classes map[string]AgentCla
 		} else if name == a.Name {
 			v.add(p, "an agent cannot be its own sub-agent")
 		}
+	}
+
+	seenTools := map[string]bool{}
+	for i, name := range a.AgentTools {
+		p := fmt.Sprintf("%s.agent_tools[%d]", path, i)
+		switch {
+		case classes[name] == "":
+			v.add(p, "unknown agent %q", name)
+		case name == a.Name:
+			v.add(p, "an agent cannot be its own tool")
+		case seenTools[name]:
+			v.add(p, "duplicate agent tool %q", name)
+		}
+		seenTools[name] = true
+	}
+	if a.AgentClass == ClassParallel {
+		v.concurrentOutputKeys(path+".sub_agents", a.SubAgents, "sub-agents of a ParallelAgent")
 	}
 
 	rule, ok := agentRules[a.AgentClass]
@@ -274,7 +297,7 @@ var builtinNodeRules = map[NodeType]NodeRule{
 	},
 	NodeWorkflow:       {Required: []string{"nodes", "edges"}},
 	NodeParallelWorker: {Optional: []string{"function", "tool", "agent", "max_concurrency", "retry", "timeout"}},
-	NodeDynamic:        {Required: []string{"function"}, Optional: []string{"max_iters", "children", "retry", "timeout"}},
+	NodeDynamic:        {Required: []string{"function"}, Optional: []string{"max_iters", "children", "isolation", "retry", "timeout"}},
 	NodeHITL:           {Required: []string{"message"}},
 }
 
@@ -288,7 +311,7 @@ func presentFields(n *NodeSpec) map[string]bool {
 	maps.Copy(present, map[string]bool{
 		"function": n.Function != "", "tool": n.Tool != "", "agent": n.Agent != "",
 		"max_concurrency": n.MaxConcurrency != 0, "max_iters": n.MaxIters != 0,
-		"children": len(n.Children) > 0, "message": n.Message != "",
+		"children": len(n.Children) > 0, "isolation": n.Isolation != "", "message": n.Message != "",
 		"nodes": len(n.Nodes) > 0, "edges": len(n.Edges) > 0,
 		"retry": n.Retry != nil, "timeout": n.Timeout != "",
 	})
@@ -414,6 +437,7 @@ func (v *validator) edges(path string, nodes []NodeSpec, edges []EdgeSpec, entry
 			defaults[e.From] = true
 		}
 	}
+	v.fanOutOutputKeys(path, nodes, edges)
 	for i, n := range nodes {
 		if ids[n.ID] && !connected[n.ID] {
 			v.add(fmt.Sprintf("%s.nodes[%d]", path, i), "node %q is not connected by any edge", n.ID)
@@ -451,6 +475,11 @@ func (v *validator) node(path string, n *NodeSpec, classes map[string]AgentClass
 	case NodeDynamic:
 		if n.MaxIters < 0 {
 			v.add(path+".max_iters", "must not be negative")
+		}
+		switch n.Isolation {
+		case "", IsolationShared, IsolationBranch, IsolationScope:
+		default:
+			v.add(path+".isolation", "must be one of shared, branch, scope, got %q", n.Isolation)
 		}
 		if n.Function != "" && v.refs != nil && !v.refs.hasDynamic(n.Function) {
 			v.add(path+".function", "dynamic function %q is not registered", n.Function)
@@ -521,6 +550,9 @@ func (v *validator) parallelWorker(path string, n *NodeSpec, classes map[string]
 	v.function(path, n.Function)
 	v.toolNode(path, n.Tool)
 	v.agentTarget(path+".agent", n.Agent, classes)
+	if target := v.agents[n.Agent]; target != nil && target.OutputKey != "" {
+		v.add(path+".agent", "every concurrent item writes the state key %q of agent %q; drop its output_key and read the worker's output", target.OutputKey, n.Agent)
+	}
 }
 
 func (v *validator) retry(path string, r *RetrySpec) {
@@ -558,6 +590,13 @@ func (v *validator) agentTree(spec *Spec) {
 		}
 	}
 	for i, a := range spec.Agents {
+		for j, tool := range a.AgentTools {
+			if owner, isSub := parent[tool]; isSub {
+				v.add(fmt.Sprintf("agents[%d].agent_tools[%d]", i, j), "agent %q is a sub-agent of %q; an agent is either a sub-agent (shared session) or an agent tool (its own session)", tool, owner)
+			}
+		}
+	}
+	for i, a := range spec.Agents {
 		seen := map[string]bool{a.Name: true}
 		for cur, ok := parent[a.Name]; ok; cur, ok = parent[cur] {
 			if seen[cur] {
@@ -567,4 +606,134 @@ func (v *validator) agentTree(spec *Spec) {
 			seen[cur] = true
 		}
 	}
+}
+
+// concurrentOutputKeys reports agents that run side by side and write the same
+// session state key. Branches isolate history, not state: a shared key is
+// written by whichever branch finishes last.
+func (v *validator) concurrentOutputKeys(path string, agentNames []string, what string) {
+	owner := map[string]string{}
+	for i, name := range agentNames {
+		target := v.agents[name]
+		if target == nil || target.OutputKey == "" {
+			continue
+		}
+		if prev, taken := owner[target.OutputKey]; taken {
+			v.add(fmt.Sprintf("%s[%d]", path, i), "%s %q and %q both write the state key %q; give each its own output_key", what, prev, name, target.OutputKey)
+			continue
+		}
+		owner[target.OutputKey] = name
+	}
+}
+
+// fanOutOutputKeys applies the same rule to the unconditional successors of
+// one node, which the engine starts concurrently.
+func (v *validator) fanOutOutputKeys(path string, nodes []NodeSpec, edges []EdgeSpec) {
+	byID := make(map[string]*NodeSpec, len(nodes))
+	for i := range nodes {
+		byID[nodes[i].ID] = &nodes[i]
+	}
+	successors := map[string][]string{}
+	for _, e := range edges {
+		if e.Route == "" {
+			successors[e.From] = append(successors[e.From], e.To)
+		}
+	}
+	for _, from := range slices.Sorted(maps.Keys(successors)) {
+		targets := successors[from]
+		if len(targets) < 2 {
+			continue
+		}
+		owner := map[string]string{}
+		for _, id := range targets {
+			n := byID[id]
+			if n == nil {
+				continue
+			}
+			key := n.OutputKey
+			if n.Type == NodeAgent && v.agents[n.Agent] != nil {
+				key = v.agents[n.Agent].OutputKey
+			}
+			if key == "" {
+				continue
+			}
+			if prev, taken := owner[key]; taken {
+				v.add(path+".edges", "nodes %q and %q run concurrently after %q and both write the state key %q; give each its own output_key", prev, id, from, key)
+				continue
+			}
+			owner[key] = id
+		}
+	}
+}
+
+// agentReferences rejects cycles through agent references. sub_agents cycles
+// have their own message; this reports the ones that also pass through an
+// agent tool or an agent node, which would recurse without end when built.
+func (v *validator) agentReferences(spec *Spec) {
+	type edge struct{ to, kind string }
+	uses := map[string][]edge{}
+	for _, a := range spec.Agents {
+		for _, s := range a.SubAgents {
+			uses[a.Name] = append(uses[a.Name], edge{s, "sub_agents"})
+		}
+		for _, t := range a.AgentTools {
+			uses[a.Name] = append(uses[a.Name], edge{t, "agent_tools"})
+		}
+		for _, target := range nodeAgents(a.Nodes) {
+			uses[a.Name] = append(uses[a.Name], edge{target, "an agent node"})
+		}
+	}
+
+	const (
+		unvisited = iota
+		onStack
+		done
+	)
+	state := map[string]int{}
+	reported := map[string]bool{}
+	var stack []string
+	var kinds []string
+	var visit func(name string)
+	visit = func(name string) {
+		state[name] = onStack
+		stack = append(stack, name)
+		for _, e := range uses[name] {
+			switch state[e.to] {
+			case unvisited:
+				kinds = append(kinds, e.kind)
+				visit(e.to)
+				kinds = kinds[:len(kinds)-1]
+			case onStack:
+				start := slices.Index(stack, e.to)
+				cycleKinds := append(slices.Clone(kinds[start:]), e.kind)
+				members := append(slices.Clone(stack[start:]), e.to)
+				if slices.ContainsFunc(cycleKinds, func(k string) bool { return k != "sub_agents" }) && !reported[e.to] {
+					for _, m := range members {
+						reported[m] = true
+					}
+					v.add("agents", "agents reference themselves: %s", strings.Join(members, " → "))
+				}
+			}
+		}
+		stack = stack[:len(stack)-1]
+		state[name] = done
+	}
+	for _, a := range spec.Agents {
+		if state[a.Name] == unvisited {
+			visit(a.Name)
+		}
+	}
+}
+
+// nodeAgents lists the agents that nodes run, through nested workflows too.
+func nodeAgents(nodes []NodeSpec) []string {
+	var out []string
+	for i := range nodes {
+		n := &nodes[i]
+		if n.Agent != "" {
+			out = append(out, n.Agent)
+		}
+		out = append(out, nodeAgents(n.Nodes)...)
+	}
+	return out
 }

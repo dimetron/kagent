@@ -52,19 +52,33 @@ type DynamicEnv struct {
 	// Emit publishes an intermediate event such as a state delta.
 	Emit func(*session.Event) error
 
-	ctx      agent.Context
-	children map[string]workflow.Node
-	runs     int
+	ctx       agent.Context
+	children  map[string]workflow.Node
+	isolation Isolation
+	runs      int
 }
 
-// Run executes child as part of this node and returns its output. Each call
-// spends one iteration of the max_iters budget.
+// Run executes child as part of this node and returns its output, isolated as
+// the node's isolation says. Each call spends one iteration of the max_iters
+// budget.
 func (e *DynamicEnv) Run(child workflow.Node, input any) (any, error) {
 	if e.MaxIters > 0 && e.runs >= e.MaxIters {
 		return nil, ErrIterationBudget
 	}
 	e.runs++
-	return workflow.RunNode[any](e.ctx, child, input)
+	return workflow.RunNode[any](e.ctx, child, input, e.runOptions()...)
+}
+
+// runOptions translates the node's isolation into engine options. Shared adds
+// none: the child runs on the dynamic node's own branch.
+func (e *DynamicEnv) runOptions() []workflow.RunNodeOption {
+	switch e.isolation {
+	case IsolationBranch:
+		return []workflow.RunNodeOption{workflow.WithUseSubBranch()}
+	case IsolationScope:
+		return []workflow.RunNodeOption{workflow.WithUseSubBranch(), workflow.WithIsolationScopeFromNodePath()}
+	}
+	return nil
 }
 
 // RunChild executes the child node declared under id in the node's children

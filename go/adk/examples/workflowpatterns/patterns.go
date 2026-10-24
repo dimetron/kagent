@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"time"
 
 	"google.golang.org/adk/v2/agent"
@@ -10,6 +11,8 @@ import (
 	"google.golang.org/adk/v2/agent/workflowagents/parallelagent"
 	"google.golang.org/adk/v2/agent/workflowagents/sequentialagent"
 	"google.golang.org/adk/v2/session"
+	"google.golang.org/adk/v2/tool"
+	"google.golang.org/adk/v2/tool/agenttool"
 	"google.golang.org/adk/v2/workflow"
 
 	"github.com/kagent-dev/kagent/go/adk/pkg/declarative"
@@ -322,5 +325,97 @@ func taskModeNodeGo() (agent.Agent, error) {
 	return workflowagent.New(workflowagent.Config{
 		Name:  "task_mode_node",
 		Edges: workflow.Chain(workflow.Start, node),
+	})
+}
+
+// Session isolation patterns. The history model answers "saw=N", the number of
+// conversation text parts it was shown, so the trace shows what each agent
+// could see.
+
+func fanOutAgentsGo() (agent.Agent, error) {
+	left, err := chatAgent("left")
+	if err != nil {
+		return nil, err
+	}
+	right, err := chatAgent("right")
+	if err != nil {
+		return nil, err
+	}
+	leftNode, err := workflow.NewAgentNode(left, workflow.NodeConfig{})
+	if err != nil {
+		return nil, err
+	}
+	rightNode, err := workflow.NewAgentNode(right, workflow.NodeConfig{})
+	if err != nil {
+		return nil, err
+	}
+	gather := workflow.NewJoinNode("gather")
+	merge := workflow.NewFunctionNode("combine", func(_ agent.Context, in map[string]any) (string, error) {
+		return combine(in), nil
+	}, workflow.NodeConfig{})
+	return workflowagent.New(workflowagent.Config{
+		Name: "fan_out_agents",
+		Edges: workflow.NewEdgeBuilder().
+			AddFanOut(workflow.Start, leftNode, rightNode).
+			AddFanIn(gather, leftNode, rightNode).
+			Add(gather, merge).
+			Build(),
+	})
+}
+
+// reviewersGo builds a dynamic node that runs two chat agents in turn. opts
+// decide how much of the session the second one is shown.
+func reviewersGo(name string, opts ...workflow.RunNodeOption) (agent.Agent, error) {
+	first, err := chatAgent("first")
+	if err != nil {
+		return nil, err
+	}
+	second, err := chatAgent("second")
+	if err != nil {
+		return nil, err
+	}
+	firstNode, err := workflow.NewAgentNode(first, workflow.NodeConfig{})
+	if err != nil {
+		return nil, err
+	}
+	secondNode, err := workflow.NewAgentNode(second, workflow.NodeConfig{})
+	if err != nil {
+		return nil, err
+	}
+	review := workflow.NewDynamicNode(name, func(ctx agent.Context, in any, _ func(*session.Event) error) (any, error) {
+		a, err := workflow.RunNode[any](ctx, firstNode, in, opts...)
+		if err != nil {
+			return nil, err
+		}
+		b, err := workflow.RunNode[any](ctx, secondNode, in, opts...)
+		if err != nil {
+			return nil, err
+		}
+		return fmt.Sprintf("first %v, second %v", a, b), nil
+	}, workflow.NodeConfig{})
+	return workflowagent.New(workflowagent.Config{
+		Name:  name,
+		Edges: workflow.Chain(workflow.Start, review),
+	})
+}
+
+func sharedChildrenGo() (agent.Agent, error) { return reviewersGo("shared_children") }
+
+func isolatedChildrenGo() (agent.Agent, error) {
+	return reviewersGo("isolated_children", workflow.WithUseSubBranch())
+}
+
+func agentAsToolGo() (agent.Agent, error) {
+	specialist, err := llmagent.New(llmagent.Config{
+		Name: "specialist", Description: "Answers one question.", Instruction: "Answer.", Model: historyModel{},
+	})
+	if err != nil {
+		return nil, err
+	}
+	return llmagent.New(llmagent.Config{
+		Name:        "agent_as_tool",
+		Instruction: "Delegate to the specialist.",
+		Model:       callerModel{tool: "specialist"},
+		Tools:       []tool.Tool{agenttool.New(specialist, nil)},
 	})
 }

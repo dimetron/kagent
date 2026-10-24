@@ -134,6 +134,52 @@ func TestValidateReportsFieldPaths(t *testing.T) {
 			[]string{`node "c" is a dynamic child and cannot have edges`}},
 		{"children only belong to dynamic nodes", wf("[{ id: f, type: function, function: f, children: [f] }]", startTo("f")),
 			[]string{"nodes[0].children: not allowed on node type function"}},
+		{"agent tool references", docHeader +
+			"  - { name: a, agent_class: LlmAgent, model: m, instruction: i, agent_tools: [a, ghost, b, b] }\n" +
+			"  - { name: b, agent_class: LlmAgent, model: m, instruction: i }\n",
+			[]string{"agent_tools[0]: an agent cannot be its own tool", `agent_tools[1]: unknown agent "ghost"`, `agent_tools[3]: duplicate agent tool "b"`}},
+		{"agent tools belong to LlmAgents", docHeader +
+			"  - { name: w, agent_class: LlmAgent, model: m, instruction: i }\n" +
+			"  - { name: s, agent_class: SequentialAgent, sub_agents: [w], agent_tools: [w] }\n",
+			[]string{"agents[1].agent_tools: not allowed on agent_class SequentialAgent"}},
+		{"an agent is a sub-agent or a tool, not both", docHeader +
+			"  - { name: parent, agent_class: LlmAgent, model: m, instruction: i, sub_agents: [child] }\n" +
+			"  - { name: caller, agent_class: LlmAgent, model: m, instruction: i, agent_tools: [child] }\n" +
+			"  - { name: child, agent_class: LlmAgent, model: m, instruction: i }\n",
+			[]string{`agents[1].agent_tools[0]: agent "child" is a sub-agent of "parent"`}},
+		{"agent tool cycle", docHeader +
+			"  - { name: a, agent_class: LlmAgent, model: m, instruction: i, agent_tools: [b] }\n" +
+			"  - { name: b, agent_class: LlmAgent, model: m, instruction: i, agent_tools: [a] }\n",
+			[]string{"agents reference themselves: a → b → a"}},
+		{"cycle through an agent node", docHeader +
+			"  - { name: caller, agent_class: LlmAgent, model: m, instruction: i, agent_tools: [flow] }\n" +
+			"  - name: flow\n    agent_class: Workflow\n    nodes: [{ id: ask, type: agent, agent: caller }]\n    edges: [{ from: START, to: ask }]\n",
+			[]string{"agents reference themselves: caller → flow → caller"}},
+		{"bad dynamic isolation", wf("[{ id: d, type: dynamic, function: f, isolation: private }]", startTo("d")),
+			[]string{`nodes[0].isolation: must be one of shared, branch, scope, got "private"`}},
+		{"isolation only belongs to dynamic nodes", wf("[{ id: f, type: function, function: f, isolation: branch }]", startTo("f")),
+			[]string{"nodes[0].isolation: not allowed on node type function"}},
+		{"ParallelAgent sub-agents share an output key", docHeader +
+			"  - { name: p, agent_class: ParallelAgent, sub_agents: [a, b] }\n" +
+			"  - { name: a, agent_class: LlmAgent, model: m, instruction: i, output_key: result }\n" +
+			"  - { name: b, agent_class: LlmAgent, model: m, instruction: i, output_key: result }\n",
+			[]string{`agents[0].sub_agents[1]: sub-agents of a ParallelAgent "a" and "b" both write the state key "result"`}},
+		{"fan-out branches share an output key", docHeader +
+			"  - name: wf\n    agent_class: Workflow\n" +
+			"    nodes:\n" +
+			"      - { id: left, type: llm, model: m, instruction: i, output_key: out }\n" +
+			"      - { id: right, type: agent, agent: worker }\n" +
+			"      - { id: g, type: join }\n" +
+			"      - { id: e, type: function, function: f }\n" +
+			"    edges: [{ from: START, to: left }, { from: START, to: right }, { from: left, to: g }, { from: right, to: g }, { from: g, to: e }]\n" +
+			"  - { name: worker, agent_class: LlmAgent, model: m, mode: single_turn, instruction: i, output_key: out }\n",
+			[]string{`nodes "left" and "right" run concurrently after "START" and both write the state key "out"`}},
+		{"parallel worker iterations share an agent output key", docHeader +
+			"  - name: wf\n    agent_class: Workflow\n" +
+			"    nodes: [{ id: each, type: parallel_worker, agent: worker }, { id: e, type: function, function: f }]\n" +
+			"    edges: [{ from: START, to: each }, { from: each, to: e }]\n" +
+			"  - { name: worker, agent_class: LlmAgent, model: m, mode: single_turn, instruction: i, output_key: out }\n",
+			[]string{`nodes[0].agent: every concurrent item writes the state key "out" of agent "worker"`}},
 		{"errors inside a nested workflow carry the full path", wf("[{ id: outer, type: workflow, nodes: [{ id: in, type: function }], edges: [{ from: START, to: in }] }]", startTo("outer")),
 			[]string{"agents[0].nodes[0].nodes[0].function: required for node type function"}},
 	}
@@ -216,4 +262,30 @@ func TestValidateWithRulesAcceptsExtraNodeTypes(t *testing.T) {
 	require.NoError(t, err)
 	require.ErrorContains(t, Validate(spec), `unknown node type "shout"`)
 	require.NoError(t, ValidateWithRules(spec, map[NodeType]NodeRule{"shout": {Required: []string{"message"}}}))
+}
+
+func TestSharedOutputKeysAreFineWhenNothingRunsConcurrently(t *testing.T) {
+	tests := map[string]string{
+		"SequentialAgent": docHeader +
+			"  - { name: s, agent_class: SequentialAgent, sub_agents: [a, b] }\n" +
+			"  - { name: a, agent_class: LlmAgent, model: m, instruction: i, output_key: out }\n" +
+			"  - { name: b, agent_class: LlmAgent, model: m, instruction: i, output_key: out }\n",
+		"routed branches": docHeader +
+			"  - name: wf\n    agent_class: Workflow\n" +
+			"    nodes:\n" +
+			"      - { id: r, type: function, function: f }\n" +
+			"      - { id: x, type: llm, model: m, instruction: i, output_key: out }\n" +
+			"      - { id: y, type: llm, model: m, instruction: i, output_key: out }\n" +
+			"    edges: [{ from: START, to: r }, { from: r, to: x, route: A }, { from: r, to: y, route: B }]\n",
+		"distinct keys in a fan-out": docHeader +
+			"  - { name: p, agent_class: ParallelAgent, sub_agents: [a, b] }\n" +
+			"  - { name: a, agent_class: LlmAgent, model: m, instruction: i, output_key: left }\n" +
+			"  - { name: b, agent_class: LlmAgent, model: m, instruction: i, output_key: right }\n",
+	}
+	for name, doc := range tests {
+		t.Run(name, func(t *testing.T) {
+			_, err := Parse([]byte(doc))
+			require.NoError(t, err)
+		})
+	}
 }

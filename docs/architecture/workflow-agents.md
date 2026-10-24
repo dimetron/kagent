@@ -53,7 +53,7 @@ converted with the same code as structured output) and `include_contents`
 | `llm`             | `model`, `instruction`     | Inline single-turn agent named after the node id                |
 | `workflow`        | `nodes`, `edges`           | Nested graph with its own `START`, nested at most 8 deep        |
 | `parallel_worker` | one of function/tool/agent | Runs the target once per item of a list input                   |
-| `dynamic`         | `function`                 | Registered `DynamicFunc` that runs children under `max_iters`   |
+| `dynamic`         | `function`                 | Registered `DynamicFunc` that runs children under `max_iters`, with `isolation` |
 | `hitl`            | `message`                  | Pauses for a human reply and forwards the reply                 |
 
 `function`, `tool`, `agent`, `llm`, `parallel_worker` and `dynamic` nodes accept
@@ -82,6 +82,32 @@ they are, structured values as JSON. A terminal `tool`, `join` or
 `parallel_worker` node would end the run with output no client displays, so
 validation rejects it: end such a branch with a `function` node. A nested
 `workflow` node is checked through its own terminals.
+
+### Session isolation
+
+How much of the session a concurrent branch or a subagent sees is a choice with
+four levels: shared, branch, scope, and a separate session. Static fan-out,
+`parallel_worker` items and `ParallelAgent` sub-agents are always isolated by
+branch. Two fields control the rest:
+
+- `isolation` on a `dynamic` node sets how its children run: `shared` (the
+  default, the whole conversation), `branch` (siblings do not see each other)
+  or `scope` (a child sees only its own events).
+- `agent_tools` on an `LlmAgent` calls other agents as tools. Each call runs in a
+  new session seeded with a copy of the caller's state, so the agent never sees
+  the caller's history, parallel calls cannot interfere, and its state writes
+  are not copied back. An agent is either a `sub_agents` entry (shared session,
+  transfer) or an `agent_tools` entry, never both.
+
+Branches isolate history, not state. Validation rejects two agents that run
+concurrently and write the same `output_key`: `ParallelAgent` sub-agents,
+unconditional fan-out successors, and a `parallel_worker` agent with an
+`output_key`. Cycles through `sub_agents`, `agent_tools` and `agent` nodes are
+rejected too, since each would build forever.
+
+[Workflow design patterns](workflow-patterns.md#session-isolation) has the full
+matrix, and runnable patterns that print what each agent saw. The behavior is
+pinned by `isolation_test.go`, which measures it rather than assuming it.
 
 ## Boundaries
 
