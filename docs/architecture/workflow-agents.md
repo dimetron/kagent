@@ -71,6 +71,17 @@ Edges connect node ids. `START` is the entry source; `entry` is shorthand for a
 `function` node returns; `DEFAULT` is the edge taken when no route matched.
 Unknown fields anywhere in the document are decode errors.
 
+### Typed contracts
+
+A `function`, `dynamic`, `agent` or `llm` node can carry an `input_schema`, and a
+`function` or `dynamic` node an `output_schema` (an `llm` node's `output_schema`
+is the model's reply schema). On a `join`, `input_schema` applies to each
+predecessor's output separately. The engine validates what a node returns and
+what the next node receives, and compares the two schemas on every edge when it
+builds the graph, so a producer that promises a string cannot feed a consumer
+that requires an integer. Validation parses and resolves each schema, so a
+malformed one fails at reconcile time.
+
 ### Output visibility
 
 A2A clients display event message text only; successor nodes read the structured

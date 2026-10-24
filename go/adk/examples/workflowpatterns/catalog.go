@@ -244,6 +244,12 @@ var catalog = []Pattern{
 		Cases:   []Case{{Input: "c-7", Want: []string{"out:customer c-7 is on plan pro"}}},
 	},
 	{
+		Name: "typed_contract", Title: "Typed contract between steps (JSON Schema)", Go: typedContractGo, Ordered: true,
+		Summary: "A node can carry an input and an output JSON Schema. The engine validates what the node returns and what the next node receives, and compares the two schemas on every edge when it builds the graph.",
+		Shape:   "START → parse (output: {name}) → greet (input: {name})",
+		Cases:   []Case{{Input: "Ada", Want: []string{"out:hello Ada"}}},
+	},
+	{
 		Name: "resilient", Title: "Resilient step (retry and timeout)", Go: resilientGo, Ordered: true,
 		Summary: "A node carries a retry policy and a timeout. The step below fails twice, then succeeds on the third attempt.",
 		Shape:   "START → unreliable (retry ×3, timeout 5s)",
@@ -375,6 +381,11 @@ var antiPatterns = []AntiPattern{
 		Name: "task_mode_node", Title: "Task-mode agent as a graph node", Go: taskModeNodeGo, GoRejects: true,
 		Why:     "A task-mode agent is multi-turn and cannot be a static graph node. Use single_turn, or run it dynamically.",
 		WantErr: "task",
+	},
+	{
+		Name: "schema_mismatch", Title: "Schemas that disagree across an edge", Go: schemaMismatchGo, GoRejects: true,
+		Why:     "A step that promises a string cannot feed a step that requires an integer. The engine compares the schemas when it builds the graph, so the mistake never reaches a run.",
+		WantErr: "schema mismatch",
 	},
 	{
 		Name: "terminal_tool", Title: "Ending a branch on a tool node", Go: nil,

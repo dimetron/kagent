@@ -120,3 +120,18 @@ func newSession(t testing.TB) (session.Service, string) {
 	require.NoError(t, err)
 	return svc, resp.Session.ID()
 }
+
+// tryRun runs the root agent once and returns the first error instead of failing.
+func tryRun(t testing.TB, sys *System, sessions session.Service, sessionID, input string) ([]*session.Event, error) {
+	t.Helper()
+	r, err := runner.New(runner.Config{AppName: "test", Agent: sys.Root(), SessionService: sessions, MemoryService: memory.InMemoryService()})
+	require.NoError(t, err)
+	var events []*session.Event
+	for ev, err := range r.Run(context.Background(), "user", sessionID, genai.NewContentFromText(input, genai.RoleUser), agent.RunConfig{}) {
+		if err != nil {
+			return events, err
+		}
+		events = append(events, ev)
+	}
+	return events, nil
+}

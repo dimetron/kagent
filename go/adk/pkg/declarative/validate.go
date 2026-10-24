@@ -1,6 +1,7 @@
 package declarative
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"maps"
@@ -8,6 +9,8 @@ import (
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/google/jsonschema-go/jsonschema"
 
 	adkoutputschema "github.com/kagent-dev/kagent/go/adk/pkg/outputschema"
 )
@@ -287,17 +290,17 @@ type NodeRule struct {
 }
 
 var builtinNodeRules = map[NodeType]NodeRule{
-	NodeFunction: {Required: []string{"function"}, Optional: []string{"retry", "timeout"}},
-	NodeJoin:     {},
+	NodeFunction: {Required: []string{"function"}, Optional: []string{"input_schema", "output_schema", "retry", "timeout"}},
+	NodeJoin:     {Optional: []string{"input_schema"}},
 	NodeTool:     {Required: []string{"tool"}, Optional: []string{"retry", "timeout"}},
-	NodeAgent:    {Required: []string{"agent"}, Optional: []string{"retry", "timeout"}},
+	NodeAgent:    {Required: []string{"agent"}, Optional: []string{"input_schema", "retry", "timeout"}},
 	NodeLLM: {
 		Required: []string{"model", "instruction"},
-		Optional: []string{"mode", "global_instruction", "tools", "output_key", "output_schema", "include_contents", "retry", "timeout"},
+		Optional: []string{"mode", "global_instruction", "tools", "output_key", "input_schema", "output_schema", "include_contents", "retry", "timeout"},
 	},
 	NodeWorkflow:       {Required: []string{"nodes", "edges"}},
 	NodeParallelWorker: {Optional: []string{"function", "tool", "agent", "max_concurrency", "retry", "timeout"}},
-	NodeDynamic:        {Required: []string{"function"}, Optional: []string{"max_iters", "children", "isolation", "retry", "timeout"}},
+	NodeDynamic:        {Required: []string{"function"}, Optional: []string{"max_iters", "children", "isolation", "input_schema", "output_schema", "retry", "timeout"}},
 	NodeHITL:           {Required: []string{"message"}},
 }
 
@@ -312,7 +315,8 @@ func presentFields(n *NodeSpec) map[string]bool {
 		"function": n.Function != "", "tool": n.Tool != "", "agent": n.Agent != "",
 		"max_concurrency": n.MaxConcurrency != 0, "max_iters": n.MaxIters != 0,
 		"children": len(n.Children) > 0, "isolation": n.Isolation != "", "message": n.Message != "",
-		"nodes": len(n.Nodes) > 0, "edges": len(n.Edges) > 0,
+		"input_schema": len(n.InputSchema) > 0,
+		"nodes":        len(n.Nodes) > 0, "edges": len(n.Edges) > 0,
 		"retry": n.Retry != nil, "timeout": n.Timeout != "",
 	})
 	return present
@@ -461,6 +465,8 @@ func (v *validator) node(path string, n *NodeSpec, classes map[string]AgentClass
 	}
 	v.checkFields(path, "node type "+string(n.Type), presentFields(n), rule.Required, rule.Optional)
 
+	v.nodeSchemas(path, n)
+
 	if terminal && slices.Contains(structuredTerminals, n.Type) {
 		v.add(path, "terminal %s node emits structured output that A2A clients do not display; end the branch with a function node", n.Type)
 	}
@@ -503,6 +509,35 @@ func (v *validator) node(path string, n *NodeSpec, classes map[string]AgentClass
 	if n.Retry != nil {
 		v.retry(path+".retry", n.Retry)
 	}
+}
+
+// nodeSchemas checks that a node's contracts are JSON Schemas the engine can
+// use. An inline llm node's output_schema is the model's reply schema and is
+// checked with the other model options.
+func (v *validator) nodeSchemas(path string, n *NodeSpec) {
+	if len(n.InputSchema) > 0 {
+		if _, err := parseSchema(n.InputSchema); err != nil {
+			v.add(path+".input_schema", "%v", err)
+		}
+	}
+	if n.Type != NodeLLM && len(n.OutputSchema) > 0 {
+		if _, err := parseSchema(n.OutputSchema); err != nil {
+			v.add(path+".output_schema", "%v", err)
+		}
+	}
+}
+
+// parseSchema decodes and resolves a JSON Schema, so a malformed or
+// unresolvable one fails validation instead of the first run.
+func parseSchema(raw json.RawMessage) (*jsonschema.Schema, error) {
+	var schema jsonschema.Schema
+	if err := json.Unmarshal(raw, &schema); err != nil {
+		return nil, fmt.Errorf("not a JSON Schema: %w", err)
+	}
+	if _, err := schema.Resolve(nil); err != nil {
+		return nil, fmt.Errorf("cannot resolve the schema: %w", err)
+	}
+	return &schema, nil
 }
 
 func (v *validator) function(path, name string) {

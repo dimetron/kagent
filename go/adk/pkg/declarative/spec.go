@@ -177,10 +177,14 @@ type NodeSpec struct {
 	// Isolation sets how much of the session each child run of a dynamic
 	// node sees. Unset is shared.
 	Isolation Isolation `json:"isolation,omitempty"`
+	// InputSchema is a JSON Schema that the node's input must satisfy. On a
+	// join it applies to each predecessor's output separately.
+	InputSchema json.RawMessage `json:"input_schema,omitempty"`
 	// Message is the prompt a hitl node shows the human.
 	Message string `json:"message,omitempty"`
 
-	// Inline llm node fields.
+	// Inline llm node fields. OutputSchema also types the output of function
+	// and dynamic nodes: the JSON Schema their result must satisfy.
 	LLMSpec
 
 	// Nested workflow fields. A nested workflow has its own START.

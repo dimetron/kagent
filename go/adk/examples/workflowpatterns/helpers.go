@@ -122,6 +122,10 @@ func combine(branches map[string]any) string {
 	return strings.Join(parts, "|")
 }
 
+func makePerson(s string) map[string]any { return map[string]any{"name": s} }
+
+func greetPerson(person map[string]any) string { return fmt.Sprintf("hello %v", person["name"]) }
+
 func customerArgs(s string) map[string]any { return map[string]any{"customer_id": s} }
 
 func describeCustomer(c map[string]any) string {

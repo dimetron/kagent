@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/jsonschema-go/jsonschema"
+
 	"google.golang.org/adk/v2/agent"
 	"google.golang.org/adk/v2/session"
 	"google.golang.org/adk/v2/workflow"
@@ -19,27 +21,31 @@ func (b *builder) node(bc *BuildContext, sc *scope, n *NodeSpec, render bool) (w
 	if err != nil {
 		return nil, err
 	}
+	in, out, err := nodeSchemas(n)
+	if err != nil {
+		return nil, err
+	}
 	switch n.Type {
 	case NodeFunction:
 		fn, err := b.function(n.Function)
 		if err != nil {
 			return nil, err
 		}
-		return workflow.NewFunctionNode(n.ID, functionBody(fn, render), cfg), nil
+		return workflow.NewFunctionNodeWithSchema[any, any](n.ID, functionBody(fn, render), in, out, cfg)
 	case NodeJoin:
-		return workflow.NewJoinNode(n.ID), nil
+		return joinNode(n.ID, in)
 	case NodeTool:
 		return b.toolNode(n.ID, n.Tool, cfg)
 	case NodeAgent:
-		return b.agentNode(n.Agent, cfg)
+		return b.agentNode(n.Agent, in, cfg)
 	case NodeLLM:
-		return b.llmNode(n, cfg)
+		return b.llmNode(n, in, cfg)
 	case NodeWorkflow:
 		return b.workflowNode(n, render)
 	case NodeParallelWorker:
 		return b.parallelWorker(n, cfg)
 	case NodeDynamic:
-		return b.dynamicNode(sc, n, cfg, render)
+		return b.dynamicNode(sc, n, cfg, render, in, out)
 	case NodeHITL:
 		return hitlNode(n, cfg, render), nil
 	}
@@ -121,17 +127,46 @@ func (b *builder) toolNode(id, toolName string, cfg workflow.NodeConfig) (workfl
 
 // agentNode wraps a document agent. ADK names an agent node after its agent,
 // so the document id of such a node is not visible to the engine.
-func (b *builder) agentNode(agentName string, cfg workflow.NodeConfig) (workflow.Node, error) {
+func (b *builder) agentNode(agentName string, in *jsonschema.Schema, cfg workflow.NodeConfig) (workflow.Node, error) {
 	a, err := b.agent(agentName)
 	if err != nil {
 		return nil, err
 	}
-	return workflow.NewAgentNode(a, cfg)
+	return workflow.NewAgentNodeWithSchemas(a, in, nil, cfg)
+}
+
+// nodeSchemas parses the node's contracts. Validate already resolved them.
+// An inline llm node's output_schema is the model's reply schema, handled when
+// the agent is built, so it is not a node contract here.
+func nodeSchemas(n *NodeSpec) (in, out *jsonschema.Schema, err error) {
+	if len(n.InputSchema) > 0 {
+		if in, err = parseSchema(n.InputSchema); err != nil {
+			return nil, nil, fmt.Errorf("input_schema: %w", err)
+		}
+	}
+	if n.Type != NodeLLM && len(n.OutputSchema) > 0 {
+		if out, err = parseSchema(n.OutputSchema); err != nil {
+			return nil, nil, fmt.Errorf("output_schema: %w", err)
+		}
+	}
+	return in, out, nil
+}
+
+// joinNode applies the schema to each predecessor's output, as the engine does.
+func joinNode(id string, in *jsonschema.Schema) (workflow.Node, error) {
+	if in == nil {
+		return workflow.NewJoinNode(id), nil
+	}
+	resolved, err := in.Resolve(nil)
+	if err != nil {
+		return nil, fmt.Errorf("input_schema: %w", err)
+	}
+	return workflow.NewJoinNodeWithSchema(id, resolved), nil
 }
 
 // llmNode builds an inline llm node as an anonymous single-turn agent named
 // after the node id.
-func (b *builder) llmNode(n *NodeSpec, cfg workflow.NodeConfig) (workflow.Node, error) {
+func (b *builder) llmNode(n *NodeSpec, in *jsonschema.Schema, cfg workflow.NodeConfig) (workflow.Node, error) {
 	mode := n.Mode
 	if mode == "" {
 		mode = ModeSingleTurn
@@ -140,7 +175,7 @@ func (b *builder) llmNode(n *NodeSpec, cfg workflow.NodeConfig) (workflow.Node, 
 	if err != nil {
 		return nil, err
 	}
-	return workflow.NewAgentNode(a, cfg)
+	return workflow.NewAgentNodeWithSchemas(a, in, nil, cfg)
 }
 
 func (b *builder) workflowNode(n *NodeSpec, render bool) (workflow.Node, error) {
@@ -165,7 +200,7 @@ func (b *builder) parallelWorker(n *NodeSpec, cfg workflow.NodeConfig) (workflow
 	case n.Tool != "":
 		wrapped, err = b.toolNode(n.ID+"_item", n.Tool, workflow.NodeConfig{})
 	default:
-		wrapped, err = b.agentNode(n.Agent, workflow.NodeConfig{})
+		wrapped, err = b.agentNode(n.Agent, nil, workflow.NodeConfig{})
 	}
 	if err != nil {
 		return nil, err
@@ -182,23 +217,23 @@ func plainFunc(fn Func) func(agent.Context, any) (any, error) {
 	}
 }
 
-func (b *builder) dynamicNode(sc *scope, n *NodeSpec, cfg workflow.NodeConfig, render bool) (workflow.Node, error) {
+func (b *builder) dynamicNode(sc *scope, n *NodeSpec, cfg workflow.NodeConfig, render bool, in, out *jsonschema.Schema) (workflow.Node, error) {
 	fn, ok := b.reg.dynamics[n.Function]
 	if !ok {
 		return nil, fmt.Errorf("dynamic function %q is not registered", n.Function)
 	}
 	maxIters, childIDs, isolation := n.MaxIters, n.Children, n.Isolation
-	return workflow.NewDynamicNode(n.ID, func(ctx agent.Context, in any, emit func(*session.Event) error) (any, error) {
+	return workflow.NewDynamicNodeWithSchema[any, any](n.ID, func(ctx agent.Context, input any, emit func(*session.Event) error) (any, error) {
 		children := make(map[string]workflow.Node, len(childIDs))
 		for _, id := range childIDs {
 			children[id] = sc.nodes[id]
 		}
-		out, err := fn(ctx, in, &DynamicEnv{MaxIters: maxIters, Emit: emit, ctx: ctx, children: children, isolation: isolation})
+		result, err := fn(ctx, input, &DynamicEnv{MaxIters: maxIters, Emit: emit, ctx: ctx, children: children, isolation: isolation})
 		if err != nil {
 			return nil, err
 		}
-		return finish(ctx, emit, out, render)
-	}, cfg), nil
+		return finish(ctx, emit, result, render)
+	}, in, out, cfg)
 }
 
 // hitlNode pauses the workflow until a human answers and forwards the answer.

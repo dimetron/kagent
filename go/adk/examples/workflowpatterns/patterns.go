@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/jsonschema-go/jsonschema"
+
 	"google.golang.org/adk/v2/agent"
 	"google.golang.org/adk/v2/agent/llmagent"
 	"google.golang.org/adk/v2/agent/workflowagent"
@@ -201,6 +203,32 @@ func toolStageGo() (agent.Agent, error) {
 	return workflowagent.New(workflowagent.Config{
 		Name:  "tool_stage",
 		Edges: workflow.Chain(workflow.Start, args, lookupNode, describe),
+	})
+}
+
+// personSchema is the contract between the typed_contract steps.
+var personSchema = &jsonschema.Schema{
+	Type:       "object",
+	Properties: map[string]*jsonschema.Schema{"name": {Type: "string"}},
+	Required:   []string{"name"},
+}
+
+func typedContractGo() (agent.Agent, error) {
+	parse, err := workflow.NewFunctionNodeWithSchema(
+		"parse", func(_ agent.Context, in string) (map[string]any, error) { return makePerson(in), nil },
+		nil, personSchema, workflow.NodeConfig{})
+	if err != nil {
+		return nil, err
+	}
+	greet, err := workflow.NewFunctionNodeWithSchema(
+		"greet", func(_ agent.Context, in map[string]any) (string, error) { return greetPerson(in), nil },
+		personSchema, nil, workflow.NodeConfig{})
+	if err != nil {
+		return nil, err
+	}
+	return workflowagent.New(workflowagent.Config{
+		Name:  "typed_contract",
+		Edges: workflow.Chain(workflow.Start, parse, greet),
 	})
 }
 
@@ -417,5 +445,24 @@ func agentAsToolGo() (agent.Agent, error) {
 		Instruction: "Delegate to the specialist.",
 		Model:       callerModel{tool: "specialist"},
 		Tools:       []tool.Tool{agenttool.New(specialist, nil)},
+	})
+}
+
+func schemaMismatchGo() (agent.Agent, error) {
+	produce, err := workflow.NewFunctionNodeWithSchema(
+		"produce", func(_ agent.Context, in string) (string, error) { return in, nil },
+		nil, &jsonschema.Schema{Type: "string"}, workflow.NodeConfig{})
+	if err != nil {
+		return nil, err
+	}
+	consume, err := workflow.NewFunctionNodeWithSchema(
+		"consume", func(_ agent.Context, in int) (string, error) { return fmt.Sprint(in), nil },
+		&jsonschema.Schema{Type: "integer"}, nil, workflow.NodeConfig{})
+	if err != nil {
+		return nil, err
+	}
+	return workflowagent.New(workflowagent.Config{
+		Name:  "schema_mismatch",
+		Edges: workflow.Chain(workflow.Start, produce, consume),
 	})
 }

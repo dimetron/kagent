@@ -60,6 +60,13 @@ func newRegistry() (*declarative.Registry, error) {
 			branches, _ := in.(map[string]any)
 			return declarative.Output(combine(branches)), nil
 		},
+		"make_person": func(_ agent.Context, in any) (declarative.Result, error) {
+			return declarative.Output(makePerson(fmt.Sprint(in))), nil
+		},
+		"greet_person": func(_ agent.Context, in any) (declarative.Result, error) {
+			person, _ := in.(map[string]any)
+			return declarative.Output(greetPerson(person)), nil
+		},
 		"customer_args": func(_ agent.Context, in any) (declarative.Result, error) {
 			return declarative.Output(customerArgs(fmt.Sprint(in))), nil
 		},

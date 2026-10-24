@@ -1,6 +1,6 @@
 # Workflow Design Patterns
 
-Each pattern below is written twice: with the Go ADK API (`google.golang.org/adk/v2/workflow`) and as a declarative `adk.declarative/v0.2` document (see [Declarative workflow agents](workflow-agents.md)). The code is not illustrative: it lives in [`go/adk/examples/workflowpatterns`](../../go/adk/examples/workflowpatterns), the tests run both versions on the same inputs and require the same events, and a test fails when this page is out of date.
+Each pattern below is written twice: with the Go ADK API (`google.golang.org/adk/v2/workflow`, described in the [ADK graph documentation](https://adk.dev/graphs/)) and as a declarative `adk.declarative/v0.2` document (see [Declarative workflow agents](workflow-agents.md)). The code is not illustrative: it lives in [`go/adk/examples/workflowpatterns`](../../go/adk/examples/workflowpatterns), the tests run both versions on the same inputs and require the same events, and a test fails when this page is out of date.
 
 Run any pattern, in either form or both, from `go/`:
 
@@ -708,6 +708,68 @@ agents:
 <tr>
 <td valign="top">
 
+**Typed contract between steps (JSON Schema)**
+
+A node can carry an input and an output JSON Schema. The engine validates what the node returns and what the next node receives, and compares the two schemas on every edge when it builds the graph.
+
+```text
+START → parse (output: {name}) → greet (input: {name})
+```
+
+Run: `"Ada"` → `out:hello Ada`
+
+</td>
+<td valign="top">
+
+```go
+func typedContractGo() (agent.Agent, error) {
+	parse, err := workflow.NewFunctionNodeWithSchema(
+		"parse", func(_ agent.Context, in string) (map[string]any, error) { return makePerson(in), nil },
+		nil, personSchema, workflow.NodeConfig{})
+	if err != nil {
+		return nil, err
+	}
+	greet, err := workflow.NewFunctionNodeWithSchema(
+		"greet", func(_ agent.Context, in map[string]any) (string, error) { return greetPerson(in), nil },
+		personSchema, nil, workflow.NodeConfig{})
+	if err != nil {
+		return nil, err
+	}
+	return workflowagent.New(workflowagent.Config{
+		Name:  "typed_contract",
+		Edges: workflow.Chain(workflow.Start, parse, greet),
+	})
+}
+```
+
+</td>
+<td valign="top">
+
+```yaml
+apiVersion: adk.declarative/v0.2
+kind: AgentSystem
+agents:
+  - name: typed_contract
+    agent_class: Workflow
+    nodes:
+      - id: parse
+        type: function
+        function: make_person
+        output_schema: { type: object, properties: { name: { type: string } }, required: [name] }
+      - id: greet
+        type: function
+        function: greet_person
+        input_schema: { type: object, properties: { name: { type: string } }, required: [name] }
+    edges:
+      - { from: START, to: parse }
+      - { from: parse, to: greet }
+```
+
+</td>
+</tr>
+<tr>
+<td valign="top">
+
 **Resilient step (retry and timeout)**
 
 A node carries a retry policy and a timeout. The step below fails twice, then succeeds on the third attempt.
@@ -1385,6 +1447,62 @@ agents:
 <tr>
 <td valign="top">
 
+**Schemas that disagree across an edge**
+
+A step that promises a string cannot feed a step that requires an integer. The engine compares the schemas when it builds the graph, so the mistake never reaches a run.
+
+Fails when built with:
+
+```text
+…schema mismatch…
+```
+
+</td>
+<td valign="top">
+
+```go
+func schemaMismatchGo() (agent.Agent, error) {
+	produce, err := workflow.NewFunctionNodeWithSchema(
+		"produce", func(_ agent.Context, in string) (string, error) { return in, nil },
+		nil, &jsonschema.Schema{Type: "string"}, workflow.NodeConfig{})
+	if err != nil {
+		return nil, err
+	}
+	consume, err := workflow.NewFunctionNodeWithSchema(
+		"consume", func(_ agent.Context, in int) (string, error) { return fmt.Sprint(in), nil },
+		&jsonschema.Schema{Type: "integer"}, nil, workflow.NodeConfig{})
+	if err != nil {
+		return nil, err
+	}
+	return workflowagent.New(workflowagent.Config{
+		Name:  "schema_mismatch",
+		Edges: workflow.Chain(workflow.Start, produce, consume),
+	})
+}
+```
+
+</td>
+<td valign="top">
+
+```yaml
+apiVersion: adk.declarative/v0.2
+kind: AgentSystem
+agents:
+  - name: schema_mismatch
+    agent_class: Workflow
+    nodes:
+      - { id: produce, type: function, function: clean, output_schema: { type: string } }
+      - { id: consume, type: function, function: clean, input_schema: { type: integer } }
+    edges:
+      - { from: START, to: produce }
+      - { from: produce, to: consume }
+```
+
+</td>
+</tr>
+<tr>
+<td valign="top">
+
 **Ending a branch on a tool node**
 
 The ADK accepts it, but the tool's structured result is data that no A2A client displays. The declarative validation asks for a closing function node.
@@ -1442,13 +1560,17 @@ Concurrent branches and subagents differ in how much of the session they can see
 - **scope**: the child also gets a scope unique to the run, so it sees only its own events. The user's message and the input you hand it still arrive; earlier agents' replies do not.
 - **session** (`agent_tools`): the agent runs in a new session seeded with a copy of the caller's state. It never sees the caller's history, parallel calls get one session each, and its state writes are not copied back.
 
-`include_contents: none` is not isolation. It keeps the current turn, and the replies of agents that ran earlier in that turn are part of it, so a sequential sub-agent still receives what the one before it said (and loses the user's message).
+The ADK graph pages do not describe branch or scope isolation, so this matrix is measured, not quoted. `include_contents: none` is not isolation. It keeps the current turn, and the replies of agents that ran earlier in that turn are part of it, so a sequential sub-agent still receives what the one before it said (and loses the user's message).
 
 Isolation covers history, not state. Branches share one session state, so two concurrent agents that write the same `output_key` race; validation rejects that for `ParallelAgent`, for unconditional fan-out successors, and for `parallel_worker` agents. Remember that a tool agent starts from a copy of the caller's state, so do not keep secrets there that the tool agent should not see.
 
 ## Reading the table
 
-- **One result.** A workflow ends in exactly one terminal output. Branches that run concurrently must converge in a `join`, or all but one must finish without output.
+- **One result.** A workflow ends in exactly one terminal output. The ADK graph pages do not state this, but the engine enforces it: branches that run concurrently must converge in a `join`, or all but one must finish without output.
+- **Joins need outputs.** A join releases only after all its predecessors finish, and a predecessor that finishes without an output leaves the join no value for that branch. The failure shows up downstream, away from the node that caused it, so give every branch an output and a retry policy where it can fail.
+- **Cycles are not bounded.** A routed back-edge re-activates a node on each pass and nothing stops it, so the exit condition must eventually hold. When you need a hard bound, use a `dynamic` node (`max_iters`) or a `LoopAgent` (`max_iterations`).
+- **Agent nodes.** The ADK documents graph agents as `single_turn` or `task`. The engine also accepts `chat` for a node fed directly by START and for a dynamic child, and rejects a static `task` node; a task agent is for dynamic dispatch. The isolation patterns use `chat` on purpose, because a `single_turn` node already sees only its input.
+- **Data between steps.** Pass data through node outputs, not session state. State is for values that tools, callbacks and instruction templates read, and it should stay small. Give a step an `input_schema` or `output_schema` when you want the engine to enforce the contract.
 - **Routes are strings.** `BoolRoute(true)` and `IntRoute(1)` match the strings `"true"` and `"1"`, which is how YAML writes them. `DEFAULT` is the ADK `Default` route.
 - **Plain steps are silent.** A function node emits data for its successors. The terminal result is also rendered as message text, so A2A clients display the answer and not every intermediate step.
 - **Names.** A sub-workflow node cannot share the root agent's name, and an agent node is named after its agent.
