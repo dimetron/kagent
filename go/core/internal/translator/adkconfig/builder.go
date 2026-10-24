@@ -86,6 +86,9 @@ func (c *Builder) Build(ctx context.Context, input *translator.HarnessInput) (*R
 			return nil, err
 		}
 	}
+	if input.Harness.Spec.BYO != nil {
+		applyWorkflow(result.Config, input.Workflow)
+	}
 	// The Python runtime needs an async SQLite driver; the Go runtime accepts
 	// this URL and strips the driver before opening the same durable database.
 	result.Config.SessionDbUrl = "sqlite+aiosqlite:////data/sessions.db"
@@ -172,6 +175,9 @@ func (c *Builder) BuildProvenance(ctx context.Context, harness *translator.Harne
 		}
 		if template.Spec.OutputSchemaFrom != nil {
 			configMaps[template.Spec.OutputSchemaFrom.Name] = struct{}{}
+		}
+		if template.Spec.WorkflowFrom != nil {
+			configMaps[template.Spec.WorkflowFrom.Name] = struct{}{}
 		}
 		if template.Spec.PromptTemplate != nil {
 			for _, source := range template.Spec.PromptTemplate.DataSources {

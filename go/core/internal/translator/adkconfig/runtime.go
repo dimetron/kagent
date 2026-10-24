@@ -124,6 +124,18 @@ func applyOutputSchema(config *configv1.ADKAgentConfig, output *translator.Resol
 	return nil
 }
 
+// applyWorkflow delivers the validated declarative workflow document to the
+// BYO image, which builds its agents from it.
+func applyWorkflow(config *configv1.ADKAgentConfig, workflow *translator.ResolvedWorkflow) {
+	if workflow == nil {
+		return
+	}
+	config.Workflow = &configv1.ADKWorkflowConfig{
+		Document: append([]byte(nil), workflow.Document...),
+		Sha256:   workflow.SHA256,
+	}
+}
+
 func requireModels(input *translator.AgentInput) error {
 	if input.ResolvedModelConfig == nil || input.ResolvedModelConfig.Config == nil {
 		return translator.NewValidationError("kagent ModelConfig is required")

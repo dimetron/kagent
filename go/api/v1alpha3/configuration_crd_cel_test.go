@@ -317,6 +317,38 @@ func TestConfigurationCRDValidation(t *testing.T) {
 			object: unstructuredStrictTemplate(namespace, "strict-true-schema-from", true, nil, &ConfigMapKeyReference{Name: "schemas", Key: "output.json"}),
 		},
 		{
+			name:   "AgentTemplate accepts workflowFrom without a prompt",
+			object: workflowTemplate(namespace, "workflow-only", func(s *AgentTemplateSpec) {}),
+		},
+		{
+			name: "AgentTemplate rejects workflowFrom with systemPrompt",
+			object: workflowTemplate(namespace, "workflow-prompt", func(s *AgentTemplateSpec) {
+				s.SystemPrompt = "You are helpful."
+			}),
+			wantReject: "workflowFrom cannot be combined with systemPrompt or systemPromptFrom",
+		},
+		{
+			name: "AgentTemplate rejects workflowFrom with systemPromptFrom",
+			object: workflowTemplate(namespace, "workflow-prompt-from", func(s *AgentTemplateSpec) {
+				s.SystemPromptFrom = &ConfigMapKeyReference{Name: "prompts", Key: "system"}
+			}),
+			wantReject: "workflowFrom cannot be combined with systemPrompt or systemPromptFrom",
+		},
+		{
+			name: "AgentTemplate rejects workflowFrom with an empty key",
+			object: workflowTemplate(namespace, "workflow-empty-key", func(s *AgentTemplateSpec) {
+				s.WorkflowFrom.Key = ""
+			}),
+			wantReject: "spec.workflowFrom.key",
+		},
+		{
+			name: "AgentTemplate rejects workflowFrom with an empty name",
+			object: workflowTemplate(namespace, "workflow-empty-name", func(s *AgentTemplateSpec) {
+				s.WorkflowFrom.Name = ""
+			}),
+			wantReject: "spec.workflowFrom.name",
+		},
+		{
 			name: "AgentTemplate rejects unsupported MCP server kind",
 			object: validAgentTemplate(namespace, "unsupported-mcp-kind", []ToolBinding{{
 				MCP: &MCPToolBinding{Server: corev1.TypedLocalObjectReference{Kind: "Service", Name: "tools"}},
@@ -590,6 +622,13 @@ func validAgentTemplate(namespace, name string, tools []ToolBinding) *AgentTempl
 			Tools:       tools,
 		},
 	}
+}
+
+func workflowTemplate(namespace, name string, mutate func(*AgentTemplateSpec)) *AgentTemplate {
+	template := validAgentTemplate(namespace, name, nil)
+	template.Spec.WorkflowFrom = &ConfigMapKeyReference{Name: "workflows", Key: "agents.yaml"}
+	mutate(&template.Spec)
+	return template
 }
 
 func unstructuredStrictTemplate(namespace, name string, strict bool, schema *apiextensionsv1.JSON, schemaFrom *ConfigMapKeyReference) ctrlclient.Object {

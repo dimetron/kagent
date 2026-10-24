@@ -53,6 +53,9 @@ func CreateGoogleADKAgent(ctx context.Context, config *configv1.ADKConfig, agent
 	if err := protovalidate.Validate(config); err != nil {
 		return nil, err
 	}
+	if config.Agent.Workflow != nil {
+		return nil, fmt.Errorf("agent config carries a declarative workflow, which only BYO images run")
+	}
 	return createGoogleADKAgent(ctx, config.Agent, agentName, stsPlugin, runtimeconfig.ProcessConfig(config), extraTools...)
 }
 

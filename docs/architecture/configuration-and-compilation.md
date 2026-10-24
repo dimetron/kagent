@@ -8,7 +8,10 @@ literal environment values, WorkerPool configuration, and snapshot location.
 
 `AgentTemplate` describes what the agent does. It contains model configuration,
 description and prompt, MCP tool bindings, skills, plugins, and Shared
-subagent bindings (`tools[].subAgent`). Model configuration may be omitted for BYO images;
+subagent bindings (`tools[].subAgent`). A BYO root template may instead set
+`workflowFrom` to a ConfigMap-held declarative workflow document that the
+controller validates and delivers (see [Declarative workflow agents](workflow-agents.md#control-plane)).
+Model configuration may be omitted for BYO images;
 Agent compilation rejects managed harness combinations without one.
 
 `Agent` pairs one template and one Harness. The required `template` field selects

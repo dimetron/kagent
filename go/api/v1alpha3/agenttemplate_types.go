@@ -171,6 +171,7 @@ type PluginBundle struct {
 // AgentTemplateSpec defines portable agent behavior.
 // +kubebuilder:validation:AtMostOneOf=systemPrompt;systemPromptFrom
 // +kubebuilder:validation:AtMostOneOf=outputSchema;outputSchemaFrom
+// +kubebuilder:validation:XValidation:rule="!has(self.workflowFrom) || (!has(self.systemPrompt) && !has(self.systemPromptFrom))",message="workflowFrom cannot be combined with systemPrompt or systemPromptFrom"
 // +kubebuilder:validation:XValidation:rule="!has(self.outputSchemaStrict) || !self.outputSchemaStrict || has(self.outputSchema) || has(self.outputSchemaFrom)",message="outputSchemaStrict requires outputSchema or outputSchemaFrom"
 type AgentTemplateSpec struct {
 	// ModelConfig is required by managed harnesses and optional for BYO harnesses.
@@ -184,6 +185,13 @@ type AgentTemplateSpec struct {
 	// SystemPromptFrom references prompt text in a same-namespace ConfigMap.
 	// +optional
 	SystemPromptFrom *ConfigMapKeyReference `json:"systemPromptFrom,omitempty"`
+	// WorkflowFrom references an adk.declarative/v0.2 AgentSystem document, as
+	// YAML or JSON, in a same-namespace ConfigMap key. The controller validates
+	// the document's structure and delivers it to the runtime; the BYO image
+	// resolves the functions, tools, and models it names. Only a root template
+	// on a BYO Harness may set it.
+	// +optional
+	WorkflowFrom *ConfigMapKeyReference `json:"workflowFrom,omitempty"`
 	// OutputSchema constrains successful terminal output when this template is
 	// compiled as the root agent.
 	// +optional

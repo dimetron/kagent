@@ -83,6 +83,21 @@ describe("the agent template draft", () => {
     expect(spec.promptTemplate).toEqual(template.resource.spec.promptTemplate);
   });
 
+  it("keeps workflowFrom, which the form does not author, through a save", () => {
+    const template = templateWithExtras();
+    // A workflow root has no prompt: the CRD rejects workflowFrom beside one.
+    delete template.resource.spec.systemPrompt;
+    template.resource.spec.workflowFrom = { name: "workflows", key: "agents.yaml" };
+
+    const spec = specFromDraft(draftFromTemplate(template), template.resource.spec);
+
+    expect(spec.workflowFrom, "an edit must not delete the workflow reference").toEqual({
+      name: "workflows",
+      key: "agents.yaml",
+    });
+    expect(spec.systemPrompt).toBeUndefined();
+  });
+
   it("round-trips the fields it does show", () => {
     const template = templateWithExtras();
     const spec = specFromDraft(

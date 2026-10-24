@@ -99,6 +99,13 @@ export interface AgentTemplateSpec {
   systemPrompt?: string;
   systemPromptFrom?: ConfigMapKeyRef;
   /**
+   * A same-namespace ConfigMap key containing an `adk.declarative/v0.2` AgentSystem
+   * document, as YAML or JSON. Only a root template on a BYO harness may set it, and
+   * the CRD rejects it together with `systemPrompt` or `systemPromptFrom`. The form
+   * does not author it; edits preserve it.
+   */
+  workflowFrom?: ConfigMapKeyRef;
+  /**
    * The JSON Schema for a successful terminal response from this template when it
    * runs as the root agent. Mutually exclusive with `outputSchemaFrom`.
    */

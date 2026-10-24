@@ -9,7 +9,9 @@
 //
 // Deploy through a BYO Harness. Process settings are loaded from the root
 // runtime object in /config/config.json. OPENAI_API_KEY remains a provider
-// credential.
+// credential. An AgentTemplate that sets spec.workflowFrom replaces the
+// embedded document: the controller validates it and delivers it in
+// /config/config.json.
 package main
 
 import (
@@ -33,6 +35,7 @@ import (
 	"github.com/kagent-dev/kagent/go/adk/pkg/config"
 	"github.com/kagent-dev/kagent/go/adk/pkg/declarative"
 	"github.com/kagent-dev/kagent/go/adk/pkg/models"
+	configv1 "github.com/kagent-dev/kagent/go/api/gen/kagent/config/v1"
 	"github.com/kagent-dev/kagent/go/pkg/logging"
 )
 
@@ -107,6 +110,15 @@ func billReply(_ adkagent.Context, in any) (declarative.Result, error) {
 	return declarative.Output(fmt.Sprintf("Customer record: %v", in)), nil
 }
 
+// loadDocument prefers the document the controller validated and delivered
+// from AgentTemplate.spec.workflowFrom, and falls back to the embedded one.
+func loadDocument(reg *declarative.Registry, delivered *configv1.ADKWorkflowConfig) (*declarative.Spec, error) {
+	if delivered != nil {
+		return reg.ParseConfig(delivered)
+	}
+	return reg.Parse(agentsDocument)
+}
+
 func main() {
 	if err := config.MaterializeFromEnv("/config"); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -131,9 +143,9 @@ func main() {
 		logger.Error("failed to create registry", "error", err)
 		os.Exit(1)
 	}
-	spec, err := reg.Parse(agentsDocument)
+	spec, err := loadDocument(reg, compiled.GetAgent().GetWorkflow())
 	if err != nil {
-		logger.Error("failed to parse agents.yaml", "error", err)
+		logger.Error("failed to load the agent document", "error", err)
 		os.Exit(1)
 	}
 	system, err := declarative.Build(ctx, spec, reg)

@@ -37,6 +37,9 @@ message ADKAgentConfig {
   string skills_directory = 16;
   repeated ADKAgentConfig sub_agents = 17;
   ADKOutputConfig output = 18;
+  // workflow carries a declarative AgentSystem document for BYO images. The
+  // managed runtimes reject it.
+  ADKWorkflowConfig workflow = 19;
 }
 
 // ADKModelConfig shares transport settings across a single selected provider.
@@ -357,6 +360,17 @@ message ADKOutputConfig {
   // Canonical JSON bytes retain the exact schema hashed by the compiler.
   bytes json_schema = 1;
   string sha256 = 2;
+}
+
+// ADKWorkflowConfig is an adk.declarative AgentSystem document that the
+// controller validated. The BYO image owns the Go behavior the document names.
+message ADKWorkflowConfig {
+  // Canonical JSON bytes retain the exact document hashed by the compiler.
+  bytes document = 1 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 65536
+  }];
+  string sha256 = 2 [(buf.validate.field).string = {pattern: "^[0-9a-f]{64}$"}];
 }
 message ADKAgentPlugins {
   repeated ADKSkill skills = 1;
